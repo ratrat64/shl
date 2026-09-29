@@ -34,9 +34,29 @@ test('build produces a minimal site, copies the map and CNAME, and cleans stale 
   assert.equal(await f.read('CNAME'), 'go.example.com\n');
   assert.equal(await f.read('.nojekyll'), '');
   await assert.rejects(f.read('stale.html'), { code: 'ENOENT' });
-  assert.doesNotMatch(await f.read('index.html'), /example\.com|Mixed|Example/);
+  assert.match(await f.read('index.html'), /href="\.\/Mixed\/">Mixed<\/a> — Example/);
   assert.match(await f.read('Mixed/index.html'), /http-equiv="refresh"/);
   assert.match(await f.read('plain/index.html'), /http:\/\/example.org\//);
+});
+
+test('homepage lists sorted links safely with project-relative URLs and handles an empty map', async (t) => {
+  const url = 'https://example.com/?q=<img>&x="quoted"';
+  const f = await fixture(t, { zebra: url, Alpha: { url, title: '<script>title</script>' }, beta: { url, title: '' } });
+  assert.equal(f.build().status, 0);
+  const html = await f.read('index.html');
+  const codes = [...html.matchAll(/class="code" href="([^"]+)">([^<]+)<\/a>/g)];
+  assert.deepEqual(codes.map((match) => match[2]), ['Alpha', 'beta', 'zebra']);
+  for (const [, href, code] of codes) {
+    for (const prefix of ['/', '/project/']) {
+      assert.equal(new URL(href, `https://example.org${prefix}`).pathname, `${prefix}${code}/`);
+    }
+  }
+  assert.match(html, /&lt;script&gt;title&lt;\/script&gt;/);
+  assert.match(html, /https:\/\/example\.com\/\?q=&lt;img&gt;&amp;x=&quot;quoted&quot;/);
+  assert.doesNotMatch(html, /<script|<img|undefined/);
+  const empty = await fixture(t, {});
+  assert.equal(empty.build().status, 0);
+  assert.match(await empty.read('index.html'), /No links available yet\./);
 });
 
 test('redirect script safely preserves destinations containing HTML and quotes', async (t) => {
@@ -52,6 +72,51 @@ test('redirect script safely preserves destinations containing HTML and quotes',
   assert.match(html, /&lt;img/);
 });
 
+test('script launchers are opt-in, quote URLs, forward arguments and statuses, and clean up', async (t) => {
+  const url = 'https://example.com/setup.sh?q=\'";printf injected;#$(printf expanded)&x=`printf backticks`\\path\nnext';
+  const f = await fixture(t, { Run: { url, script: true }, disabled: { url, script: false }, plain: url });
+  const build = f.build();
+  assert.equal(build.status, 0, build.stderr);
+  const launcher = await f.read('Run.sh');
+  assert.match(await f.read('Run/index.html'), /http-equiv="refresh"/);
+  await assert.rejects(f.read('disabled.sh'), { code: 'ENOENT' });
+  await assert.rejects(f.read('plain.sh'), { code: 'ENOENT' });
+
+  const log = join(f.cwd, 'curl.json');
+  const payload = 'printf \'%s\\n\' "$@"\nexit "$SCRIPT_STATUS"\n';
+  await writeFile(join(f.cwd, 'curl'), `#!/usr/bin/env node
+const { writeFileSync } = require('node:fs');
+const args = process.argv.slice(2);
+writeFileSync(process.env.CURL_LOG, JSON.stringify(args));
+writeFileSync(args[args.indexOf('-o') + 1], ${JSON.stringify(payload)});
+process.exit(Number(process.env.CURL_STATUS));
+`, { mode: 0o755 });
+
+  const args = ['--verbose', 'two words', '', '$HOME; $(printf injected)'];
+  // Even failed/partial downloads leave executable content: it must never run.
+  for (const [curlStatus, scriptStatus] of [[0, 0], [0, 7], [22, 0], [18, 0]]) {
+    const result = spawnSync('bash', ['-s', '--', ...args], {
+      cwd: f.cwd,
+      input: launcher,
+      encoding: 'utf8',
+      timeout: 5000,
+      env: {
+        ...process.env,
+        PATH: `${f.cwd}:${process.env.PATH}`,
+        TMPDIR: f.cwd,
+        CURL_LOG: log,
+        CURL_STATUS: String(curlStatus),
+        SCRIPT_STATUS: String(scriptStatus),
+      },
+    });
+    assert.equal(result.status, curlStatus || scriptStatus, result.stderr);
+    assert.equal(result.stdout, curlStatus ? '' : args.join('\n') + '\n');
+    const request = JSON.parse(await readFile(log, 'utf8'));
+    assert.equal(request.at(-1), url);
+    await assert.rejects(readFile(request[request.indexOf('-o') + 1]), { code: 'ENOENT' });
+  }
+});
+
 test('invalid input fails before replacing an existing build', async (t) => {
   const cases = [
     null, [], 'https://example.com',
@@ -61,6 +126,9 @@ test('invalid input fails before replacing an existing build', async (t) => {
     { code: '/relative' }, { '.hidden': 'https://example.com' },
     { '../escape': 'https://example.com' }, { INDEX: 'https://example.com' },
     { gh: 'https://example.com', GH: 'https://example.org' },
+    ...[null, 'true', 1, [], {}].map((script) => ({ code: { url: 'https://example.com', script } })),
+    { code: { url: 'https://example.com', script: true }, 'code.sh': 'https://example.org' },
+    { 'CODE.SH': 'https://example.org', code: { url: 'https://example.com', script: true } },
   ];
   const f = await fixture(t, {});
   await mkdir(join(f.cwd, 'dist'));
@@ -77,7 +145,7 @@ test('invalid input fails before replacing an existing build', async (t) => {
 });
 
 test('404 script resolves root and project links with either casing and trailing slash', async (t) => {
-  const map = { Mixed: { url: 'https://example.com/' }, plain: 'https://example.org/' };
+  const map = { Mixed: { url: 'https://example.com/', script: true }, plain: 'https://example.org/' };
   const f = await fixture(t, map);
   assert.equal(f.build().status, 0);
   const [script] = scripts(await f.read('404.html'));
