@@ -9,8 +9,9 @@ and GitHub Actions deploys it on every push to `main`.
 1. Create a GitHub repository with these files and a `main` branch. A public
    repository works with GitHub Pages on GitHub Free.
 2. Settings → Pages → **Source: GitHub Actions**.
-3. Edit `links.json` with your links, then push to `main`. The workflow checks,
-   builds, and deploys. Wait for **Actions → Deploy short links** to finish.
+3. Edit `links.json` with your links on a branch and open a pull request to `main`.
+   Once checks pass, merge it. The deployment workflow checks, builds, and deploys.
+   Wait for **Actions → Deploy short links** to finish.
 
 Your links live at `https://<user>.github.io/<repo>/<code>`. Want bare
 `go.example.com/<code>`? Add a root `CNAME` file containing only `go.example.com`
@@ -21,7 +22,7 @@ follow [GitHub's DNS instructions](https://docs.github.com/en/pages/configuring-
 
 ## Adding a link
 
-Edit `links.json`, commit, done:
+Edit `links.json` on a branch and submit a pull request:
 
 ```json
 {
@@ -32,13 +33,29 @@ Edit `links.json`, commit, done:
 
 Short form is just `"code": "url"`. Long form adds an optional string `title` shown
 on the redirect fallback page. You can edit the file in GitHub's web editor;
-the links become live after the commit to `main` finishes deploying.
+choose to create a branch and pull request. The links become live after the merge
+to `main` finishes deploying.
 
 Codes start with an ASCII letter or number, followed by letters, numbers, `.`,
 `_`, or `-`. `index`, `404`, `assets`, and `links` are reserved in any casing.
 Two codes cannot differ only by case. Destinations must be absolute HTTP or HTTPS
 URLs. Edit a destination to retarget a link; delete its entry to remove it on the
 next deployment.
+
+## Pull request checks
+
+Every pull request targeting `main` runs **Check pull request**, using Node.js 22
+on Ubuntu. The **PR validation** job runs `node --test build.test.mjs` followed by
+`node build.mjs`: tests cover regression cases, and the build validates the proposed
+`links.json`. New commits rerun checks and cancel older runs for the same PR.
+PR checks have read-only repository permissions and do not deploy the site.
+
+For your own repository, configure an active branch ruleset under **Settings →
+Rules → Rulesets**, targeting `main`. Require a pull request and the **PR validation**
+status check from GitHub Actions, with the branch up to date before merging.
+No approving review is required by this baseline; add one if your team needs it.
+Run the workflow on an initial PR if the check is not yet available in the picker.
+Merging to `main` triggers the existing production deployment.
 
 ## Local build
 
