@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Turns links.json into a static site: one folder per short code, each with an
-// instant redirect. No dependencies, no server.
+// instant redirect and optional Bash launcher. No dependencies, no server.
 
 import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -34,10 +34,13 @@ for (const [code, value] of Object.entries(raw)) {
   const url = typeof value === 'string' ? value : value?.url;
   const title = typeof value === 'object' ? value?.title ?? '' : '';
   if (typeof value !== 'string' && (!value || typeof value !== 'object' || Array.isArray(value))) {
-    problems.push(`"${code}" — expected a URL string or an object with url and optional title`);
+    problems.push(`"${code}" — expected a URL string or an object with url, optional title and script`);
   }
   if (typeof value === 'object' && value && 'title' in value && typeof value.title !== 'string') {
     problems.push(`"${code}" — title must be a string`);
+  }
+  if (typeof value === 'object' && value && 'script' in value && typeof value.script !== 'boolean') {
+    problems.push(`"${code}" — script must be a boolean`);
   }
 
   if (!CODE_RE.test(code)) problems.push(`"${code}" — codes must start with a letter or number and contain only letters, numbers, . _ -`);
@@ -54,7 +57,14 @@ for (const [code, value] of Object.entries(raw)) {
   if (seen.has(key)) problems.push(`"${code}" — collides with "${seen.get(key)}" (codes are matched case-insensitively)`);
   seen.set(key, code);
 
-  links.push({ code, url, title });
+  links.push({ code, url, title, script: value?.script === true });
+}
+
+for (const { code, script } of links) {
+  const filename = `${code}.sh`;
+  if (script && seen.has(filename.toLowerCase())) {
+    problems.push(`"${code}" — launcher "${filename}" collides with code "${seen.get(filename.toLowerCase())}"`);
+  }
 }
 
 if (problems.length) {
@@ -67,6 +77,16 @@ if (problems.length) {
 
 // HTML's script parser recognizes </script> even inside a JavaScript string.
 const scriptString = (value) => JSON.stringify(value).replace(/</g, '\\u003c');
+
+const shellString = (value) => "'" + value.replace(/'/g, "'\\''") + "'";
+
+const scriptLauncher = ({ url }) => `#!/usr/bin/env bash
+set -euo pipefail
+script=$(mktemp)
+trap 'rm -f "$script"' EXIT
+curl -fsSL -o "$script" -- ${shellString(url)}
+bash "$script" "$@"
+`;
 
 const redirectPage = ({ url, title }) => `<!doctype html>
 <html lang="en">
@@ -187,6 +207,7 @@ await mkdir(OUT, { recursive: true });
 for (const link of links) {
   await mkdir(join(OUT, link.code), { recursive: true });
   await writeFile(join(OUT, link.code, 'index.html'), redirectPage(link));
+  if (link.script) await writeFile(join(OUT, `${link.code}.sh`), scriptLauncher(link));
 }
 
 await writeFile(join(OUT, 'index.html'), indexPage());
