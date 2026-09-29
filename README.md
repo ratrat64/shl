@@ -42,6 +42,41 @@ Two codes cannot differ only by case. Destinations must be absolute HTTP or HTTP
 URLs. Edit a destination to retarget a link; delete its entry to remove it on the
 next deployment.
 
+## Running Bash scripts
+
+Set `"script": true` on a link object to generate an additional `<code>.sh`
+launcher alongside its browser redirect:
+
+```json
+{
+  "ohmyposh-setup-stable": {
+    "url": "https://raw.githubusercontent.com/ratrat64/homelab-public/refs/heads/main/scripts/ubuntu/oh-my-posh/setup.sh",
+    "script": true
+  }
+}
+```
+
+After deployment, use the `.sh` URL for remote execution:
+
+```bash
+curl -fsSL https://ratrat64.github.io/shortlink/ohmyposh-setup-stable.sh | bash
+
+# Arguments are forwarded to the destination script:
+curl -fsSL https://ratrat64.github.io/shortlink/ohmyposh-setup-stable.sh | bash -s -- --verbose
+```
+
+Use the code's exact casing, with `.sh` and **no trailing slash**. The browser
+URL ending in `/<code>/` returns HTML, which `curl -L` cannot follow.
+
+Launchers require Bash, curl, mktemp, and rm. Each run downloads the current
+destination into a temporary file, executes it only after a successful download,
+and removes it on exit. Download failures and the script's exit status are
+returned by the launcher.
+
+The `script` field must be a boolean; omitting it or setting it to `false` produces
+only the browser redirect. A generated `<code>.sh` must not collide with another
+short code, regardless of casing.
+
 ## Pull request checks
 
 Every pull request targeting `main` runs **Check pull request**, using Node.js 22
@@ -59,7 +94,7 @@ Merging to `main` triggers the existing production deployment.
 
 ## Local build
 
-Use Node.js 22. No package installation is needed.
+Use Node.js 22; launcher tests also require Bash. No package installation is needed.
 
 ```bash
 node --test build.test.mjs # validation and generated-script regression checks
@@ -68,12 +103,13 @@ npx serve dist          # optional preview
 ```
 
 Run from the repository root. A successful build replaces `dist/` completely;
-edit the HTML templates in `build.mjs`, not the generated files. Validation fails
+edit the templates in `build.mjs`, not the generated files. Validation fails
 before the old output is removed. URL syntax is checked, but destination
 reachability is not.
 
 For a focused check: `node --test --test-name-pattern="404" build.test.mjs`.
-The checks execute generated JavaScript in Node with simulated browser APIs.
+The checks execute generated JavaScript in Node with simulated browser APIs,
+and Bash launchers with a stubbed downloader.
 After deploying, smoke-test a known code, a wrong-case code (with and without a
 trailing slash), and an unknown code in a browser. Repeat under a project prefix
 when changing routing; local preview servers may serve 404 pages differently
@@ -84,9 +120,12 @@ from GitHub Pages.
 - `dist/<code>/index.html` — canonical link, meta refresh, and `location.replace`.
   These are browser redirects, not HTTP 301/302 responses; `curl -L` does not
   follow them. A clickable fallback is included.
+- `dist/<code>.sh` — an opt-in Bash launcher for links with `"script": true`.
 - `dist/404.html` — GitHub Pages serves this for anything unmatched. It reads
   `links.json` client-side and catches wrong-case codes before giving up.
-- `dist/index.html` — a minimal landing page without a link directory.
+- `dist/index.html` — a directory of all links, sorted by code, showing optional
+  titles and destination URLs. Select a code to follow its short link. The directory
+  is generated at build time and updates on each deployment.
 
 Routing supports both user-site roots and project-site prefixes. Wrong-case
 requests rely on Pages serving `404.html`; JavaScript fetches the public link map
@@ -96,6 +135,6 @@ variable is required.
 ## Limits
 
 Published destinations are public, including `links.json` and redirect pages,
-even though the homepage does not list them. There is no backend, database,
+and the homepage lists all links. There is no backend, database,
 anonymous link submission, or built-in click tracking. Managing links is a
 repository edit followed by a deployment.

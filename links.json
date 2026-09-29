@@ -8,5 +8,8 @@
     "url": "https://www.powershellgallery.com/",
     "title": "PowerShell Gallery"
   },
-  "ohmyposh-setup-stable": "https://raw.githubusercontent.com/ratrat64/homelab-public/refs/heads/main/scripts/ubuntu/oh-my-posh/setup.sh"
+  "ohmyposh-setup-stable": {
+    "url": "https://raw.githubusercontent.com/ratrat64/homelab-public/refs/heads/main/scripts/ubuntu/oh-my-posh/setup.sh",
+    "script": true
+  }
 }
