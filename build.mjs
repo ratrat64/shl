@@ -94,9 +94,9 @@ const redirectPage = ({ url, title }) => `<!doctype html>
 `;
 
 const styles = `
-  :root{--bg:#fff;--ink:#1a1d24;--muted:#5d6472;--rule:#e4e6ec;--accent:#0b6e4f}
+  :root{--bg:#fff;--ink:#1a1d24;--muted:#5d6472;--accent:#0b6e4f}
   @media(prefers-color-scheme:dark){
-    :root{--bg:#12151c;--ink:#e6e8ee;--muted:#949cad;--rule:#272c37;--accent:#5fd0a3}
+    :root{--bg:#12151c;--ink:#e6e8ee;--muted:#949cad;--accent:#5fd0a3}
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);padding:clamp(1.5rem,6vw,5rem);
@@ -104,16 +104,10 @@ const styles = `
   main{max-width:46rem;margin:0 auto}
   h1{font-size:1.4rem;font-weight:600;letter-spacing:-.01em;margin:0 0 .25rem}
   .sub{color:var(--muted);margin:0 0 2.5rem}
-  ul{list-style:none;padding:0;margin:0}
-  li{border-top:1px solid var(--rule);padding:.9rem 0;display:flex;flex-wrap:wrap;
-     gap:.25rem 1rem;align-items:baseline}
-  li:last-child{border-bottom:1px solid var(--rule)}
   .code{font:600 .95rem/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;
         color:var(--accent);text-decoration:none;min-width:8rem}
   .code:hover,.code:focus-visible{text-decoration:underline}
-  .dest{color:var(--muted);font-size:.9rem;overflow-wrap:anywhere;flex:1}
-  footer{margin-top:2.5rem;color:var(--muted);font-size:.85rem}
-  a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 `;
 
 const indexPage = () => `<!doctype html>
@@ -157,10 +151,6 @@ const notFoundPage = () => `<!doctype html>
   const seg = parts.pop() || '';
   const base = (parts.join('/') || '') + '/';   // works on user AND project pages
   document.getElementById('home').href = base;
-  const done = (h, m) => {
-    document.getElementById('head').textContent = h;
-    document.getElementById('msg').textContent = m;
-  };
   for (const path of [base + 'links.json', '/links.json']) {
     try {
       const res = await fetch(path, { cache: 'no-cache' });
@@ -174,7 +164,8 @@ const notFoundPage = () => `<!doctype html>
       break;
     } catch (e) { /* try next */ }
   }
-  done('Link not found', seg ? '"' + seg + '" is not a short link here.' : 'That address does not exist.');
+  document.getElementById('head').textContent = 'Link not found';
+  document.getElementById('msg').textContent = seg ? '"' + seg + '" is not a short link here.' : 'That address does not exist.';
 })();
 </script>
 </body>
