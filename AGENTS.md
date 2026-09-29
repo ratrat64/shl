@@ -4,6 +4,9 @@
 - Before making changes, create one task branch and a separate Git worktree; do the work and run checks there. Keep related features for the task together in that worktree.
 - Preserve existing uncommitted work when consolidating changes from other worktrees.
 
+## Git permissions
+- The user authorizes agents to write commit messages, commit task changes, push commits, and publish new branches without asking again for each operation.
+
 ## Build and verification
 - Use Node.js 22 (the CI version). Launcher tests also require Bash. There is no package manifest or dependency-install step.
 - CI runs `node --test build.test.mjs` then `node build.mjs`. Run from the repository root: build input and output paths are relative to the working directory. No lint or typecheck suite is configured.
