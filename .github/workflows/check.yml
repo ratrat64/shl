@@ -17,10 +17,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check changed files
+        id: changes
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if git diff --quiet "$BASE" HEAD -- . ':(exclude)AGENTS.md'; then
+            echo 'AGENTS.md-only change; skipping tests and build'
+            echo 'run_checks=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'run_checks=true' >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/setup-node@v4
+        if: steps.changes.outputs.run_checks == 'true'
         with:
           node-version: 22
       - name: Test
+        if: steps.changes.outputs.run_checks == 'true'
         run: node --test build.test.mjs
       - name: Build
+        if: steps.changes.outputs.run_checks == 'true'
         run: node build.mjs

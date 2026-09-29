@@ -84,6 +84,8 @@ on Ubuntu. The **PR validation** job runs `node --test build.test.mjs` followed 
 `node build.mjs`: tests cover regression cases, and the build validates the proposed
 `links.json`. New commits rerun checks and cancel older runs for the same PR.
 PR checks have read-only repository permissions and do not deploy the site.
+For PRs changing only `AGENTS.md`, the required job succeeds without running
+Node.js tests or a build; mixed changes still run both.
 
 For your own repository, configure an active branch ruleset under **Settings →
 Rules → Rulesets**, targeting `main`. Require a pull request and the **PR validation**
