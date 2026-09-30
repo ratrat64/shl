@@ -34,7 +34,8 @@ test('build produces a minimal site, copies the map and CNAME, and cleans stale 
   assert.equal(await f.read('CNAME'), 'go.example.com\n');
   assert.equal(await f.read('.nojekyll'), '');
   await assert.rejects(f.read('stale.html'), { code: 'ENOENT' });
-  assert.match(await f.read('index.html'), /href="\.\/Mixed\/">Mixed<\/a> — Example/);
+  assert.match(await f.read('index.html'), /href="\.\/Mixed\/">Mixed<\/a>/);
+  assert.match(await f.read('index.html'), /class="link-title">Example/);
   assert.match(await f.read('Mixed/index.html'), /http-equiv="refresh"/);
   assert.match(await f.read('plain/index.html'), /http:\/\/example.org\//);
 });
@@ -53,9 +54,11 @@ Run:
     const f = await fixture(t, yaml, source);
     const result = f.build();
     assert.equal(result.status, 0, result.stderr);
-    for (const path of ['links.json', 'index.html', '404.html', 'Run/index.html', 'Run.sh']) {
+    for (const path of ['links.json', '404.html', 'Run/index.html', 'Run.sh']) {
       assert.equal(await f.read(path), await json.read(path), `${source}: ${path}`);
     }
+    assert.match(await f.read('index.html'), new RegExp(`in <code>${source.replace('.', '\\.')}<\\/code>`));
+    assert.match(await f.read('guide/index.html'), new RegExp(`<code>${source.replace('.', '\\.')}<\\/code>`));
     assert.deepEqual(JSON.parse(await f.read('links.json')), links);
   }
 });
@@ -106,43 +109,78 @@ test('homepage lists sorted links safely with project-relative URLs and handles 
   }
   assert.match(html, /&lt;script&gt;title&lt;\/script&gt;/);
   assert.match(html, /https:\/\/example\.com\/\?q=&lt;img&gt;&amp;x=&quot;quoted&quot;/);
-  assert.doesNotMatch(html, /<script|<img|undefined/);
+  assert.doesNotMatch(html, /<script>title|<img|undefined/);
   const empty = await fixture(t, {});
   assert.equal(empty.build().status, 0);
   assert.match(await empty.read('index.html'), /No links available yet\./);
 });
 
-test('nested JSON and YAML build browseable directories and path-based redirects', async (t) => {
-  const links = {
-    tools: { git: 'https://git-scm.com/', editors: { Code: { url: 'https://example.org/?x=<img>&q="', title: '<Editor>' } } },
-    gh: 'https://github.com/',
-  };
-  const json = await fixture(t, links);
-  assert.equal(json.build().status, 0);
-  const home = await json.read('index.html');
+test('nested JSON and YAML build themed directory pages and redirects', async (t) => {
+  const links = { tools: { git: 'https://git-scm.com/', editors: { Code: { url: 'https://example.org/?x=<img>&q="', title: '<Editor>' } } }, gh: 'https://github.com/' };
+  const f = await fixture(t, links);
+  assert.equal(f.build().status, 0);
+  const home = await f.read('index.html');
   assert.match(home, /<details><summary>tools<\/summary>/);
   assert.match(home, /href="\.\/tools\/">Browse tools<\/a>/);
-  assert.match(home, /href="\.\/tools\/editors\/Code\/">Code<\/a> — &lt;Editor&gt;/);
+  assert.match(home, /href="\.\/tools\/editors\/Code\/">Code<\/a>/);
+  assert.match(home, /class="link-title">&lt;Editor&gt;/);
   assert.doesNotMatch(home, /<img>/);
-  const tools = await json.read('tools/index.html');
+  const tools = await f.read('tools/index.html');
+  assert.match(tools, /href="\.\.\/assets\/site\.css"/);
   assert.match(tools, /href="\.\/git\/">git<\/a>/);
   assert.match(tools, /href="\.\/editors\/">Browse editors<\/a>/);
-  const editors = await json.read('tools/editors/index.html');
+  const editors = await f.read('tools/editors/index.html');
+  assert.match(editors, /href="\.\.\/\.\.\/assets\/site\.css"/);
   assert.match(editors, /href="\.\.\/\.\.\/">Home<\/a>/);
   assert.match(editors, /href="\.\.\/">tools<\/a>/);
   assert.match(editors, /href="\.\/Code\/">Code<\/a>/);
   for (const prefix of ['/', '/project/']) {
     assert.equal(new URL('./tools/editors/Code/', `https://example.org${prefix}`).pathname, `${prefix}tools/editors/Code/`);
   }
-  assert.match(await json.read('tools/git/index.html'), /https:\/\/git-scm\.com\//);
-  assert.match(await json.read('tools/editors/Code/index.html'), /&lt;img&gt;/);
-  assert.deepEqual(JSON.parse(await json.read('links.json')), links);
-
+  assert.match(await f.read('tools/git/index.html'), /https:\/\/git-scm\.com\//);
+  assert.match(await f.read('tools/editors/Code/index.html'), /&lt;img&gt;/);
+  assert.deepEqual(JSON.parse(await f.read('links.json')), links);
   const yaml = await fixture(t, 'tools:\n  git: https://git-scm.com/\n  editors:\n    Code:\n      url: https://example.org/?x=<img>&q="\n      title: <Editor>\ngh: https://github.com/\n', 'links.yaml');
   assert.equal(yaml.build().status, 0);
-  for (const path of ['index.html', 'tools/index.html', 'tools/editors/index.html', 'tools/editors/Code/index.html', 'links.json']) {
-    assert.equal(await yaml.read(path), await json.read(path), path);
+  for (const path of ['links.json', 'tools/editors/Code/index.html']) {
+    assert.equal(await yaml.read(path), await f.read(path), path);
   }
+  assert.match(await yaml.read('tools/editors/index.html'), /href="\.\/Code\/">Code<\/a>/);
+});
+
+test('information pages use relative navigation and shared theme assets', async (t) => {
+  const f = await fixture(t, { aboutme: 'https://example.org/' });
+  assert.equal(f.build().status, 0);
+  const home = await f.read('index.html');
+  assert.match(home, /href="\.\/assets\/site\.css"/);
+  assert.match(home, /href="\.\/about\/"/);
+  for (const page of ['about', 'guide', 'how-it-works']) {
+    const html = await f.read(`${page}/index.html`);
+    assert.match(html, /href="\.\.\/assets\/site\.css"/);
+    assert.match(html, /src="\.\.\/assets\/theme\.js"/);
+    assert.match(html, /href="\.\.\/"/);
+  }
+  assert.match(await f.read('assets/site.css'), /data-theme=dark/);
+  assert.match(await f.read('assets/theme.js'), /shortlink-theme/);
+  assert.match(await f.read('guide/index.html'), /github\.com\/ratrat64\/shortlink#readme/);
+});
+
+test('ads are off by default, safely rendered when enabled, and validated before deleting output', async (t) => {
+  const f = await fixture(t, {});
+  assert.equal(f.build().status, 0);
+  assert.doesNotMatch(await f.read('index.html'), /class="sponsor"/);
+  await writeFile(join(f.cwd, 'ads.json'), JSON.stringify({ enabled: true, directory: {
+    label: '<script>bad</script>', text: 'Try this & that', url: 'https://example.org/?a=1&b=2',
+  } }));
+  assert.equal(f.build().status, 0);
+  const html = await f.read('index.html');
+  assert.match(html, /aria-label="Advertisement"/);
+  assert.match(html, /&lt;script&gt;bad&lt;\/script&gt;/);
+  assert.match(html, /rel="sponsored noopener noreferrer"/);
+  assert.doesNotMatch(await f.read('guide/index.html'), /class="sponsor"/);
+  await writeFile(join(f.cwd, 'ads.json'), JSON.stringify({ enabled: true, directory: { label: 'Bad', text: 'Bad', url: 'javascript:alert(1)' } }));
+  assert.equal(f.build().status, 1);
+  assert.match(await f.read('index.html'), /Try this &amp; that/);
 });
 
 test('redirect script safely preserves destinations containing HTML and quotes', async (t) => {
@@ -213,6 +251,7 @@ test('invalid input fails before replacing an existing build', async (t) => {
     { code: 'https://' }, { code: 'https://bad host/' }, { code: 'javascript:alert(1)' },
     { code: '/relative' }, { '.hidden': 'https://example.com' },
     { '../escape': 'https://example.com' }, { INDEX: 'https://example.com' },
+    ...['about', 'GUIDE', 'how-it-works'].map((code) => ({ [code]: 'https://example.com' })),
     { gh: 'https://example.com', GH: 'https://example.org' },
     { tools: { Git: 'https://example.com', git: 'https://example.org' } },
     { tools: { 'index.html': 'https://example.com' } },

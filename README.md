@@ -4,6 +4,10 @@ A URL shortener that runs entirely on GitHub Pages. A JSON or YAML link map is
 the source of truth; a build step turns each entry into a static folder with an
 instant redirect, and GitHub Actions deploys it on every push to `main`.
 
+The generated site includes a browsable directory, an About page, a setup guide,
+and a How it works page. It follows the system light/dark preference; visitors
+can override it with the Theme button, saved in their browser.
+
 ## Setup
 
 1. Create a GitHub repository with these files and a `main` branch. A public
@@ -36,7 +40,7 @@ on the redirect fallback page. You can edit the file in GitHub's web editor;
 choose to create a branch and pull request. The links become live after the merge
 to `main` finishes deploying.
 
-Use nested objects for directories, in JSON or YAML. For example:
+Nest objects to create directories in JSON or YAML:
 
 ```json
 {
@@ -51,14 +55,14 @@ Use nested objects for directories, in JSON or YAML. For example:
 
 This creates browseable `/tools/` and `/tools/editors/` pages and redirect URLs
 `/tools/git/` and `/tools/editors/code/`. The homepage has expandable directories;
-each directory page also lists its links and subdirectories. Existing top-level
-links keep their URLs. Directory names are their display labels, and a directory
-must contain at least one entry. A path cannot be both a directory and a redirect.
+each directory page also lists links and subdirectories. Existing top-level links
+keep their URLs. Directory names are their display labels, and a directory must
+contain at least one entry. A path cannot be both a directory and a redirect.
 
 Each path segment starts with an ASCII letter or number, followed by letters,
-numbers, `.`, `_`, or `-`. `index`, `404`, `assets`, `links`, and generated
-filenames (such as `index.html`) are reserved in any casing. Siblings cannot
-differ only by case. Destinations must be absolute HTTP or HTTPS
+numbers, `.`, `_`, or `-`. `index`, `404`, `assets`, `links`, `about`, `guide`,
+`how-it-works`, and generated filenames (such as `index.html`) are reserved in
+any casing. Siblings cannot differ only by case. Destinations must be absolute HTTP or HTTPS
 URLs. Edit a destination to retarget a link; delete its entry to remove it on the
 next deployment.
 
@@ -101,7 +105,7 @@ curl -fsSL https://ratrat64.github.io/shortlink/ohmyposh-setup-stable.sh | bash 
 ```
 
 Use the full link path's exact casing, with `.sh` and **no trailing slash**. The browser
-URL ending in `/<code>/` returns HTML, which `curl -L` cannot follow.
+URL ending in `/<path>/` returns HTML, which `curl -L` cannot follow.
 
 Launchers require Bash, curl, mktemp, and rm. Each run downloads the current
 destination into a temporary file, executes it only after a successful download,
@@ -110,7 +114,7 @@ returned by the launcher.
 
 The `script` field must be a boolean; omitting it or setting it to `false` produces
 only the browser redirect. A generated `<code>.sh` must not collide with another
-short code, regardless of casing.
+short code or directory in the same folder, regardless of casing.
 
 ## Pull request checks
 
@@ -128,6 +132,28 @@ status check from GitHub Actions, with the branch up to date before merging.
 No approving review is required by this baseline; add one if your team needs it.
 Run the workflow on an initial PR if the check is not yet available in the picker.
 Merging to `main` triggers the existing production deployment.
+
+## Optional advertisements
+
+`ads.json` controls two text-only placements: `directory` (beside the link
+list) and `guide` (at the end of the setup guide). They are off by default.
+To show them, set `enabled` to `true` and fill in either slot:
+
+```json
+{
+  "enabled": true,
+  "directory": {
+    "label": "Your sponsor name",
+    "text": "A short description of the offer.",
+    "url": "https://example.com/"
+  },
+  "guide": null
+}
+```
+
+Set `enabled` back to `false` to hide all placements. Set an individual slot
+to `null` to hide only that slot. Only text and an HTTP(S) link are accepted;
+the build escapes displayed content and does not load ad scripts.
 
 ## Local build
 
@@ -168,7 +194,7 @@ from GitHub Pages.
 
 Routing supports both user-site roots and project-site prefixes. Wrong-case
 requests rely on Pages serving `404.html`; JavaScript fetches the public link map
-and matches the final path segment case-insensitively. No base-URL environment
+and matches the full relative path case-insensitively. No base-URL environment
 variable is required.
 
 ## Limits
