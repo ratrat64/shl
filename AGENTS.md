@@ -1,6 +1,7 @@
 # Working in this repository
 
 ## Branch and worktree workflow
+- Before creating a new branch or worktree, update local `main` from `origin/main` with a fast-forward pull.
 - Before making changes, create one task branch and a separate Git worktree; do the work and run checks there. Keep related features for the task together in that worktree.
 - Preserve existing uncommitted work when consolidating changes from other worktrees.
 - If `main` advances during feature work, check whether the feature needs changes to align with it; if so, make a plan for those changes before editing.
