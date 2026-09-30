@@ -7,6 +7,8 @@ instant redirect, and GitHub Actions deploys it on every push to `main`.
 The generated site includes a browsable directory, an About page, a setup guide,
 and a How it works page. It follows the system light/dark preference; visitors
 can override it with the Theme button, saved in their browser.
+Search on the homepage and each directory page filters the visible links by code,
+title, or destination (including nested links). Browsing still works without JavaScript.
 
 ## Setup
 

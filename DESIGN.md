@@ -37,7 +37,7 @@ rounded:
 
 **Creative North Star: "The Bookmark Register"**
 
-A quiet, precise index: codes, destinations, and practical guidance are the material. The UI keeps the link directory visible without requiring an account or a search interface.
+A quiet, precise index: codes, destinations, and practical guidance are the material. The link directory stays visible before visitors use its optional search field.
 
 **Key Characteristics:**
 - Ruled entries instead of cards for the directory.
