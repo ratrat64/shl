@@ -118,7 +118,7 @@ short code or directory in the same folder, regardless of casing.
 
 ## Pull request checks
 
-Every pull request targeting `main` runs **Check pull request**, using Node.js 22
+Every pull request targeting `main` runs **Check pull request**, using Node.js 24
 on Ubuntu. The **PR validation** job runs `node --test build.test.mjs` followed by
 `node build.mjs`: tests cover regression cases, and the build validates the proposed
 link file. New commits rerun checks and cancel older runs for the same PR.
@@ -157,7 +157,7 @@ the build escapes displayed content and does not load ad scripts.
 
 ## Local build
 
-Use Node.js 22; launcher tests also require Bash. Install the YAML parser once:
+Use Node.js 24; launcher tests also require Bash. Install the YAML parser once:
 
 ```bash
 npm ci
