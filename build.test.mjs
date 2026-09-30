@@ -165,24 +165,6 @@ test('information pages use relative navigation and shared theme assets', async 
   assert.match(await f.read('guide/index.html'), /github\.com\/ratrat64\/shortlink#readme/);
 });
 
-test('ads are off by default, safely rendered when enabled, and validated before deleting output', async (t) => {
-  const f = await fixture(t, {});
-  assert.equal(f.build().status, 0);
-  assert.doesNotMatch(await f.read('index.html'), /class="sponsor"/);
-  await writeFile(join(f.cwd, 'ads.json'), JSON.stringify({ enabled: true, directory: {
-    label: '<script>bad</script>', text: 'Try this & that', url: 'https://example.org/?a=1&b=2',
-  } }));
-  assert.equal(f.build().status, 0);
-  const html = await f.read('index.html');
-  assert.match(html, /aria-label="Advertisement"/);
-  assert.match(html, /&lt;script&gt;bad&lt;\/script&gt;/);
-  assert.match(html, /rel="sponsored noopener noreferrer"/);
-  assert.doesNotMatch(await f.read('guide/index.html'), /class="sponsor"/);
-  await writeFile(join(f.cwd, 'ads.json'), JSON.stringify({ enabled: true, directory: { label: 'Bad', text: 'Bad', url: 'javascript:alert(1)' } }));
-  assert.equal(f.build().status, 1);
-  assert.match(await f.read('index.html'), /Try this &amp; that/);
-});
-
 test('redirect script safely preserves destinations containing HTML and quotes', async (t) => {
   const url = 'https://example.com/?q=</script><script>alert("x")</script>&a=\'quoted\'';
   const f = await fixture(t, { safe: { url, title: '<img src=x onerror=alert(1)>' } });
@@ -276,17 +258,16 @@ test('invalid input fails before replacing an existing build', async (t) => {
   assert.match(f.build().stderr, /Build stopped\. Fix links.json/);
 });
 
-test('404 resolves nested links and directory casing under root and project prefixes', async (t) => {
-  const map = { tools: { Git: 'https://git-scm.com/', editors: { Code: { url: 'https://example.org/' } } } };
+test('404 resolves root and nested paths under user and project sites', async (t) => {
+  const map = {
+    tools: { Git: 'https://git-scm.com/', editors: { Code: { url: 'https://example.org/' } } },
+    Mixed: { url: 'https://example.com/', script: true }, plain: 'https://example.org/',
+  };
   const f = await fixture(t, map);
   assert.equal(f.build().status, 0);
   const [script] = scripts(await f.read('404.html'));
   for (const prefix of ['/', '/project/']) {
-    for (const [path, expected] of [
-      ['TOOLS/git/', 'https://git-scm.com/'],
-      ['tools/EDITORS/code', 'https://example.org/'],
-      ['TOOLS/editors/', prefix + 'tools/editors/'],
-    ]) {
+    const visit = async (path, offline = false) => {
       const elements = { home: {}, head: {}, msg: {} };
       const requests = [];
       let destination;
@@ -295,54 +276,26 @@ test('404 resolves nested links and directory casing under root and project pref
         document: { getElementById: (id) => elements[id] },
         fetch: async (url) => {
           requests.push(url);
+          if (offline) throw new Error('offline');
           return url === prefix + 'links.json' ? { ok: true, json: async () => map } : { ok: false };
         },
       });
+      return { elements, requests, destination };
+    };
+    for (const [path, expected] of [
+      ['TOOLS/git/', map.tools.Git], ['tools/EDITORS/code', map.tools.editors.Code.url],
+      ['TOOLS/editors/', prefix + 'tools/editors/'],
+      ...['Mixed', 'mixed', 'MIXED/'].map((code) => [code, map.Mixed.url]),
+      ['plain', map.plain], ['PLAIN/', map.plain],
+    ]) {
+      const { elements, requests, destination } = await visit(path);
       assert.equal(destination, expected);
       assert.equal(elements.home.href, prefix);
       assert.equal(requests.at(-1), prefix + 'links.json');
     }
-    const elements = { home: {}, head: {}, msg: {} };
-    await runInNewContext(script, {
-      location: { pathname: prefix + 'tools/missing/', replace: () => assert.fail('unexpected redirect') },
-      document: { getElementById: (id) => elements[id] },
-      fetch: async (url) => url === prefix + 'links.json' ? { ok: true, json: async () => map } : { ok: false },
-    });
-    assert.equal(elements.head.textContent, 'Link not found');
-    assert.equal(elements.home.href, prefix);
-  }
-});
-
-test('404 script resolves root and project links with either casing and trailing slash', async (t) => {
-  const map = { Mixed: { url: 'https://example.com/', script: true }, plain: 'https://example.org/' };
-  const f = await fixture(t, map);
-  assert.equal(f.build().status, 0);
-  const [script] = scripts(await f.read('404.html'));
-  for (const prefix of ['/', '/project/']) {
-    for (const code of ['Mixed', 'mixed', 'MIXED/', 'plain', 'PLAIN/']) {
-      const elements = { home: {}, head: {}, msg: {} };
-      let destination;
-      await runInNewContext(script, {
-        location: { pathname: prefix + code, replace: (url) => { destination = url; } },
-        document: { getElementById: (id) => elements[id] },
-        fetch: async (path) => {
-          assert.equal(path, prefix + 'links.json');
-          return { ok: true, json: async () => map };
-        },
-      });
-      assert.equal(destination, code.toLowerCase().startsWith('plain') ? map.plain : map.Mixed.url);
-      assert.equal(elements.home.href, prefix);
-    }
-    for (const mode of ['missing', 'network failure']) {
-      const elements = { home: {}, head: {}, msg: {} };
-      await runInNewContext(script, {
-        location: { pathname: prefix + 'unknown/', replace: () => assert.fail('unexpected redirect') },
-        document: { getElementById: (id) => elements[id] },
-        fetch: async () => {
-          if (mode === 'network failure') throw new Error('offline');
-          return { ok: true, json: async () => map };
-        },
-      });
+    for (const [path, offline] of [['tools/missing/', false], ['unknown/', false], ['unknown/', true]]) {
+      const { elements, destination } = await visit(path, offline);
+      assert.equal(destination, undefined);
       assert.equal(elements.head.textContent, 'Link not found');
       assert.equal(elements.home.href, prefix);
     }

@@ -113,28 +113,6 @@ if (problems.length) {
   process.exit(1);
 }
 
-// Optional, build-time-only sponsor placements. Never inject raw markup.
-let ads = { enabled: false, directory: null, guide: null };
-try {
-  ads = { ...ads, ...JSON.parse(await readFile('ads.json', 'utf8')) };
-  if (typeof ads.enabled !== 'boolean') throw new Error('enabled must be a boolean');
-  for (const slot of ['directory', 'guide']) {
-    const item = ads[slot];
-    if (item === null || item === undefined) continue;
-    if (!item || typeof item !== 'object' || Array.isArray(item) ||
-        typeof item.label !== 'string' || typeof item.text !== 'string' || typeof item.url !== 'string') {
-      throw new Error(`${slot} must contain string label, text and url`);
-    }
-    const url = new URL(item.url);
-    if (!['http:', 'https:'].includes(url.protocol) || !url.hostname) throw new Error(`${slot} URL must be HTTP(S)`);
-  }
-} catch (error) {
-  if (error.code !== 'ENOENT') {
-    console.error(`Build stopped. Fix ads.json: ${error.message}`);
-    process.exit(1);
-  }
-}
-
 // ---- templates ------------------------------------------------------------
 
 // HTML's script parser recognizes </script> even inside a JavaScript string.
@@ -224,9 +202,6 @@ const styles = `
   .side{border-top:1px solid var(--ink);padding-top:1.2rem;color:var(--muted)}
   .side h2{color:var(--ink);font-size:1.25rem}.side p{font-size:.93rem}
   .side a{font-weight:600}
-  .sponsor{margin-top:2.5rem;padding:1.3rem;background:var(--panel);border:1px solid var(--line);border-radius:10px}
-  .sponsor small{display:block;color:var(--muted);font-size:.73rem;margin-bottom:.6rem;text-transform:uppercase;letter-spacing:.08em}
-  .sponsor p{margin:.35rem 0 0;color:var(--muted);font-size:.92rem}
   .prose{max-width:740px}.prose h2{margin-top:3.5rem}.prose p,.prose li{color:var(--muted)}
   .prose ol,.prose ul{padding-left:1.4rem}.prose li{padding-left:.35rem;margin-bottom:.8rem}
   .prose strong{color:var(--ink)}
@@ -255,10 +230,6 @@ const themeScript = `(() => {
     update();
   });
 })();`;
-
-const sponsor = (slot) => ads.enabled && ads[slot] ? `<aside class="sponsor" aria-label="Advertisement">
-  <small>Advertisement</small><a href="${esc(ads[slot].url)}" rel="sponsored noopener noreferrer">${esc(ads[slot].label)}</a>
-  <p>${esc(ads[slot].text)}</p></aside>` : '';
 
 const shell = (title, active, depth, content) => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -297,7 +268,7 @@ const indexPage = () => shell('Links', 'links', './', `
     ${links.length ? listing(raw) : `<p>No links available yet. Add your first entry to ${source} and rebuild the site.</p>`}
   </section><aside class="side"><h2>Simple by design.</h2>
   <p>Each shortcut is a static page made from a link in <code>${source}</code>. No account, database, or application server required.</p>
-  <p><a href="./about/">Why this approach ↗</a></p>${sponsor('directory')}</aside></div>`);
+  <p><a href="./about/">Why this approach ↗</a></p></aside></div>`);
 
 const directoryPage = ({ path, entries }) => shell(path.at(-1), 'links', '../'.repeat(path.length), `
   <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="${'../'.repeat(path.length)}">Home</a>${path.map((code, i) => ` / ${i < path.length - 1 ? `<a href="${'../'.repeat(path.length - i - 1)}">${esc(code)}</a>` : esc(code)}`).join('')}</nav>
@@ -307,7 +278,7 @@ const directoryPage = ({ path, entries }) => shell(path.at(-1), 'links', '../'.r
     ${listing(entries)}
   </section><aside class="side"><h2>Simple by design.</h2>
     <p>Each shortcut is a static page made from a link in <code>${source}</code>.</p>
-    <p><a href="${'../'.repeat(path.length)}about/">Why this approach ↗</a></p>${sponsor('directory')}</aside></div>`);
+    <p><a href="${'../'.repeat(path.length)}about/">Why this approach ↗</a></p></aside></div>`);
 
 const aboutPage = () => shell('About', 'about', '../', `<article class="prose">
   <h1>Small infrastructure. Useful links.</h1>
@@ -341,14 +312,13 @@ const guidePage = () => shell('How to use', 'guide', '../', `<article class="pro
   <h2>Optional script launchers</h2>
   <p>Set <code>"script": true</code> on an object entry to also build a <code>&lt;path&gt;.sh</code> launcher. Use the exact casing and no trailing slash. Only run scripts from sources you trust; the launcher downloads the current destination each time.</p>
   <div class="callout"><h3>Want the full reference?</h3><p>The <a href="https://github.com/ratrat64/shortlink#readme">repository documentation ↗</a> covers YAML, custom domains, validation rules, local builds, and deployment checks.</p></div>
-  ${sponsor('guide')}</article>`);
+  </article>`);
 
 const howPage = () => shell('How it works', 'how-it-works', '../', `<article class="prose">
   <h1>From a file to a link.</h1><p class="lead">The route is short because the system is short. Here is the whole path.</p>
   <h2>One source of truth</h2><p><code>${source}</code> maps codes to destinations. The build checks every entry before replacing the output, including code collisions and URL syntax.</p>
   <h2>A page for every path</h2><p>For each valid link path the build writes <code>&lt;path&gt;/index.html</code>. The page uses JavaScript and a meta refresh to send visitors to the destination, with a clickable fallback if neither redirect runs. Directories get browseable pages instead. This is a browser redirect, not an HTTP 301/302.</p>
   <h2>Published as static files</h2><p>GitHub Actions builds and deploys the generated files to GitHub Pages after a merge to <code>main</code>. The directory is built from the same map. A 404 page checks differently capitalized codes in the public map before showing an error.</p>
-  <div class="callout"><h3>What stays in your hands</h3><p>Your map is version-controlled, your destinations are visible, and optional advertisement content is configured at build time. <a href="../guide/">Read the setup guide →</a></p></div>
   </article>`);
 
 // GitHub Pages serves 404.html for anything unmatched. Catches codes that only
