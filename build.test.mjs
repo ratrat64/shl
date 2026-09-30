@@ -84,6 +84,7 @@ test('missing, conflicting, malformed, or invalid YAML input preserves the prior
     ['Run:\n  url: https://example.com/\n  script: yes\n', /script must be a boolean/],
     ['- https://example.com/\n', /expected an object mapping/],
     ['!!set {Run: null}\n', /expected an object mapping/],
+    ['tools: &tools\n  again: *tools\n', /directory cannot contain itself/],
   ]) {
     await writeFile(join(f.cwd, 'links.yaml'), value);
     fails(pattern);
@@ -112,6 +113,39 @@ test('homepage lists sorted links safely with project-relative URLs and handles 
   const empty = await fixture(t, {});
   assert.equal(empty.build().status, 0);
   assert.match(await empty.read('index.html'), /No links available yet\./);
+});
+
+test('nested JSON and YAML build themed directory pages and redirects', async (t) => {
+  const links = { tools: { git: 'https://git-scm.com/', editors: { Code: { url: 'https://example.org/?x=<img>&q="', title: '<Editor>' } } }, gh: 'https://github.com/' };
+  const f = await fixture(t, links);
+  assert.equal(f.build().status, 0);
+  const home = await f.read('index.html');
+  assert.match(home, /<details><summary>tools<\/summary>/);
+  assert.match(home, /href="\.\/tools\/">Browse tools<\/a>/);
+  assert.match(home, /href="\.\/tools\/editors\/Code\/">Code<\/a>/);
+  assert.match(home, /class="link-title">&lt;Editor&gt;/);
+  assert.doesNotMatch(home, /<img>/);
+  const tools = await f.read('tools/index.html');
+  assert.match(tools, /href="\.\.\/assets\/site\.css"/);
+  assert.match(tools, /href="\.\/git\/">git<\/a>/);
+  assert.match(tools, /href="\.\/editors\/">Browse editors<\/a>/);
+  const editors = await f.read('tools/editors/index.html');
+  assert.match(editors, /href="\.\.\/\.\.\/assets\/site\.css"/);
+  assert.match(editors, /href="\.\.\/\.\.\/">Home<\/a>/);
+  assert.match(editors, /href="\.\.\/">tools<\/a>/);
+  assert.match(editors, /href="\.\/Code\/">Code<\/a>/);
+  for (const prefix of ['/', '/project/']) {
+    assert.equal(new URL('./tools/editors/Code/', `https://example.org${prefix}`).pathname, `${prefix}tools/editors/Code/`);
+  }
+  assert.match(await f.read('tools/git/index.html'), /https:\/\/git-scm\.com\//);
+  assert.match(await f.read('tools/editors/Code/index.html'), /&lt;img&gt;/);
+  assert.deepEqual(JSON.parse(await f.read('links.json')), links);
+  const yaml = await fixture(t, 'tools:\n  git: https://git-scm.com/\n  editors:\n    Code:\n      url: https://example.org/?x=<img>&q="\n      title: <Editor>\ngh: https://github.com/\n', 'links.yaml');
+  assert.equal(yaml.build().status, 0);
+  for (const path of ['links.json', 'tools/editors/Code/index.html']) {
+    assert.equal(await yaml.read(path), await f.read(path), path);
+  }
+  assert.match(await yaml.read('tools/editors/index.html'), /href="\.\/Code\/">Code<\/a>/);
 });
 
 test('information pages use relative navigation and shared theme assets', async (t) => {
@@ -164,10 +198,12 @@ test('redirect script safely preserves destinations containing HTML and quotes',
 
 test('script launchers are opt-in, quote URLs, forward arguments and statuses, and clean up', async (t) => {
   const url = 'https://example.com/setup.sh?q=\'";printf injected;#$(printf expanded)&x=`printf backticks`\\path\nnext';
-  const f = await fixture(t, { Run: { url, script: true }, disabled: { url, script: false }, plain: url });
+  const f = await fixture(t, { Run: { url, script: true }, tools: { Nested: { url, script: true } }, disabled: { url, script: false }, plain: url });
   const build = f.build();
   assert.equal(build.status, 0, build.stderr);
   const launcher = await f.read('Run.sh');
+  assert.equal(await f.read('tools/Nested.sh'), launcher);
+  assert.match(await f.read('tools/Nested/index.html'), /http-equiv="refresh"/);
   assert.match(await f.read('Run/index.html'), /http-equiv="refresh"/);
   await assert.rejects(f.read('disabled.sh'), { code: 'ENOENT' });
   await assert.rejects(f.read('plain.sh'), { code: 'ENOENT' });
@@ -217,9 +253,14 @@ test('invalid input fails before replacing an existing build', async (t) => {
     { '../escape': 'https://example.com' }, { INDEX: 'https://example.com' },
     ...['about', 'GUIDE', 'how-it-works'].map((code) => ({ [code]: 'https://example.com' })),
     { gh: 'https://example.com', GH: 'https://example.org' },
+    { tools: { Git: 'https://example.com', git: 'https://example.org' } },
+    { tools: { 'index.html': 'https://example.com' } },
+    { tools: { git: 'https://example.com', 'GIT.SH': {} } },
+    { tools: {} }, { tools: { git: { title: 'missing URL' } } },
     ...[null, 'true', 1, [], {}].map((script) => ({ code: { url: 'https://example.com', script } })),
     { code: { url: 'https://example.com', script: true }, 'code.sh': 'https://example.org' },
     { 'CODE.SH': 'https://example.org', code: { url: 'https://example.com', script: true } },
+    { tools: { run: { url: 'https://example.com', script: true }, 'RUN.SH': { git: 'https://example.org' } } },
   ];
   const f = await fixture(t, {});
   await mkdir(join(f.cwd, 'dist'));
@@ -233,6 +274,43 @@ test('invalid input fails before replacing an existing build', async (t) => {
   }
   await writeFile(join(f.cwd, 'links.json'), '{broken');
   assert.match(f.build().stderr, /Build stopped\. Fix links.json/);
+});
+
+test('404 resolves nested links and directory casing under root and project prefixes', async (t) => {
+  const map = { tools: { Git: 'https://git-scm.com/', editors: { Code: { url: 'https://example.org/' } } } };
+  const f = await fixture(t, map);
+  assert.equal(f.build().status, 0);
+  const [script] = scripts(await f.read('404.html'));
+  for (const prefix of ['/', '/project/']) {
+    for (const [path, expected] of [
+      ['TOOLS/git/', 'https://git-scm.com/'],
+      ['tools/EDITORS/code', 'https://example.org/'],
+      ['TOOLS/editors/', prefix + 'tools/editors/'],
+    ]) {
+      const elements = { home: {}, head: {}, msg: {} };
+      const requests = [];
+      let destination;
+      await runInNewContext(script, {
+        location: { pathname: prefix + path, replace: (url) => { destination = url; } },
+        document: { getElementById: (id) => elements[id] },
+        fetch: async (url) => {
+          requests.push(url);
+          return url === prefix + 'links.json' ? { ok: true, json: async () => map } : { ok: false };
+        },
+      });
+      assert.equal(destination, expected);
+      assert.equal(elements.home.href, prefix);
+      assert.equal(requests.at(-1), prefix + 'links.json');
+    }
+    const elements = { home: {}, head: {}, msg: {} };
+    await runInNewContext(script, {
+      location: { pathname: prefix + 'tools/missing/', replace: () => assert.fail('unexpected redirect') },
+      document: { getElementById: (id) => elements[id] },
+      fetch: async (url) => url === prefix + 'links.json' ? { ok: true, json: async () => map } : { ok: false },
+    });
+    assert.equal(elements.head.textContent, 'Link not found');
+    assert.equal(elements.home.href, prefix);
+  }
 });
 
 test('404 script resolves root and project links with either casing and trailing slash', async (t) => {
