@@ -325,21 +325,18 @@ const guidePage = () => shell('How to use', 'guide', '../', `<article class="pro
   <p class="lead">A link is one entry in a JSON or YAML file. Edit, review, merge; the build takes care of the rest.</p>
   <h2>Get started</h2><ol>
     <li>Create a GitHub repository with these project files and a <code>main</code> branch. In Settings → Pages, set the source to <strong>GitHub Actions</strong>.</li>
-    <li>Edit <code>${source}</code> on a branch. Add a code and its absolute HTTP(S) destination (JSON example):</li>
-  </ol><pre><code>{
-  "gh": "https://github.com/",
-  "docs": {
-    "url": "https://docs.github.com/en/pages",
-    "title": "GitHub Pages docs"
-  }
-}</code></pre><ol start="3">
+    <li>Edit <code>${source}</code> on a branch. Add a code and its absolute HTTP(S) destination (YAML example):</li>
+  </ol><pre><code>gh: https://github.com/
+docs:
+  url: https://docs.github.com/en/pages
+  title: GitHub Pages docs</code></pre><ol start="3">
     <li>Open a pull request to <code>main</code>. Once checks pass, merge it and wait for the deploy workflow to finish.</li>
     <li>Visit <code>https://&lt;user&gt;.github.io/&lt;repo&gt;/gh/</code>, or use your configured custom domain.</li>
   </ol>
   <h2>Editing and removing links</h2>
   <p>Change the URL to retarget an existing code; delete the entry to remove it on the next deployment. Nest objects to make browseable directories and URLs such as <code>/tools/git/</code>. Codes start with a letter or number and may contain letters, numbers, dots, underscores and hyphens. Sibling names cannot differ only by case.</p>
   <h2>Optional script launchers</h2>
-  <p>Set <code>"script": true</code> on an object entry to also build a <code>&lt;path&gt;.sh</code> launcher. Use the exact casing and no trailing slash. Only run scripts from sources you trust; the launcher downloads the current destination each time.</p>
+  <p>Set <code>script: true</code> on an object entry to also build a <code>&lt;path&gt;.sh</code> launcher. Use the exact casing and no trailing slash. Only run scripts from sources you trust; the launcher downloads the current destination each time.</p>
   <div class="callout"><h3>Want the full reference?</h3><p>The <a href="https://github.com/ratrat64/shortlink#readme">repository documentation ↗</a> covers YAML, custom domains, validation rules, local builds, and deployment checks.</p></div>
   ${sponsor('guide')}</article>`);
 

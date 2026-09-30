@@ -26,48 +26,7 @@ follow [GitHub's DNS instructions](https://docs.github.com/en/pages/configuring-
 
 ## Adding a link
 
-Edit `links.json` on a branch and submit a pull request:
-
-```json
-{
-  "gh": "https://github.com/",
-  "docs": { "url": "https://docs.github.com/en/pages", "title": "GitHub Pages docs" }
-}
-```
-
-Short form is just `"code": "url"`. Long form adds an optional string `title` shown
-on the redirect fallback page. You can edit the file in GitHub's web editor;
-choose to create a branch and pull request. The links become live after the merge
-to `main` finishes deploying.
-
-Nest objects to create directories in JSON or YAML:
-
-```json
-{
-  "tools": {
-    "git": "https://git-scm.com/",
-    "editors": {
-      "code": { "url": "https://code.visualstudio.com/", "title": "VS Code" }
-    }
-  }
-}
-```
-
-This creates browseable `/tools/` and `/tools/editors/` pages and redirect URLs
-`/tools/git/` and `/tools/editors/code/`. The homepage has expandable directories;
-each directory page also lists links and subdirectories. Existing top-level links
-keep their URLs. Directory names are their display labels, and a directory must
-contain at least one entry. A path cannot be both a directory and a redirect.
-
-Each path segment starts with an ASCII letter or number, followed by letters,
-numbers, `.`, `_`, or `-`. `index`, `404`, `assets`, `links`, `about`, `guide`,
-`how-it-works`, and generated filenames (such as `index.html`) are reserved in
-any casing. Siblings cannot differ only by case. Destinations must be absolute HTTP or HTTPS
-URLs. Edit a destination to retarget a link; delete its entry to remove it on the
-next deployment.
-
-To use YAML instead, rename `links.json` to `links.yaml` (or `links.yml`) and
-write the same link entries as YAML:
+Edit `links.yaml` on a branch and submit a pull request:
 
 ```yaml
 gh: https://github.com/
@@ -76,23 +35,63 @@ docs:
   title: GitHub Pages docs
 ```
 
+Short form is just `code: https://example.com/`. Long form adds an optional string `title` shown
+on the redirect fallback page. You can edit the file in GitHub's web editor;
+choose to create a branch and pull request. The links become live after the merge
+to `main` finishes deploying.
+
+Nest objects to create directories in JSON or YAML:
+
+```yaml
+tools:
+  git: https://git-scm.com/
+  editors:
+    code:
+      url: https://code.visualstudio.com/
+      title: VS Code
+```
+
+This creates browseable `/tools/` and `/tools/editors/` pages and redirect URLs
+`/tools/git/` and `/tools/editors/code/`. The homepage has expandable directories;
+each directory page also lists links and subdirectories. Existing top-level links
+keep their URLs. Directory names are their display labels, and a directory must
+contain at least one entry. A path cannot be both a directory and a redirect.
+The checked-in `links.yaml` includes flat and nested examples, optional titles,
+`script: true` and `script: false`, and codes using dots, underscores and hyphens.
+All entries are public in the directory and generated `links.json`; hidden links
+are not supported.
+
+Each path segment starts with an ASCII letter or number, followed by letters,
+numbers, `.`, `_`, or `-`. `index`, `404`, `assets`, `links`, `about`, `guide`,
+`how-it-works`, and generated filenames (such as `index.html`) are reserved in
+any casing. Siblings cannot differ only by case. Destinations must be absolute HTTP or HTTPS
+URLs. Edit a destination to retarget a link; delete its entry to remove it on the
+next deployment.
+
+To use JSON instead, rename `links.yaml` to `links.json` and write the same
+link entries as JSON:
+
+```json
+{
+  "gh": "https://github.com/",
+  "docs": { "url": "https://docs.github.com/en/pages", "title": "GitHub Pages docs" }
+}
+```
+
 Keep **exactly one** of `links.json`, `links.yaml`, and `links.yml` in the root.
 The build rejects missing or multiple sources. Both formats use the same link
 validation; the generated site always publishes a `links.json` for browser routing.
 
 ## Running Bash scripts
 
-Set `"script": true` in JSON (or `script: true` in YAML) to generate an
+Set `script: true` in YAML (or `"script": true` in JSON) to generate an
 additional `<path>.sh` launcher alongside its browser redirect, including in
 nested directories:
 
-```json
-{
-  "ohmyposh-setup-stable": {
-    "url": "https://raw.githubusercontent.com/ratrat64/homelab-public/refs/heads/main/scripts/ubuntu/oh-my-posh/setup.sh",
-    "script": true
-  }
-}
+```yaml
+ohmyposh-setup-stable:
+  url: https://raw.githubusercontent.com/ratrat64/homelab-public/refs/heads/main/scripts/ubuntu/oh-my-posh/setup.sh
+  script: true
 ```
 
 After deployment, use the `.sh` URL for remote execution:
@@ -106,6 +105,8 @@ curl -fsSL https://ratrat64.github.io/shortlink/ohmyposh-setup-stable.sh | bash 
 
 Use the full link path's exact casing, with `.sh` and **no trailing slash**. The browser
 URL ending in `/<path>/` returns HTML, which `curl -L` cannot follow.
+The checked-in `scripts/ohmyposh-setup` entry also demonstrates a nested launcher
+at `/scripts/ohmyposh-setup.sh`.
 
 Launchers require Bash, curl, mktemp, and rm. Each run downloads the current
 destination into a temporary file, executes it only after a successful download,
