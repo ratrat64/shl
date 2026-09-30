@@ -1,15 +1,15 @@
 # Short links
 
-A URL shortener that runs entirely on GitHub Pages. `links.json` is the source of
-truth; a build step turns each entry into a static folder with an instant redirect,
-and GitHub Actions deploys it on every push to `main`.
+A URL shortener that runs entirely on GitHub Pages. A JSON or YAML link map is
+the source of truth; a build step turns each entry into a static folder with an
+instant redirect, and GitHub Actions deploys it on every push to `main`.
 
 ## Setup
 
 1. Create a GitHub repository with these files and a `main` branch. A public
    repository works with GitHub Pages on GitHub Free.
 2. Settings → Pages → **Source: GitHub Actions**.
-3. Edit `links.json` with your links on a branch and open a pull request to `main`.
+3. Edit your link file with your links on a branch and open a pull request to `main`.
    Once checks pass, merge it. The deployment workflow checks, builds, and deploys.
    Wait for **Actions → Deploy short links** to finish.
 
@@ -42,10 +42,24 @@ Two codes cannot differ only by case. Destinations must be absolute HTTP or HTTP
 URLs. Edit a destination to retarget a link; delete its entry to remove it on the
 next deployment.
 
+To use YAML instead, rename `links.json` to `links.yaml` (or `links.yml`) and
+write the same link entries as YAML:
+
+```yaml
+gh: https://github.com/
+docs:
+  url: https://docs.github.com/en/pages
+  title: GitHub Pages docs
+```
+
+Keep **exactly one** of `links.json`, `links.yaml`, and `links.yml` in the root.
+The build rejects missing or multiple sources. Both formats use the same link
+validation; the generated site always publishes a `links.json` for browser routing.
+
 ## Running Bash scripts
 
-Set `"script": true` on a link object to generate an additional `<code>.sh`
-launcher alongside its browser redirect:
+Set `"script": true` in JSON (or `script: true` in YAML) to generate an
+additional `<code>.sh` launcher alongside its browser redirect:
 
 ```json
 {
@@ -82,7 +96,7 @@ short code, regardless of casing.
 Every pull request targeting `main` runs **Check pull request**, using Node.js 22
 on Ubuntu. The **PR validation** job runs `node --test build.test.mjs` followed by
 `node build.mjs`: tests cover regression cases, and the build validates the proposed
-`links.json`. New commits rerun checks and cancel older runs for the same PR.
+link file. New commits rerun checks and cancel older runs for the same PR.
 PR checks have read-only repository permissions and do not deploy the site.
 For PRs changing only `AGENTS.md`, the required job succeeds without running
 Node.js tests or a build; mixed changes still run both.
@@ -96,9 +110,10 @@ Merging to `main` triggers the existing production deployment.
 
 ## Local build
 
-Use Node.js 22; launcher tests also require Bash. No package installation is needed.
+Use Node.js 22; launcher tests also require Bash. Install the YAML parser once:
 
 ```bash
+npm ci
 node --test build.test.mjs # validation and generated-script regression checks
 node build.mjs          # writes ./dist
 npx serve dist          # optional preview
@@ -123,6 +138,7 @@ from GitHub Pages.
   These are browser redirects, not HTTP 301/302 responses; `curl -L` does not
   follow them. A clickable fallback is included.
 - `dist/<code>.sh` — an opt-in Bash launcher for links with `"script": true`.
+- `dist/links.json` — the public link map generated from either input format.
 - `dist/404.html` — GitHub Pages serves this for anything unmatched. It reads
   `links.json` client-side and catches wrong-case codes before giving up.
 - `dist/index.html` — a directory of all links, sorted by code, showing optional
