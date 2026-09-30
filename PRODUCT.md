@@ -27,7 +27,7 @@ One JSON or YAML link map is the source of truth. The build validates it and gen
 - Link entries accept an absolute HTTP(S) destination, an optional title, and an optional `script: true` flag for a `.sh` launcher.
 - Published links and destinations are public. There is no backend, database, anonymous submission, click tracking, or HTTP 301/302 redirect.
 - Short codes are case-insensitively unique and follow the documented reserved-name rules. Destination syntax is validated, not reachability.
-- Node.js 22 runs the build and checks after `npm ci` installs the YAML parser; no frontend framework is wanted.
+- Node.js 24 runs the build and checks after `npm ci` installs the YAML parser; no frontend framework is wanted.
 - Provide dark and light modes, informational pages, and optional custom static advertisement spaces that are off by default.
 
 ## Evidence on Hand

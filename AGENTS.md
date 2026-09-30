@@ -12,7 +12,7 @@
 - The user authorizes agents to write commit messages, commit task changes, push commits, and publish new branches without asking again for each operation.
 
 ## Build and verification
-- Use Node.js 22 (the CI version) and `npm ci` to install the YAML parser. Launcher tests also require Bash.
+- Use Node.js 24 (the CI version) and `npm ci` to install the YAML parser. Launcher tests also require Bash.
 - CI installs dependencies, runs `node --test build.test.mjs`, then `node build.mjs`. Run from the repository root: build input and output paths are relative to the working directory. No lint or typecheck suite is configured.
 - Focused routing checks: `node --test --test-name-pattern="404" build.test.mjs`. Tests build in temporary directories and execute generated scripts with simulated browser APIs; actual Pages 404 behavior needs a deployed browser smoke test.
 - A successful build deletes and recreates `dist/`. Edit the templates in `build.mjs`, not generated files.
