@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-// Turns links.json into a static site: one folder per short code, each with an
-// instant redirect and optional Bash launcher. No dependencies, no server.
+// Turns a JSON or YAML link map into a static site: one folder per short code,
+// each with an instant redirect and optional Bash launcher. No server.
 
 import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
+import { parseDocument } from 'yaml';
 
 const OUT = 'dist';
 const CODE_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
@@ -17,13 +18,31 @@ const esc = (s) =>
 // ---- load + validate ------------------------------------------------------
 
 let raw;
+let source = 'link source';
 try {
-  raw = JSON.parse(await readFile('links.json', 'utf8'));
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+  const files = [];
+  for (const name of ['links.json', 'links.yaml', 'links.yml']) {
+    try {
+      files.push([name, await readFile(name, 'utf8')]);
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+  }
+  if (files.length !== 1) throw new Error(`expected exactly one of links.json, links.yaml, links.yml (found ${files.length ? files.map(([name]) => name).join(', ') : 'none'})`);
+  const text = files[0][1];
+  source = files[0][0];
+  if (source === 'links.json') {
+    raw = JSON.parse(text);
+  } else {
+    const document = parseDocument(text, { uniqueKeys: true });
+    if (document.errors.length) throw document.errors[0];
+    raw = document.toJS();
+  }
+  if (!raw || Object.getPrototypeOf(raw) !== Object.prototype) {
     throw new Error('expected an object mapping short codes to destinations');
   }
 } catch (error) {
-  console.error(`Build stopped. Fix links.json: ${error.message}`);
+  console.error(`Build stopped. Fix ${source}: ${error.message}`);
   process.exit(1);
 }
 const problems = [];
@@ -68,7 +87,7 @@ for (const { code, script } of links) {
 }
 
 if (problems.length) {
-  console.error('Build stopped. Fix these in links.json:');
+  console.error(`Build stopped. Fix these in ${source}:`);
   for (const p of problems) console.error('  - ' + p);
   process.exit(1);
 }
@@ -236,16 +255,16 @@ const indexPage = () => shell('Links', 'links', './', `
       .sort((a, b) => a.code.toLowerCase() < b.code.toLowerCase() ? -1 : 1)
       .map(({ code, url, title }) => `
       <li><div class="link-top"><a class="code" href="./${esc(code)}/">${esc(code)}</a><span class="arrow" aria-hidden="true">↗</span></div>${title ? `<p class="link-title">${esc(title)}</p>` : ''}
-        <span class="destination">${esc(url)}</span></li>`).join('')}</ul>` : '<p>No links available yet. Add your first entry to links.json and rebuild the site.</p>'}
+        <span class="destination">${esc(url)}</span></li>`).join('')}</ul>` : `<p>No links available yet. Add your first entry to ${source} and rebuild the site.</p>`}
   </section><aside class="side"><h2>Simple by design.</h2>
-  <p>Each shortcut is a static page made from a link in <code>links.json</code>. No account, database, or application server required.</p>
+  <p>Each shortcut is a static page made from a link in <code>${source}</code>. No account, database, or application server required.</p>
   <p><a href="./about/">Why this approach ↗</a></p>${sponsor('directory')}</aside></div>`);
 
 const aboutPage = () => shell('About', 'about', '../', `<article class="prose">
   <h1>Small infrastructure. Useful links.</h1>
   <p class="lead">Shortlink turns a version-controlled list of URLs into a static directory and browser redirects on GitHub Pages.</p>
   <h2>What you get</h2>
-  <p><strong>No backend or database.</strong> Your links live in <code>links.json</code>. A Node.js build generates plain files; GitHub Pages serves them. There is no application server for you to run.</p>
+  <p><strong>No backend or database.</strong> Your links live in <code>${source}</code>. A Node.js build generates plain files; GitHub Pages serves them. There is no application server for you to run.</p>
   <p><strong>Changes you can review.</strong> Edit the map on a branch, open a pull request, and merge to publish. Every destination has a place in version history.</p>
   <p><strong>A public directory.</strong> Visitors can see available links and where they go before following one. You can also use a custom domain with GitHub Pages.</p>
   <h2>Trade-offs, plainly</h2>
@@ -254,10 +273,10 @@ const aboutPage = () => shell('About', 'about', '../', `<article class="prose">
 
 const guidePage = () => shell('How to use', 'guide', '../', `<article class="prose">
   <h1>Make a short link.</h1>
-  <p class="lead">A link is one entry in a JSON file. Edit, review, merge; the build takes care of the rest.</p>
+  <p class="lead">A link is one entry in a JSON or YAML file. Edit, review, merge; the build takes care of the rest.</p>
   <h2>Get started</h2><ol>
     <li>Create a GitHub repository with these project files and a <code>main</code> branch. In Settings → Pages, set the source to <strong>GitHub Actions</strong>.</li>
-    <li>Edit <code>links.json</code> on a branch. Add a code and its absolute HTTP(S) destination:</li>
+    <li>Edit <code>${source}</code> on a branch. Add a code and its absolute HTTP(S) destination (JSON example):</li>
   </ol><pre><code>{
   "gh": "https://github.com/",
   "docs": {
@@ -272,12 +291,12 @@ const guidePage = () => shell('How to use', 'guide', '../', `<article class="pro
   <p>Change the URL to retarget an existing code; delete the entry to remove it on the next deployment. Codes start with a letter or number and may contain letters, numbers, dots, underscores and hyphens. Codes cannot differ only by case.</p>
   <h2>Optional script launchers</h2>
   <p>Set <code>"script": true</code> on an object entry to also build a <code>&lt;code&gt;.sh</code> launcher. Use the exact casing and no trailing slash. Only run scripts from sources you trust; the launcher downloads the current destination each time.</p>
-  <div class="callout"><h3>Want the full reference?</h3><p>The repository <code>README.md</code> covers custom domains, validation rules, local builds, and deployment checks.</p></div>
+  <div class="callout"><h3>Want the full reference?</h3><p>The <a href="https://github.com/ratrat64/shortlink#readme">repository documentation ↗</a> covers YAML, custom domains, validation rules, local builds, and deployment checks.</p></div>
   ${sponsor('guide')}</article>`);
 
 const howPage = () => shell('How it works', 'how-it-works', '../', `<article class="prose">
   <h1>From a file to a link.</h1><p class="lead">The route is short because the system is short. Here is the whole path.</p>
-  <h2>One source of truth</h2><p><code>links.json</code> maps codes to destinations. The build checks every entry before replacing the output, including code collisions and URL syntax.</p>
+  <h2>One source of truth</h2><p><code>${source}</code> maps codes to destinations. The build checks every entry before replacing the output, including code collisions and URL syntax.</p>
   <h2>A page for every code</h2><p>For each valid code the build writes <code>&lt;code&gt;/index.html</code>. The page uses JavaScript and a meta refresh to send visitors to the destination, with a clickable fallback if neither redirect runs. This is a browser redirect, not an HTTP 301/302.</p>
   <h2>Published as static files</h2><p>GitHub Actions builds and deploys the generated files to GitHub Pages after a merge to <code>main</code>. The directory is built from the same map. A 404 page checks differently capitalized codes in the public map before showing an error.</p>
   <div class="callout"><h3>What stays in your hands</h3><p>Your map is version-controlled, your destinations are visible, and optional advertisement content is configured at build time. <a href="../guide/">Read the setup guide →</a></p></div>

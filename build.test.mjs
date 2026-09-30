@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, writeFile, mkdir, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, mkdir, rm, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,10 +9,10 @@ import { runInNewContext } from 'node:vm';
 
 const buildScript = fileURLToPath(new URL('./build.mjs', import.meta.url));
 
-async function fixture(t, links) {
+async function fixture(t, links, source = 'links.json') {
   const cwd = await mkdtemp(join(tmpdir(), 'shortlink-'));
   t.after(() => rm(cwd, { recursive: true, force: true }));
-  await writeFile(join(cwd, 'links.json'), JSON.stringify(links));
+  await writeFile(join(cwd, source), source === 'links.json' ? JSON.stringify(links) : links);
   return {
     cwd,
     build: () => spawnSync(process.execPath, [buildScript], { cwd, encoding: 'utf8' }),
@@ -38,6 +38,60 @@ test('build produces a minimal site, copies the map and CNAME, and cleans stale 
   assert.match(await f.read('index.html'), /class="link-title">Example/);
   assert.match(await f.read('Mixed/index.html'), /http-equiv="refresh"/);
   assert.match(await f.read('plain/index.html'), /http:\/\/example.org\//);
+});
+
+test('YAML sources generate the same site and public JSON map as JSON', async (t) => {
+  const links = { gh: 'https://github.com/', Run: { url: 'https://example.com/setup.sh', title: 'Setup #1', script: true } };
+  const yaml = `gh: https://github.com/
+Run:
+  url: https://example.com/setup.sh
+  title: 'Setup #1'
+  script: true
+`;
+  const json = await fixture(t, links);
+  assert.equal(json.build().status, 0);
+  for (const source of ['links.yaml', 'links.yml']) {
+    const f = await fixture(t, yaml, source);
+    const result = f.build();
+    assert.equal(result.status, 0, result.stderr);
+    for (const path of ['links.json', '404.html', 'Run/index.html', 'Run.sh']) {
+      assert.equal(await f.read(path), await json.read(path), `${source}: ${path}`);
+    }
+    assert.match(await f.read('index.html'), new RegExp(`in <code>${source.replace('.', '\\.')}<\\/code>`));
+    assert.match(await f.read('guide/index.html'), new RegExp(`<code>${source.replace('.', '\\.')}<\\/code>`));
+    assert.deepEqual(JSON.parse(await f.read('links.json')), links);
+  }
+});
+
+test('missing, conflicting, malformed, or invalid YAML input preserves the prior build', async (t) => {
+  const f = await fixture(t, 'Run:\n  url: https://example.com/setup.sh\n', 'links.yaml');
+  await mkdir(join(f.cwd, 'dist'));
+  await writeFile(join(f.cwd, 'dist', 'marker'), 'preserved');
+  const fails = (pattern) => {
+    const result = f.build();
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, pattern);
+  };
+  await writeFile(join(f.cwd, 'links.json'), '{}');
+  fails(/expected exactly one.*links\.json, links\.yaml/);
+  await unlink(join(f.cwd, 'links.json'));
+  await writeFile(join(f.cwd, 'links.yml'), '{}');
+  fails(/expected exactly one.*links\.yaml, links\.yml/);
+  await unlink(join(f.cwd, 'links.yml'));
+  for (const [value, pattern] of [
+    ['Run: [', /Fix links\.yaml/],
+    ['Run: https://example.com/\nRun: https://example.org/\n', /unique|duplicate/i],
+    ['Run:\n  url: https://example.com/\n  script: yes\n', /script must be a boolean/],
+    ['- https://example.com/\n', /expected an object mapping/],
+    ['!!set {Run: null}\n', /expected an object mapping/],
+  ]) {
+    await writeFile(join(f.cwd, 'links.yaml'), value);
+    fails(pattern);
+    assert.equal(await f.read('marker'), 'preserved');
+  }
+  await unlink(join(f.cwd, 'links.yaml'));
+  fails(/expected exactly one.*none/);
+  assert.equal(await f.read('marker'), 'preserved');
 });
 
 test('homepage lists sorted links safely with project-relative URLs and handles an empty map', async (t) => {
@@ -74,6 +128,7 @@ test('information pages use relative navigation and shared theme assets', async 
   }
   assert.match(await f.read('assets/site.css'), /data-theme=dark/);
   assert.match(await f.read('assets/theme.js'), /shortlink-theme/);
+  assert.match(await f.read('guide/index.html'), /github\.com\/ratrat64\/shortlink#readme/);
 });
 
 test('ads are off by default, safely rendered when enabled, and validated before deleting output', async (t) => {
@@ -160,6 +215,7 @@ test('invalid input fails before replacing an existing build', async (t) => {
     { code: 'https://' }, { code: 'https://bad host/' }, { code: 'javascript:alert(1)' },
     { code: '/relative' }, { '.hidden': 'https://example.com' },
     { '../escape': 'https://example.com' }, { INDEX: 'https://example.com' },
+    ...['about', 'GUIDE', 'how-it-works'].map((code) => ({ [code]: 'https://example.com' })),
     { gh: 'https://example.com', GH: 'https://example.org' },
     ...[null, 'true', 1, [], {}].map((script) => ({ code: { url: 'https://example.com', script } })),
     { code: { url: 'https://example.com', script: true }, 'code.sh': 'https://example.org' },
