@@ -164,6 +164,7 @@ const styles = `
   ::selection{background:var(--accent);color:var(--panel)}
   a{color:var(--accent);text-underline-offset:.22em}
   a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+  [hidden]{display:none!important}
   button{font:inherit;cursor:pointer}
   .wrap{max-width:1120px;margin:auto;padding-inline:clamp(1.25rem,4vw,3rem)}
   .site-head{border-bottom:1px solid var(--line);background:var(--panel)}
@@ -185,6 +186,12 @@ const styles = `
   .grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,290px);gap:clamp(2rem,5vw,5rem);align-items:start}
   .section-head{display:flex;justify-content:space-between;gap:1rem;align-items:baseline;border-bottom:1px solid var(--ink);padding-bottom:.9rem}
   .section-head h2{margin:0}.count{color:var(--muted);font-size:.85rem;font-variant-numeric:tabular-nums}
+  .search{margin:1.25rem 0 .25rem}
+  .search label{display:block;font-weight:600;margin-bottom:.35rem}
+  .search input{width:100%;font:inherit;padding:.6rem .85rem;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink)}
+  .search input::placeholder{color:var(--muted)}
+  .search input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .search-status{font-size:.9rem;color:var(--muted);margin:.75rem 0 0}
   .links{list-style:none;padding:0;margin:0}
   .links li{border-bottom:1px solid var(--line);padding:1.2rem 0;overflow-wrap:anywhere}
   .links .links{margin:1rem 0 0 1rem;padding-left:1rem;border-left:1px solid var(--line)}
@@ -231,6 +238,46 @@ const themeScript = `(() => {
   });
 })();`;
 
+const searchScript = `(() => {
+  const input = document.querySelector('#link-search');
+  if (!input) return;
+  const list = document.querySelector('.links');
+  const status = document.querySelector('#search-status');
+  const opened = new Map();
+  input.parentElement.hidden = false;
+
+  function filter(list, query, path = '', all = false) {
+    let count = 0;
+    for (const item of list.children) {
+      const details = item.firstElementChild;
+      if (details.tagName === 'DETAILS') {
+        const next = path + details.querySelector('summary').textContent + '/';
+        const found = filter(details.querySelector('.links'), query, next, all || next.toLowerCase().includes(query));
+        item.hidden = !found;
+        if (query && found && !details.open) {
+          opened.set(details, false);
+          details.open = true;
+        }
+        count += found;
+      } else {
+        const found = all || (path + item.textContent).toLowerCase().includes(query);
+        item.hidden = !found;
+        count += Number(found);
+      }
+    }
+    return count;
+  }
+
+  input.addEventListener('input', () => {
+    for (const [details, wasOpen] of opened) details.open = wasOpen;
+    opened.clear();
+    const query = input.value.trim().toLowerCase();
+    const count = filter(list, query);
+    status.hidden = !query;
+    status.textContent = !query ? '' : count ? count + ' matching link' + (count === 1 ? '.' : 's.') : 'No links match your search.';
+  });
+})();`;
+
 const shell = (title, active, depth, content) => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark"><title>${esc(title)} · Short links</title>
@@ -260,12 +307,18 @@ const listing = (entries, prefix = '') => `<ul class="links">${Object.entries(en
         <span class="destination">${esc(url)}</span></li>`;
   }).join('')}</ul>`;
 
+const searchableListing = (entries, depth) => `<div class="search" hidden>
+    <label for="link-search">Search links</label>
+    <input id="link-search" type="search" placeholder="Code, title or destination" autocomplete="off">
+  </div><p id="search-status" class="search-status" role="status" hidden></p>
+  ${listing(entries)}<script src="${depth}assets/search.js" defer></script>`;
+
 const indexPage = () => shell('Links', 'links', './', `
   <h1>Good links. Less distance.</h1>
   <p class="lead">A small directory of shortcuts. Pick a code to go straight to its destination.</p>
   <div class="grid"><section aria-labelledby="directory-title">
     <div class="section-head"><h2 id="directory-title">The directory</h2><span class="count">${links.length} ${links.length === 1 ? 'link' : 'links'}</span></div>
-    ${links.length ? listing(raw) : `<p>No links available yet. Add your first entry to ${source} and rebuild the site.</p>`}
+    ${links.length ? searchableListing(raw, './') : `<p>No links available yet. Add your first entry to ${source} and rebuild the site.</p>`}
   </section><aside class="side"><h2>Simple by design.</h2>
   <p>Each shortcut is a static page made from a link in <code>${source}</code>. No account, database, or application server required.</p>
   <p><a href="./about/">Why this approach ↗</a></p></aside></div>`);
@@ -275,7 +328,7 @@ const directoryPage = ({ path, entries }) => shell(path.at(-1), 'links', '../'.r
   <h1>${esc(path.at(-1))}</h1><p class="lead">Browse links and subdirectories in ${esc(path.at(-1))}.</p>
   <div class="grid"><section aria-labelledby="directory-title">
     <div class="section-head"><h2 id="directory-title">The directory</h2></div>
-    ${listing(entries)}
+    ${searchableListing(entries, '../'.repeat(path.length))}
   </section><aside class="side"><h2>Simple by design.</h2>
     <p>Each shortcut is a static page made from a link in <code>${source}</code>.</p>
     <p><a href="${'../'.repeat(path.length)}about/">Why this approach ↗</a></p></aside></div>`);
@@ -386,6 +439,7 @@ await mkdir(OUT, { recursive: true });
 await mkdir(join(OUT, 'assets'), { recursive: true });
 await writeFile(join(OUT, 'assets', 'site.css'), styles);
 await writeFile(join(OUT, 'assets', 'theme.js'), themeScript);
+await writeFile(join(OUT, 'assets', 'search.js'), searchScript);
 
 for (const link of links) {
   await mkdir(join(OUT, link.code), { recursive: true });

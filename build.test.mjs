@@ -148,6 +148,68 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
   assert.match(await yaml.read('tools/editors/index.html'), /href="\.\/Code\/">Code<\/a>/);
 });
 
+test('search filters nested links on the homepage and directory pages', async (t) => {
+  const f = await fixture(t, { gh: 'https://github.com/', tools: { git: 'https://git-scm.com/', editors: { Code: { url: 'https://example.org/', title: 'VS Code' } } } });
+  assert.equal(f.build().status, 0);
+  for (const [page, depth] of [['index.html', './'], ['tools/index.html', '../'], ['tools/editors/index.html', '../../']]) {
+    const html = await f.read(page);
+    assert.match(html, /<div class="search" hidden>\s*<label for="link-search">Search links<\/label>/);
+    assert.match(html, new RegExp(`src="${depth.replaceAll('.', '\\.')}assets/search\\.js"`));
+    assert.match(html, /id="search-status"[^>]*role="status" hidden/);
+  }
+
+  const leaf = (text) => ({ firstElementChild: { tagName: 'DIV' }, textContent: text, hidden: false });
+  const group = (name, ...children) => {
+    const details = { tagName: 'DETAILS', open: false, querySelector: (selector) => selector === 'summary' ? { textContent: name } : { children } };
+    return { firstElementChild: details, hidden: false };
+  };
+  const gh = leaf('gh https://github.com/');
+  const git = leaf('git https://git-scm.com/');
+  const code = leaf('Code VS Code https://example.org/');
+  const editors = group('editors', code);
+  const tools = group('tools', git, editors);
+  const list = { children: [gh, tools] };
+  const search = { hidden: true };
+  const input = { value: '', parentElement: search, addEventListener: (_, listener) => { input.update = listener; } };
+  const status = { hidden: true, textContent: '' };
+  const elements = { '#link-search': input, '.links': list, '#search-status': status };
+  runInNewContext(await f.read('assets/search.js'), { document: { querySelector: (selector) => elements[selector] } });
+  assert.equal(search.hidden, false);
+
+  tools.firstElementChild.open = true; // Preserve directories opened by the visitor.
+  input.value = 'vs code';
+  input.update();
+  assert.equal(status.textContent, '1 matching link.');
+  assert.equal(code.hidden, false);
+  assert.equal(git.hidden, true);
+  assert.equal(gh.hidden, true);
+  assert.equal(editors.firstElementChild.open, true);
+
+  input.value = 'TOOLS/GIT';
+  input.update();
+  assert.equal(git.hidden, false);
+  assert.equal(code.hidden, true);
+  assert.equal(editors.hidden, true);
+
+  input.value = 'tools';
+  input.update();
+  assert.equal(status.textContent, '2 matching links.');
+  assert.equal(git.hidden, false);
+  assert.equal(code.hidden, false);
+
+  input.value = 'missing';
+  input.update();
+  assert.equal(status.textContent, 'No links match your search.');
+  assert.equal(tools.hidden, true);
+
+  input.value = '';
+  input.update();
+  assert.equal(status.hidden, true);
+  assert.equal(gh.hidden, false);
+  assert.equal(editors.firstElementChild.open, false);
+  assert.equal(tools.firstElementChild.open, true);
+});
+
 test('information pages use relative navigation and shared theme assets', async (t) => {
   const f = await fixture(t, { aboutme: 'https://example.org/' });
   assert.equal(f.build().status, 0);
