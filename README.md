@@ -4,6 +4,10 @@ A URL shortener that runs entirely on GitHub Pages. A JSON or YAML link map is
 the source of truth; a build step turns each entry into a static folder with an
 instant redirect, and GitHub Actions deploys it on every push to `main`.
 
+The generated site includes a browsable directory, an About page, a setup guide,
+and a How it works page. It follows the system light/dark preference; visitors
+can override it with the Theme button, saved in their browser.
+
 ## Setup
 
 1. Create a GitHub repository with these files and a `main` branch. A public
@@ -37,7 +41,8 @@ choose to create a branch and pull request. The links become live after the merg
 to `main` finishes deploying.
 
 Codes start with an ASCII letter or number, followed by letters, numbers, `.`,
-`_`, or `-`. `index`, `404`, `assets`, and `links` are reserved in any casing.
+`_`, or `-`. `index`, `404`, `assets`, `links`, `about`, `guide`, and
+`how-it-works` are reserved in any casing.
 Two codes cannot differ only by case. Destinations must be absolute HTTP or HTTPS
 URLs. Edit a destination to retarget a link; delete its entry to remove it on the
 next deployment.
@@ -107,6 +112,28 @@ status check from GitHub Actions, with the branch up to date before merging.
 No approving review is required by this baseline; add one if your team needs it.
 Run the workflow on an initial PR if the check is not yet available in the picker.
 Merging to `main` triggers the existing production deployment.
+
+## Optional advertisements
+
+`ads.json` controls two text-only placements: `directory` (beside the link
+list) and `guide` (at the end of the setup guide). They are off by default.
+To show them, set `enabled` to `true` and fill in either slot:
+
+```json
+{
+  "enabled": true,
+  "directory": {
+    "label": "Your sponsor name",
+    "text": "A short description of the offer.",
+    "url": "https://example.com/"
+  },
+  "guide": null
+}
+```
+
+Set `enabled` back to `false` to hide all placements. Set an individual slot
+to `null` to hide only that slot. Only text and an HTTP(S) link are accepted;
+the build escapes displayed content and does not load ad scripts.
 
 ## Local build
 

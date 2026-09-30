@@ -34,7 +34,8 @@ test('build produces a minimal site, copies the map and CNAME, and cleans stale 
   assert.equal(await f.read('CNAME'), 'go.example.com\n');
   assert.equal(await f.read('.nojekyll'), '');
   await assert.rejects(f.read('stale.html'), { code: 'ENOENT' });
-  assert.match(await f.read('index.html'), /href="\.\/Mixed\/">Mixed<\/a> — Example/);
+  assert.match(await f.read('index.html'), /href="\.\/Mixed\/">Mixed<\/a>/);
+  assert.match(await f.read('index.html'), /class="link-title">Example/);
   assert.match(await f.read('Mixed/index.html'), /http-equiv="refresh"/);
   assert.match(await f.read('plain/index.html'), /http:\/\/example.org\//);
 });
@@ -53,9 +54,11 @@ Run:
     const f = await fixture(t, yaml, source);
     const result = f.build();
     assert.equal(result.status, 0, result.stderr);
-    for (const path of ['links.json', 'index.html', '404.html', 'Run/index.html', 'Run.sh']) {
+    for (const path of ['links.json', '404.html', 'Run/index.html', 'Run.sh']) {
       assert.equal(await f.read(path), await json.read(path), `${source}: ${path}`);
     }
+    assert.match(await f.read('index.html'), new RegExp(`in <code>${source.replace('.', '\\.')}<\\/code>`));
+    assert.match(await f.read('guide/index.html'), new RegExp(`<code>${source.replace('.', '\\.')}<\\/code>`));
     assert.deepEqual(JSON.parse(await f.read('links.json')), links);
   }
 });
@@ -105,10 +108,45 @@ test('homepage lists sorted links safely with project-relative URLs and handles 
   }
   assert.match(html, /&lt;script&gt;title&lt;\/script&gt;/);
   assert.match(html, /https:\/\/example\.com\/\?q=&lt;img&gt;&amp;x=&quot;quoted&quot;/);
-  assert.doesNotMatch(html, /<script|<img|undefined/);
+  assert.doesNotMatch(html, /<script>title|<img|undefined/);
   const empty = await fixture(t, {});
   assert.equal(empty.build().status, 0);
   assert.match(await empty.read('index.html'), /No links available yet\./);
+});
+
+test('information pages use relative navigation and shared theme assets', async (t) => {
+  const f = await fixture(t, { aboutme: 'https://example.org/' });
+  assert.equal(f.build().status, 0);
+  const home = await f.read('index.html');
+  assert.match(home, /href="\.\/assets\/site\.css"/);
+  assert.match(home, /href="\.\/about\/"/);
+  for (const page of ['about', 'guide', 'how-it-works']) {
+    const html = await f.read(`${page}/index.html`);
+    assert.match(html, /href="\.\.\/assets\/site\.css"/);
+    assert.match(html, /src="\.\.\/assets\/theme\.js"/);
+    assert.match(html, /href="\.\.\/"/);
+  }
+  assert.match(await f.read('assets/site.css'), /data-theme=dark/);
+  assert.match(await f.read('assets/theme.js'), /shortlink-theme/);
+  assert.match(await f.read('guide/index.html'), /github\.com\/ratrat64\/shortlink#readme/);
+});
+
+test('ads are off by default, safely rendered when enabled, and validated before deleting output', async (t) => {
+  const f = await fixture(t, {});
+  assert.equal(f.build().status, 0);
+  assert.doesNotMatch(await f.read('index.html'), /class="sponsor"/);
+  await writeFile(join(f.cwd, 'ads.json'), JSON.stringify({ enabled: true, directory: {
+    label: '<script>bad</script>', text: 'Try this & that', url: 'https://example.org/?a=1&b=2',
+  } }));
+  assert.equal(f.build().status, 0);
+  const html = await f.read('index.html');
+  assert.match(html, /aria-label="Advertisement"/);
+  assert.match(html, /&lt;script&gt;bad&lt;\/script&gt;/);
+  assert.match(html, /rel="sponsored noopener noreferrer"/);
+  assert.doesNotMatch(await f.read('guide/index.html'), /class="sponsor"/);
+  await writeFile(join(f.cwd, 'ads.json'), JSON.stringify({ enabled: true, directory: { label: 'Bad', text: 'Bad', url: 'javascript:alert(1)' } }));
+  assert.equal(f.build().status, 1);
+  assert.match(await f.read('index.html'), /Try this &amp; that/);
 });
 
 test('redirect script safely preserves destinations containing HTML and quotes', async (t) => {
@@ -177,6 +215,7 @@ test('invalid input fails before replacing an existing build', async (t) => {
     { code: 'https://' }, { code: 'https://bad host/' }, { code: 'javascript:alert(1)' },
     { code: '/relative' }, { '.hidden': 'https://example.com' },
     { '../escape': 'https://example.com' }, { INDEX: 'https://example.com' },
+    ...['about', 'GUIDE', 'how-it-works'].map((code) => ({ [code]: 'https://example.com' })),
     { gh: 'https://example.com', GH: 'https://example.org' },
     ...[null, 'true', 1, [], {}].map((script) => ({ code: { url: 'https://example.com', script } })),
     { code: { url: 'https://example.com', script: true }, 'code.sh': 'https://example.org' },
