@@ -3,6 +3,7 @@
 ## Branch and worktree workflow
 - Before making changes, create one task branch and a separate Git worktree; do the work and run checks there. Keep related features for the task together in that worktree.
 - Preserve existing uncommitted work when consolidating changes from other worktrees.
+- If `main` advances during feature work, check whether the feature needs changes to align with it; if so, make a plan for those changes before editing.
 - A feature is ready only after a pull request is opened and checked for merge conflicts against the current `main`.
 - If resolving a conflict needs user input, report the blocker and stop; do not mark the feature ready.
 
