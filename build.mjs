@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-// Turns links.json into a static site: one folder per short code, each with an
-// instant redirect and optional Bash launcher. No dependencies, no server.
+// Turns a JSON or YAML link map into a static site: one folder per short code,
+// each with an instant redirect and optional Bash launcher. No server.
 
 import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
+import { parseDocument } from 'yaml';
 
 const OUT = 'dist';
 const CODE_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
@@ -17,13 +18,31 @@ const esc = (s) =>
 // ---- load + validate ------------------------------------------------------
 
 let raw;
+let source = 'link source';
 try {
-  raw = JSON.parse(await readFile('links.json', 'utf8'));
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+  const files = [];
+  for (const name of ['links.json', 'links.yaml', 'links.yml']) {
+    try {
+      files.push([name, await readFile(name, 'utf8')]);
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+  }
+  if (files.length !== 1) throw new Error(`expected exactly one of links.json, links.yaml, links.yml (found ${files.length ? files.map(([name]) => name).join(', ') : 'none'})`);
+  const text = files[0][1];
+  source = files[0][0];
+  if (source === 'links.json') {
+    raw = JSON.parse(text);
+  } else {
+    const document = parseDocument(text, { uniqueKeys: true });
+    if (document.errors.length) throw document.errors[0];
+    raw = document.toJS();
+  }
+  if (!raw || Object.getPrototypeOf(raw) !== Object.prototype) {
     throw new Error('expected an object mapping short codes to destinations');
   }
 } catch (error) {
-  console.error(`Build stopped. Fix links.json: ${error.message}`);
+  console.error(`Build stopped. Fix ${source}: ${error.message}`);
   process.exit(1);
 }
 const problems = [];
@@ -68,7 +87,7 @@ for (const { code, script } of links) {
 }
 
 if (problems.length) {
-  console.error('Build stopped. Fix these in links.json:');
+  console.error(`Build stopped. Fix these in ${source}:`);
   for (const p of problems) console.error('  - ' + p);
   process.exit(1);
 }

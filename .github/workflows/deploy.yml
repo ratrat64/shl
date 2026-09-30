@@ -23,6 +23,8 @@ jobs:
         with:
           node-version: 22
       - uses: actions/configure-pages@v5
+      - name: Install dependencies
+        run: npm ci
       - name: Check
         run: node --test build.test.mjs
       - name: Build
