@@ -1,5 +1,8 @@
 # Working in this repository
 
+## Git workflow
+- The agent may write commit messages, push commits, and publish new branches for requested work. Use a task branch for changes intended for a pull request; do not push directly to `main`.
+
 ## Build and verification
 - Use Node.js 22 (the CI version). There is no package manifest or dependency-install step.
 - CI runs `node --test build.test.mjs` then `node build.mjs`. Run from the repository root: build input and output paths are relative to the working directory. No lint or typecheck suite is configured.
