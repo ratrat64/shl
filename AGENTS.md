@@ -3,6 +3,8 @@
 ## Branch and worktree workflow
 - Before making changes, create one task branch and a separate Git worktree; do the work and run checks there. Keep related features for the task together in that worktree.
 - Preserve existing uncommitted work when consolidating changes from other worktrees.
+- A feature is ready only after a pull request is opened and checked for merge conflicts against the current `main`.
+- If resolving a conflict needs user input, report the blocker and stop; do not mark the feature ready.
 
 ## Git permissions
 - The user authorizes agents to write commit messages, commit task changes, push commits, and publish new branches without asking again for each operation.
