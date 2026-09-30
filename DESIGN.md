@@ -62,7 +62,7 @@ Flat by design: surfaces use color and a one-pixel rule instead of shadows.
 
 ## Shapes
 
-Directory rows and sections are square and ruled. Sponsor placements, code blocks, and callouts have 10px corners; the theme control is pill-shaped.
+Directory rows and sections are square and ruled. Code blocks and callouts have 10px corners; the theme control is pill-shaped.
 
 ## Components
 
@@ -73,10 +73,6 @@ Muted text links turn blue on hover or when current. On small screens navigation
 ### Directory rows
 
 A code links to its relative redirect page; the optional title and full destination appear beneath. A bottom rule separates each entry. Codes and long destinations wrap rather than overflow.
-
-### Sponsor placement
-
-Optional placements are text-only bordered panels labeled Advertisement; the link carries sponsored semantics. They do not appear when disabled.
 
 ## Do's and Don'ts
 

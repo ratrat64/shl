@@ -134,28 +134,6 @@ No approving review is required by this baseline; add one if your team needs it.
 Run the workflow on an initial PR if the check is not yet available in the picker.
 Merging to `main` triggers the existing production deployment.
 
-## Optional advertisements
-
-`ads.json` controls two text-only placements: `directory` (beside the link
-list) and `guide` (at the end of the setup guide). They are off by default.
-To show them, set `enabled` to `true` and fill in either slot:
-
-```json
-{
-  "enabled": true,
-  "directory": {
-    "label": "Your sponsor name",
-    "text": "A short description of the offer.",
-    "url": "https://example.com/"
-  },
-  "guide": null
-}
-```
-
-Set `enabled` back to `false` to hide all placements. Set an individual slot
-to `null` to hide only that slot. Only text and an HTTP(S) link are accepted;
-the build escapes displayed content and does not load ad scripts.
-
 ## Local build
 
 Use Node.js 24; launcher tests also require Bash. Install the YAML parser once:
