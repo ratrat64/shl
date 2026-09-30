@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Turns a JSON or YAML link map into a static site: one folder per short code,
+// Turns a JSON or YAML link map into a static site: one folder per short path,
 // each with an instant redirect and optional Bash launcher. No server.
 
 import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
@@ -8,7 +8,7 @@ import { parseDocument } from 'yaml';
 
 const OUT = 'dist';
 const CODE_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
-const RESERVED = new Set(['index', '404', 'assets', 'links']);
+const RESERVED = new Set(['index', '404', 'assets', 'links', 'index.html', '404.html', 'links.json', 'cname']);
 
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) =>
@@ -46,45 +46,66 @@ try {
   process.exit(1);
 }
 const problems = [];
-const seen = new Map();
 const links = [];
+const directories = [];
+const active = new Set();
 
-for (const [code, value] of Object.entries(raw)) {
-  const url = typeof value === 'string' ? value : value?.url;
-  const title = typeof value === 'object' ? value?.title ?? '' : '';
-  if (typeof value !== 'string' && (!value || typeof value !== 'object' || Array.isArray(value))) {
-    problems.push(`"${code}" — expected a URL string or an object with url, optional title and script`);
+function collect(entries, path = []) {
+  const seen = new Map();
+  const launchers = [];
+  if (active.has(entries)) {
+    problems.push(`"${path.join('/')}" — directory cannot contain itself`);
+    return;
   }
-  if (typeof value === 'object' && value && 'title' in value && typeof value.title !== 'string') {
-    problems.push(`"${code}" — title must be a string`);
+  if (!entries || Object.getPrototypeOf(entries) !== Object.prototype || (path.length && !Object.keys(entries).length)) {
+    problems.push(`"${path.join('/') || '/'}" — directory must contain links or subdirectories`);
+    return;
   }
-  if (typeof value === 'object' && value && 'script' in value && typeof value.script !== 'boolean') {
-    problems.push(`"${code}" — script must be a boolean`);
-  }
+  active.add(entries);
+  directories.push({ path, entries });
+  for (const [code, value] of Object.entries(entries)) {
+    const full = [...path, code];
+    const name = full.join('/');
+    if (!CODE_RE.test(code)) problems.push(`"${name}" — codes must start with a letter or number and contain only letters, numbers, . _ -`);
+    if (RESERVED.has(code.toLowerCase())) problems.push(`"${name}" — reserved name`);
+    const key = code.toLowerCase();
+    if (seen.has(key)) problems.push(`"${name}" — collides with "${seen.get(key)}" (codes are matched case-insensitively)`);
+    seen.set(key, name);
 
-  if (!CODE_RE.test(code)) problems.push(`"${code}" — codes must start with a letter or number and contain only letters, numbers, . _ -`);
-  if (RESERVED.has(code.toLowerCase())) problems.push(`"${code}" — reserved name`);
-  try {
-    if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) throw new Error();
-    const parsed = new URL(url);
-    if (!['http:', 'https:'].includes(parsed.protocol) || !parsed.hostname) throw new Error();
-  } catch {
-    problems.push(`"${code}" — destination must be a valid absolute HTTP or HTTPS URL`);
+    if (value && typeof value === 'object' && !Array.isArray(value) && !('url' in value)) {
+      collect(value, full);
+      continue;
+    }
+    const url = typeof value === 'string' ? value : value?.url;
+    const title = typeof value === 'object' ? value?.title ?? '' : '';
+    if (typeof value !== 'string' && (!value || typeof value !== 'object' || Array.isArray(value))) {
+      problems.push(`"${name}" — expected a URL string, an object with url, or a directory`);
+    }
+    if (typeof value === 'object' && value && 'title' in value && typeof value.title !== 'string') {
+      problems.push(`"${name}" — title must be a string`);
+    }
+    if (typeof value === 'object' && value && 'script' in value && typeof value.script !== 'boolean') {
+      problems.push(`"${name}" — script must be a boolean`);
+    }
+    try {
+      if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) throw new Error();
+      const parsed = new URL(url);
+      if (!['http:', 'https:'].includes(parsed.protocol) || !parsed.hostname) throw new Error();
+    } catch {
+      problems.push(`"${name}" — destination must be a valid absolute HTTP or HTTPS URL`);
+    }
+    links.push({ code: name, url, title, script: value?.script === true });
+    if (value?.script === true) launchers.push(code);
   }
-
-  const key = code.toLowerCase();
-  if (seen.has(key)) problems.push(`"${code}" — collides with "${seen.get(key)}" (codes are matched case-insensitively)`);
-  seen.set(key, code);
-
-  links.push({ code, url, title, script: value?.script === true });
+  for (const code of launchers) {
+    const filename = `${code}.sh`;
+    if (seen.has(filename.toLowerCase())) {
+      problems.push(`"${[...path, code].join('/')}" — launcher "${filename}" collides with "${seen.get(filename.toLowerCase())}"`);
+    }
+  }
+  active.delete(entries);
 }
-
-for (const { code, script } of links) {
-  const filename = `${code}.sh`;
-  if (script && seen.has(filename.toLowerCase())) {
-    problems.push(`"${code}" — launcher "${filename}" collides with code "${seen.get(filename.toLowerCase())}"`);
-  }
-}
+collect(raw);
 
 if (problems.length) {
   console.error(`Build stopped. Fix these in ${source}:`);
@@ -149,27 +170,44 @@ const styles = `
   a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
   .links{list-style:none;padding:0}
   .links li{padding:1rem 0;border-bottom:1px solid var(--muted);overflow-wrap:anywhere}
+  .links .links{margin:0 0 0 1rem;border-left:1px solid var(--muted);padding-left:1rem}
+  summary{cursor:pointer;color:var(--accent);font-weight:600}
+  summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  .browse{margin:.5rem 0 0}
+  nav{margin-bottom:1.5rem}
   .destination{display:block;color:var(--muted)}
 `;
 
-const indexPage = () => `<!doctype html>
+const listing = (entries, prefix = '') => `<ul class="links">${Object.entries(entries)
+  .sort(([a], [b]) => a.toLowerCase() < b.toLowerCase() ? -1 : 1)
+  .map(([code, value]) => {
+    const href = `./${prefix}${code}/`;
+    if (typeof value === 'object' && !('url' in value)) return `
+    <li><details><summary>${esc(code)}</summary>
+      <p class="browse"><a href="${esc(href)}">Browse ${esc(code)}</a></p>
+      ${listing(value, `${prefix}${code}/`)}
+    </details></li>`;
+    const url = typeof value === 'string' ? value : value.url;
+    const title = typeof value === 'string' ? '' : value.title;
+    return `
+    <li><a class="code" href="${esc(href)}">${esc(code)}</a>${title ? ` — ${esc(title)}` : ''}
+      <span class="destination">${esc(url)}</span></li>`;
+  }).join('')}</ul>`;
+
+const indexPage = ({ path, entries }) => `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Short links</title>
+<title>${path.length ? esc(path.join(' / ')) + ' — ' : ''}Short links</title>
 <style>${styles}</style>
 </head>
 <body>
 <main>
-  <h1>Short links</h1>
+  ${path.length ? `<nav aria-label="Breadcrumb"><a href="${'../'.repeat(path.length)}">Home</a>${path.map((code, i) => ` / ${i < path.length - 1 ? `<a href="${'../'.repeat(path.length - i - 1)}">${esc(code)}</a>` : esc(code)}`).join('')}</nav>` : ''}
+  <h1>${esc(path.at(-1) || 'Short links')}</h1>
   <p class="sub">Browse all available short links.</p>
-  ${links.length ? `<ul class="links">${[...links]
-    .sort((a, b) => a.code.toLowerCase() < b.code.toLowerCase() ? -1 : 1)
-    .map(({ code, url, title }) => `
-    <li><a class="code" href="./${esc(code)}/">${esc(code)}</a>${title ? ` — ${esc(title)}` : ''}
-      <span class="destination">${esc(url)}</span></li>`).join('')}
-  </ul>` : '<p>No links available yet.</p>'}
+  ${Object.keys(entries).length ? listing(entries) : '<p>No links available yet.</p>'}
 </main>
 </body>
 </html>
@@ -194,20 +232,30 @@ const notFoundPage = () => `<!doctype html>
 </main>
 <script>
 (async () => {
-  const parts = location.pathname.replace(/\\/+$/, '').split('/');
-  const seg = parts.pop() || '';
-  const base = (parts.join('/') || '') + '/';   // works on user AND project pages
-  document.getElementById('home').href = base;
-  for (const path of [base + 'links.json', '/links.json']) {
+  const parts = location.pathname.split('/').filter(Boolean);
+  const seg = parts.at(-1) || '';
+  const home = document.getElementById('home');
+  home.href = '/' + parts.slice(0, -1).join('/') + (parts.length > 1 ? '/' : '');
+  for (let depth = parts.length - 1; depth >= 0; depth--) {
+    const base = '/' + parts.slice(0, depth).join('/') + (depth ? '/' : '');
     try {
-      const res = await fetch(path, { cache: 'no-cache' });
+      const res = await fetch(base + 'links.json', { cache: 'no-cache' });
       if (!res.ok) continue;
-      const map = await res.json();
-      const hit = Object.entries(map).find(([c]) => c.toLowerCase() === seg.toLowerCase());
-      if (hit) {
-        location.replace(typeof hit[1] === 'string' ? hit[1] : hit[1].url);
+      let entry = await res.json();
+      const canonical = [];
+      for (const segment of parts.slice(depth)) {
+        const hit = entry && typeof entry === 'object' && !('url' in entry)
+          ? Object.entries(entry).find(([c]) => c.toLowerCase() === segment.toLowerCase()) : null;
+        if (!hit) { entry = null; break; }
+        canonical.push(hit[0]);
+        entry = hit[1];
+      }
+      home.href = base;
+      if (entry && typeof entry === 'object' && !('url' in entry)) {
+        location.replace(base + canonical.join('/') + '/');
         return;
       }
+      if (entry) { location.replace(typeof entry === 'string' ? entry : entry.url); return; }
       break;
     } catch (e) { /* try next */ }
   }
@@ -237,7 +285,10 @@ for (const link of links) {
   if (link.script) await writeFile(join(OUT, `${link.code}.sh`), scriptLauncher(link));
 }
 
-await writeFile(join(OUT, 'index.html'), indexPage());
+for (const directory of directories) {
+  await mkdir(join(OUT, ...directory.path), { recursive: true });
+  await writeFile(join(OUT, ...directory.path, 'index.html'), indexPage(directory));
+}
 await writeFile(join(OUT, '404.html'), notFoundPage());
 await writeFile(join(OUT, 'links.json'), JSON.stringify(raw, null, 2));
 await writeFile(join(OUT, '.nojekyll'), '');
