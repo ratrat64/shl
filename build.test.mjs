@@ -34,7 +34,8 @@ test('build produces a minimal site, copies the map and CNAME, and cleans stale 
   assert.equal(await f.read('CNAME'), 'go.example.com\n');
   assert.equal(await f.read('.nojekyll'), '');
   await assert.rejects(f.read('stale.html'), { code: 'ENOENT' });
-  assert.match(await f.read('index.html'), /href="\.\/Mixed\/">Mixed<\/a> — Example/);
+  assert.match(await f.read('index.html'), /href="\.\/Mixed\/">Mixed<\/a>/);
+  assert.match(await f.read('index.html'), /class="link-title">Example/);
   assert.match(await f.read('Mixed/index.html'), /http-equiv="refresh"/);
   assert.match(await f.read('plain/index.html'), /http:\/\/example.org\//);
 });
@@ -53,10 +54,44 @@ test('homepage lists sorted links safely with project-relative URLs and handles 
   }
   assert.match(html, /&lt;script&gt;title&lt;\/script&gt;/);
   assert.match(html, /https:\/\/example\.com\/\?q=&lt;img&gt;&amp;x=&quot;quoted&quot;/);
-  assert.doesNotMatch(html, /<script|<img|undefined/);
+  assert.doesNotMatch(html, /<script>title|<img|undefined/);
   const empty = await fixture(t, {});
   assert.equal(empty.build().status, 0);
   assert.match(await empty.read('index.html'), /No links available yet\./);
+});
+
+test('information pages use relative navigation and shared theme assets', async (t) => {
+  const f = await fixture(t, { aboutme: 'https://example.org/' });
+  assert.equal(f.build().status, 0);
+  const home = await f.read('index.html');
+  assert.match(home, /href="\.\/assets\/site\.css"/);
+  assert.match(home, /href="\.\/about\/"/);
+  for (const page of ['about', 'guide', 'how-it-works']) {
+    const html = await f.read(`${page}/index.html`);
+    assert.match(html, /href="\.\.\/assets\/site\.css"/);
+    assert.match(html, /src="\.\.\/assets\/theme\.js"/);
+    assert.match(html, /href="\.\.\/"/);
+  }
+  assert.match(await f.read('assets/site.css'), /data-theme=dark/);
+  assert.match(await f.read('assets/theme.js'), /shortlink-theme/);
+});
+
+test('ads are off by default, safely rendered when enabled, and validated before deleting output', async (t) => {
+  const f = await fixture(t, {});
+  assert.equal(f.build().status, 0);
+  assert.doesNotMatch(await f.read('index.html'), /class="sponsor"/);
+  await writeFile(join(f.cwd, 'ads.json'), JSON.stringify({ enabled: true, directory: {
+    label: '<script>bad</script>', text: 'Try this & that', url: 'https://example.org/?a=1&b=2',
+  } }));
+  assert.equal(f.build().status, 0);
+  const html = await f.read('index.html');
+  assert.match(html, /aria-label="Advertisement"/);
+  assert.match(html, /&lt;script&gt;bad&lt;\/script&gt;/);
+  assert.match(html, /rel="sponsored noopener noreferrer"/);
+  assert.doesNotMatch(await f.read('guide/index.html'), /class="sponsor"/);
+  await writeFile(join(f.cwd, 'ads.json'), JSON.stringify({ enabled: true, directory: { label: 'Bad', text: 'Bad', url: 'javascript:alert(1)' } }));
+  assert.equal(f.build().status, 1);
+  assert.match(await f.read('index.html'), /Try this &amp; that/);
 });
 
 test('redirect script safely preserves destinations containing HTML and quotes', async (t) => {
