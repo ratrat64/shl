@@ -2,59 +2,59 @@
 name: Shortlink
 description: A clear, static directory for short links.
 colors:
-  action-light: "#154db8"
-  action-dark: "#a5c4ff"
-  paper-light: "#f5f7f8"
+  action-light: "#1755a0"
+  action-dark: "#9ac6ff"
+  paper-light: "#fafafa"
   surface-light: "#fff"
-  ink-light: "#172232"
-  secondary-light: "#526174"
-  rule-light: "#d9e0e6"
-  wash-light: "#eaf0f9"
-  paper-dark: "#101923"
-  surface-dark: "#172331"
-  ink-dark: "#edf2f6"
-  secondary-dark: "#adbac9"
-  rule-dark: "#374657"
-  wash-dark: "#22354e"
+  ink-light: "#171717"
+  secondary-light: "#555555"
+  rule-light: "#dedede"
+  wash-light: "#f0f2f4"
+  paper-dark: "#000000"
+  surface-dark: "#0d0d0d"
+  ink-dark: "#f2f2f2"
+  secondary-dark: "#aaaaaa"
+  rule-dark: "#303030"
+  wash-dark: "#191919"
 typography:
   display:
     fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif"
-    fontSize: "clamp(2.7rem, 6vw, 5rem)"
-    lineHeight: 1.08
-    letterSpacing: "-.06em"
+    fontSize: "clamp(1.8rem, 3vw, 2.4rem)"
+    lineHeight: 1.2
+    letterSpacing: "-.035em"
   body:
     fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif"
     fontSize: "16px"
-    lineHeight: 1.65
+    lineHeight: 1.55
 rounded:
-  panel: "10px"
-  control: "999px"
+  panel: "4px"
+  control: "4px"
 ---
 
 # Design System: Shortlink
 
 ## Overview
 
-**Creative North Star: "The Bookmark Register"**
+**Creative North Star: "The Working Index"**
 
-A quiet, precise index: codes, destinations, and practical guidance are the material. The link directory stays visible before visitors use its optional search field.
+A compact index puts codes, titles, destinations, and search above everything else. A single guide contains the practical information.
 
 **Key Characteristics:**
-- Ruled entries instead of cards for the directory.
-- One blue link color against cool, neutral surfaces.
-- A legible light and dark version of the same structure.
+- Ruled, three-column entries instead of cards for the directory.
+- One blue link color against grayscale surfaces.
+- A true black dark background and a near-white light background.
 
 ## Colors
 
-The single action color is reserved for links and navigational feedback. Background, text, secondary text, and hairline dividers each have explicit light and dark counterparts. The soft wash distinguishes callouts and hovered controls.
+The single action color is reserved for links and focus. Dark mode uses a black page and charcoal controls; light mode uses an off-white page and white controls. Hairline dividers and muted text have theme-specific contrast.
 
 ## Typography
 
-The site uses the system sans for reading and large, tightly tracked headings. Codes, URLs in prose, and code samples use a system monospace. Supporting prose stays within a readable measure; destinations may wrap without truncation.
+The site uses the system sans for reading and modest headings. Codes and code samples use a system monospace. Destinations may wrap without truncation.
 
 ## Layout
 
-A centered 1120px outer container carries the site header and content. At wider widths the directory shares space with a narrow explanatory aside; below 740px the columns stack and navigation wraps to a separate line. Reading pages use a narrower 740px column.
+A centered 1160px container carries the directory across its full width. Search shares the title row on desktop; entries use code, title, and destination columns. Below 740px search and destinations stack, while the guide uses a narrower 740px column.
 
 ## Elevation & Depth
 
@@ -62,17 +62,17 @@ Flat by design: surfaces use color and a one-pixel rule instead of shadows.
 
 ## Shapes
 
-Directory rows and sections are square and ruled. Code blocks and callouts have 10px corners; the theme control is pill-shaped.
+Directory rows and sections are square and ruled. Inputs and code blocks have subtle 4px corners.
 
 ## Components
 
 ### Navigation
 
-Muted text links turn blue on hover or when current. On small screens navigation wraps below the brand and theme toggle. The toggle has a fine border and a visible keyboard focus outline.
+The header has only Links and Guide navigation. Current links are underlined. The theme toggle has a fine border and a visible keyboard focus outline.
 
 ### Directory rows
 
-A code links to its relative redirect page; the optional title and full destination appear beneath. A bottom rule separates each entry. Codes and long destinations wrap rather than overflow.
+A code links to its relative redirect page; the optional title and full destination share its row. A bottom rule separates entries. Codes and long destinations wrap rather than overflow.
 
 ## Do's and Don'ts
 

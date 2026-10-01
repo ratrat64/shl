@@ -141,9 +141,9 @@ const redirectPage = ({ url, title }) => `<!doctype html>
 <style>
   body{font:16px/1.6 ui-sans-serif,system-ui,sans-serif;margin:0;min-height:100svh;
        display:grid;place-content:center;gap:.5rem;padding:2rem;text-align:center;
-       background:#fff;color:#1a1d24}
-  a{color:#0b6e4f}
-  @media(prefers-color-scheme:dark){body{background:#12151c;color:#e6e8ee}a{color:#5fd0a3}}
+        background:#fafafa;color:#171717}
+   a{color:#1755a0}
+   @media(prefers-color-scheme:dark){body{background:#000;color:#f2f2f2}a{color:#9ac6ff}}
 </style>
 </head>
 <body>
@@ -154,72 +154,67 @@ const redirectPage = ({ url, title }) => `<!doctype html>
 `;
 
 const styles = `
-  :root{color-scheme:light;--bg:#f5f7f8;--panel:#fff;--ink:#172232;--muted:#526174;--line:#d9e0e6;--accent:#154db8;--wash:#eaf0f9}
-  @media(prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#101923;--panel:#172331;--ink:#edf2f6;--muted:#adbac9;--line:#374657;--accent:#a5c4ff;--wash:#22354e}}
-  :root[data-theme=light]{color-scheme:light;--bg:#f5f7f8;--panel:#fff;--ink:#172232;--muted:#526174;--line:#d9e0e6;--accent:#154db8;--wash:#eaf0f9}
-  :root[data-theme=dark]{color-scheme:dark;--bg:#101923;--panel:#172331;--ink:#edf2f6;--muted:#adbac9;--line:#374657;--accent:#a5c4ff;--wash:#22354e}
+  :root{color-scheme:light;--bg:#fafafa;--panel:#fff;--ink:#171717;--muted:#555;--line:#dedede;--accent:#1755a0;--wash:#f0f2f4}
+  @media(prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#000;--panel:#0d0d0d;--ink:#f2f2f2;--muted:#aaa;--line:#303030;--accent:#9ac6ff;--wash:#191919}}
+  :root[data-theme=light]{color-scheme:light;--bg:#fafafa;--panel:#fff;--ink:#171717;--muted:#555;--line:#dedede;--accent:#1755a0;--wash:#f0f2f4}
+  :root[data-theme=dark]{color-scheme:dark;--bg:#000;--panel:#0d0d0d;--ink:#f2f2f2;--muted:#aaa;--line:#303030;--accent:#9ac6ff;--wash:#191919}
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
-  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 ui-sans-serif,system-ui,-apple-system,sans-serif}
-  ::selection{background:var(--accent);color:var(--panel)}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 ui-sans-serif,system-ui,-apple-system,sans-serif}
+  ::selection{background:var(--accent);color:var(--bg)}
   a{color:var(--accent);text-underline-offset:.22em}
   a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
   [hidden]{display:none!important}
   button{font:inherit;cursor:pointer}
-  .wrap{max-width:1120px;margin:auto;padding-inline:clamp(1.25rem,4vw,3rem)}
-  .site-head{border-bottom:1px solid var(--line);background:var(--panel)}
-  .head-inner{min-height:82px;display:flex;align-items:center;gap:2rem;flex-wrap:wrap;padding-block:1rem}
-  .brand{color:var(--ink);font-weight:760;letter-spacing:-.055em;font-size:1.45rem;text-decoration:none;line-height:1}
-  .brand-mark{color:var(--accent);margin-right:.3rem}
-  .nav{display:flex;gap:clamp(.8rem,2.4vw,2rem);align-items:center;flex-wrap:wrap;margin-left:auto}
-  .nav a{color:var(--muted);font-size:.9rem;text-decoration:none;font-weight:550}
-  .nav a[aria-current=page],.nav a:hover{color:var(--accent)}
-  .theme-toggle{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:.42rem .85rem;font-size:.85rem;white-space:nowrap}
+  .wrap{max-width:1160px;margin:auto;padding-inline:clamp(1rem,3vw,2.5rem)}
+  .site-head{border-bottom:1px solid var(--line)}
+  .head-inner{min-height:64px;display:flex;align-items:center;gap:1.5rem;padding-block:.65rem}
+  .brand{color:var(--ink);font-weight:700;letter-spacing:-.035em;font-size:1.2rem;text-decoration:none;line-height:1}
+  .nav{display:flex;gap:1.5rem;align-items:center;margin-left:auto}
+  .nav a{color:var(--muted);font-size:.9rem;text-decoration:none}
+  .nav a[aria-current=page]{color:var(--ink);text-decoration:underline;text-decoration-color:var(--accent);text-underline-offset:.45em}
+  .nav a:hover{color:var(--accent)}
+  .theme-toggle{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:4px;padding:.35rem .7rem;font-size:.85rem;white-space:nowrap}
   .theme-toggle:hover{background:var(--wash)}
-  main{padding-top:clamp(3.5rem,7vw,6rem);padding-bottom:6rem}
+  main{padding-top:clamp(1.5rem,3vw,2.5rem);padding-bottom:4rem;min-height:70vh}
   h1,h2,h3,p{margin-top:0}
-  h1{font-size:clamp(2.7rem,6vw,5rem);letter-spacing:-.06em;line-height:1.08;max-width:13ch;margin-bottom:1rem}
-  h2{font-size:clamp(1.5rem,2.4vw,2rem);letter-spacing:-.04em;line-height:1.2;margin-bottom:.8rem}
+  h1{font-size:clamp(1.8rem,3vw,2.4rem);letter-spacing:-.035em;line-height:1.2;margin-bottom:1rem}
+  h2{font-size:clamp(1.25rem,2vw,1.5rem);letter-spacing:-.025em;line-height:1.25;margin-bottom:.8rem}
   h3{font-size:1.06rem;letter-spacing:-.02em}
   p{max-width:68ch}
-  .lead{color:var(--muted);font-size:clamp(1.05rem,1.5vw,1.25rem);max-width:52ch;margin-bottom:3rem}
-  .grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,290px);gap:clamp(2rem,5vw,5rem);align-items:start}
-  .section-head{display:flex;justify-content:space-between;gap:1rem;align-items:baseline;border-bottom:1px solid var(--ink);padding-bottom:.9rem}
+  .lead{color:var(--muted);max-width:65ch;margin-bottom:2rem}
+  .section-head{display:flex;justify-content:space-between;gap:1rem;align-items:baseline;border-bottom:1px solid var(--line);padding-bottom:.6rem}
   .section-head h2{margin:0}.count{color:var(--muted);font-size:.85rem;font-variant-numeric:tabular-nums}
-  .search{margin:1.25rem 0 .25rem}
-  .search label{display:block;font-weight:600;margin-bottom:.35rem}
-  .search input{width:100%;font:inherit;padding:.6rem .85rem;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink)}
+  .directory-tools{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1rem}
+  .directory-tools h1{margin:0}.directory-tools .count{margin-left:.5rem}
+  .search{width:min(100%,360px)}
+  .search label{display:block;font-size:.82rem;color:var(--muted);margin-bottom:.2rem}
+  .search input{width:100%;font:inherit;padding:.45rem .7rem;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--ink);caret-color:var(--accent)}
   .search input::placeholder{color:var(--muted)}
   .search input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-  .search-status{font-size:.9rem;color:var(--muted);margin:.75rem 0 0}
+  .search-status{font-size:.9rem;color:var(--muted);margin:0 0 .5rem}
   .links{list-style:none;padding:0;margin:0}
-  .links li{border-bottom:1px solid var(--line);padding:1.2rem 0;overflow-wrap:anywhere}
-  .links .links{margin:1rem 0 0 1rem;padding-left:1rem;border-left:1px solid var(--line)}
+  .links li{border-bottom:1px solid var(--line);padding:.65rem 0;overflow-wrap:anywhere}
+  .links .links{margin:.35rem 0 0 .75rem;padding-left:1rem;border-left:1px solid var(--line)}
   .links .links li:last-child{border-bottom:0}
-  summary{cursor:pointer;color:var(--accent);font-weight:650}
+  summary{cursor:pointer;color:var(--ink);font-weight:600}
   summary:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
-  .browse{margin:.5rem 0 0}
-  .breadcrumbs{margin-bottom:2rem;color:var(--muted)}
-  .link-top{display:flex;gap:.75rem;justify-content:space-between;align-items:baseline}
-  .code{font:650 1.03rem/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;text-decoration:none;color:var(--accent)}
+  .browse{margin:.25rem 0 0;font-size:.85rem}
+  .breadcrumbs{margin-bottom:1rem;color:var(--muted);font-size:.9rem}
+  .link-row{display:grid;grid-template-columns:minmax(130px,22%) minmax(140px,26%) minmax(0,1fr);gap:1rem;align-items:baseline}
+  .code{font:600 .94rem/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;text-decoration:none;color:var(--accent)}
   .code:hover{text-decoration:underline}
-  .arrow{color:var(--accent);font-size:1.15rem}
-  .link-title{color:var(--ink);margin:.35rem 0 .05rem;font-weight:550}
-  .destination{display:block;color:var(--muted);font-size:.88rem}
-  .side{border-top:1px solid var(--ink);padding-top:1.2rem;color:var(--muted)}
-  .side h2{color:var(--ink);font-size:1.25rem}.side p{font-size:.93rem}
-  .side a{font-weight:600}
-  .prose{max-width:740px}.prose h2{margin-top:3.5rem}.prose p,.prose li{color:var(--muted)}
+  .link-title{color:var(--ink);font-size:.9rem}
+  .destination{display:block;color:var(--muted);font-size:.85rem}
+  .prose{max-width:740px}.prose section{border-top:1px solid var(--line);padding-top:1rem;margin-top:2.5rem;scroll-margin-top:1rem}.prose p,.prose li{color:var(--muted)}
   .prose ol,.prose ul{padding-left:1.4rem}.prose li{padding-left:.35rem;margin-bottom:.8rem}
   .prose strong{color:var(--ink)}
-  pre{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:1.5rem;color:var(--ink);line-height:1.55;font-size:.9rem}
+  pre{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:1rem;color:var(--ink);line-height:1.55;font-size:.9rem}
   code{font: .9em/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere}
   .prose pre code{overflow-wrap:normal}
-  .callout{background:var(--wash);padding:1.5rem;border-radius:10px;margin-top:3rem}
-  .callout p:last-child{margin-bottom:0}
-  .footer{border-top:1px solid var(--line);padding-block:2rem;color:var(--muted);font-size:.87rem}
+  .footer{border-top:1px solid var(--line);padding-block:1.5rem;color:var(--muted);font-size:.87rem}
   .footer .wrap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}.footer p{margin:0}
-  @media(max-width:740px){.head-inner{gap:1rem}.nav{order:3;width:100%;margin:0;gap:1rem}.grid{grid-template-columns:1fr}.side{margin-top:1rem}main{padding-top:3rem}.footer .wrap{display:block}}
+  @media(max-width:740px){.head-inner{flex-wrap:wrap;gap:.75rem}.nav{gap:1rem}.directory-tools{align-items:stretch;flex-direction:column}.search{width:100%}.link-row{grid-template-columns:minmax(0,1fr) auto;gap:.1rem .5rem}.link-title{grid-column:2;text-align:right}.destination{grid-column:1/-1}.footer .wrap{display:block}}
   @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 `;
 
@@ -283,12 +278,12 @@ const shell = (title, active, depth, content) => `<!doctype html>
 <meta name="color-scheme" content="light dark"><title>${esc(title)} · Short links</title>
 <link rel="stylesheet" href="${depth}assets/site.css"><script src="${depth}assets/theme.js" defer></script></head>
 <body><header class="site-head"><div class="wrap head-inner">
-<a class="brand" href="${depth}"><span class="brand-mark" aria-hidden="true">/</span>shortlink</a>
-<nav class="nav" aria-label="Main navigation">
-${[['Links', '', 'links'], ['About', 'about/', 'about'], ['How to use', 'guide/', 'guide'], ['How it works', 'how-it-works/', 'how-it-works']].map(([label, path, key]) => `<a href="${depth}${path}"${active === key ? ' aria-current="page"' : ''}>${label}</a>`).join('')}
-</nav><button class="theme-toggle" type="button" aria-label="Change color theme">Theme: system</button></div></header>
-<main class="wrap">${content}</main>
-<footer class="footer"><div class="wrap"><p>Short links, built from a file.</p><p><a href="${depth}guide/">Documentation</a> · <a href="${depth}about/">About this project</a></p></div></footer>
+ <a class="brand" href="${depth}">shortlink</a>
+ <nav class="nav" aria-label="Main navigation">
+ ${[['Links', '', 'links'], ['Guide', 'guide/', 'guide']].map(([label, path, key]) => `<a href="${depth}${path}"${active === key ? ' aria-current="page"' : ''}>${label}</a>`).join('')}
+ </nav><button class="theme-toggle" type="button" aria-label="Change color theme">Theme: system</button></div></header>
+ <main class="wrap">${content}</main>
+ <footer class="footer"><div class="wrap"><p>Shortlink</p><p><a href="${depth}guide/">Guide</a> · <a href="https://github.com/ratrat64/shortlink#readme">Repository</a></p></div></footer>
 </body></html>`;
 
 const listing = (entries, prefix = '') => `<ul class="links">${Object.entries(entries)
@@ -303,73 +298,51 @@ const listing = (entries, prefix = '') => `<ul class="links">${Object.entries(en
     const url = typeof value === 'string' ? value : value.url;
     const title = typeof value === 'string' ? '' : value.title;
     return `
-      <li><div class="link-top"><a class="code" href="${esc(href)}">${esc(code)}</a><span class="arrow" aria-hidden="true">↗</span></div>${title ? `<p class="link-title">${esc(title)}</p>` : ''}
-        <span class="destination">${esc(url)}</span></li>`;
+       <li><div class="link-row"><a class="code" href="${esc(href)}">${esc(code)}</a><span class="link-title">${esc(title || '')}</span>
+         <span class="destination">${esc(url)}</span></div></li>`;
   }).join('')}</ul>`;
 
 const searchableListing = (entries, depth) => `<div class="search" hidden>
-    <label for="link-search">Search links</label>
-    <input id="link-search" type="search" placeholder="Code, title or destination" autocomplete="off">
-  </div><p id="search-status" class="search-status" role="status" hidden></p>
-  ${listing(entries)}<script src="${depth}assets/search.js" defer></script>`;
+     <label for="link-search">Search links</label>
+     <input id="link-search" type="search" placeholder="Code, title or destination" autocomplete="off">
+   </div>`;
+
+const directoryContents = (entries, depth, heading, count = '') => `<section aria-label="Links">
+  <div class="directory-tools"><div><h1>${heading}</h1>${count ? `<span class="count">${count}</span>` : ''}</div>${searchableListing(entries, depth)}</div>
+  <p id="search-status" class="search-status" role="status" hidden></p>
+  ${listing(entries)}<script src="${depth}assets/search.js" defer></script></section>`;
 
 const indexPage = () => shell('Links', 'links', './', `
-  <h1>Good links. Less distance.</h1>
-  <p class="lead">A small directory of shortcuts. Pick a code to go straight to its destination.</p>
-  <div class="grid"><section aria-labelledby="directory-title">
-    <div class="section-head"><h2 id="directory-title">The directory</h2><span class="count">${links.length} ${links.length === 1 ? 'link' : 'links'}</span></div>
-    ${links.length ? searchableListing(raw, './') : `<p>No links available yet. Add your first entry to ${source} and rebuild the site.</p>`}
-  </section><aside class="side"><h2>Simple by design.</h2>
-  <p>Each shortcut is a static page made from a link in <code>${source}</code>. No account, database, or application server required.</p>
-  <p><a href="./about/">Why this approach ↗</a></p></aside></div>`);
+   ${links.length ? directoryContents(raw, './', 'Links', `${links.length} ${links.length === 1 ? 'link' : 'links'}`) : `<h1>Links</h1><p>No links available yet. Add your first entry to <code>${source}</code> and rebuild the site.</p>`}`);
 
 const directoryPage = ({ path, entries }) => shell(path.at(-1), 'links', '../'.repeat(path.length), `
-  <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="${'../'.repeat(path.length)}">Home</a>${path.map((code, i) => ` / ${i < path.length - 1 ? `<a href="${'../'.repeat(path.length - i - 1)}">${esc(code)}</a>` : esc(code)}`).join('')}</nav>
-  <h1>${esc(path.at(-1))}</h1><p class="lead">Browse links and subdirectories in ${esc(path.at(-1))}.</p>
-  <div class="grid"><section aria-labelledby="directory-title">
-    <div class="section-head"><h2 id="directory-title">The directory</h2></div>
-    ${searchableListing(entries, '../'.repeat(path.length))}
-  </section><aside class="side"><h2>Simple by design.</h2>
-    <p>Each shortcut is a static page made from a link in <code>${source}</code>.</p>
-    <p><a href="${'../'.repeat(path.length)}about/">Why this approach ↗</a></p></aside></div>`);
+   <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="${'../'.repeat(path.length)}">Home</a>${path.map((code, i) => ` / ${i < path.length - 1 ? `<a href="${'../'.repeat(path.length - i - 1)}">${esc(code)}</a>` : esc(code)}`).join('')}</nav>
+   ${directoryContents(entries, '../'.repeat(path.length), esc(path.at(-1)))}`);
 
-const aboutPage = () => shell('About', 'about', '../', `<article class="prose">
-  <h1>Small infrastructure. Useful links.</h1>
-  <p class="lead">Shortlink turns a version-controlled list of URLs into a static directory and browser redirects on GitHub Pages.</p>
-  <h2>What you get</h2>
-  <p><strong>No backend or database.</strong> Your links live in <code>${source}</code>. A Node.js build generates plain files; GitHub Pages serves them. There is no application server for you to run.</p>
-  <p><strong>Changes you can review.</strong> Edit the map on a branch, open a pull request, and merge to publish. Every destination has a place in version history.</p>
-  <p><strong>A public directory.</strong> Visitors can see available links and where they go before following one. You can also use a custom domain with GitHub Pages.</p>
-  <h2>Trade-offs, plainly</h2>
-  <p>GitHub Pages is still the hosting provider: you do not need to operate your own hosting. These are browser redirects, not HTTP 301/302 responses. Destinations and the link map are public; there is no anonymous submission or built-in click tracking.</p>
-  <p><a href="../guide/">Set up your own links →</a></p></article>`);
-
-const guidePage = () => shell('How to use', 'guide', '../', `<article class="prose">
-  <h1>Make a short link.</h1>
-  <p class="lead">A link is one entry in a JSON or YAML file. Edit, review, merge; the build takes care of the rest.</p>
-  <h2>Get started</h2><ol>
-    <li>Create a GitHub repository with these project files and a <code>main</code> branch. In Settings → Pages, set the source to <strong>GitHub Actions</strong>.</li>
-    <li>Edit <code>${source}</code> on a branch. Add a code and its absolute HTTP(S) destination (YAML example):</li>
-  </ol><pre><code>gh: https://github.com/
+const guidePage = () => shell('Guide', 'guide', '../', `<article class="prose">
+   <h1>Guide</h1>
+   <nav aria-label="On this page"><a href="#about">About</a> · <a href="#how-to-use">How to use</a> · <a href="#how-it-works">How it works</a></nav>
+   <section id="about"><h2>About</h2>
+   <p>Shortlink publishes a public directory and browser redirects from a version-controlled JSON or YAML file. GitHub Pages serves the generated files; no application server or database is required.</p>
+   <p>Links and destinations are public. Redirects are browser-based, not HTTP 301/302 responses. There is no anonymous submission or built-in click tracking.</p></section>
+   <section id="how-to-use"><h2>How to use</h2><ol>
+     <li>Create a repository with these files and a <code>main</code> branch. Set Settings → Pages → Source to <strong>GitHub Actions</strong>.</li>
+     <li>Edit <code>${source}</code> on a branch. Add an absolute HTTP(S) destination:</li>
+   </ol><pre><code>gh: https://github.com/
 docs:
   url: https://docs.github.com/en/pages
   title: GitHub Pages docs</code></pre><ol start="3">
-    <li>Open a pull request to <code>main</code>. Once checks pass, merge it and wait for the deploy workflow to finish.</li>
-    <li>Visit <code>https://&lt;user&gt;.github.io/&lt;repo&gt;/gh/</code>, or use your configured custom domain.</li>
-  </ol>
-  <h2>Editing and removing links</h2>
-  <p>Change the URL to retarget an existing code; delete the entry to remove it on the next deployment. Nest objects to make browseable directories and URLs such as <code>/tools/git/</code>. Codes start with a letter or number and may contain letters, numbers, dots, underscores and hyphens. Sibling names cannot differ only by case.</p>
-  <h2>Optional script launchers</h2>
-  <p>Set <code>script: true</code> on an object entry to also build a <code>&lt;path&gt;.sh</code> launcher. Use the exact casing and no trailing slash. Only run scripts from sources you trust; the launcher downloads the current destination each time.</p>
-  <div class="callout"><h3>Want the full reference?</h3><p>The <a href="https://github.com/ratrat64/shortlink#readme">repository documentation ↗</a> covers YAML, custom domains, validation rules, local builds, and deployment checks.</p></div>
-  </article>`);
+     <li>Open a pull request, pass checks, and merge. After deployment, visit <code>https://&lt;user&gt;.github.io/&lt;repo&gt;/gh/</code>.</li>
+   </ol>
+   <p>Change a URL to retarget a code; delete its entry to remove it. Nest objects for directories. Codes start with a letter or number and may also contain dots, underscores, and hyphens; sibling names cannot differ only by case.</p>
+   <p>Optional: <code>script: true</code> builds a <code>&lt;path&gt;.sh</code> launcher. Use exact casing and no trailing slash; only run scripts from trusted sources.</p></section>
+   <section id="how-it-works"><h2>How it works</h2>
+   <p>The build validates codes, collisions, and URL syntax before replacing output. Each link gets a redirect page with JavaScript, meta refresh, and a clickable fallback. Directories get browsable pages.</p>
+   <p>GitHub Actions deploys the files after merges to <code>main</code>. The 404 page checks the public link map for differently capitalized codes.</p>
+   <p>See the <a href="https://github.com/ratrat64/shortlink#readme">repository documentation</a> for custom domains, local builds, and full validation rules.</p></section>
+   </article>`);
 
-const howPage = () => shell('How it works', 'how-it-works', '../', `<article class="prose">
-  <h1>From a file to a link.</h1><p class="lead">The route is short because the system is short. Here is the whole path.</p>
-  <h2>One source of truth</h2><p><code>${source}</code> maps codes to destinations. The build checks every entry before replacing the output, including code collisions and URL syntax.</p>
-  <h2>A page for every path</h2><p>For each valid link path the build writes <code>&lt;path&gt;/index.html</code>. The page uses JavaScript and a meta refresh to send visitors to the destination, with a clickable fallback if neither redirect runs. Directories get browseable pages instead. This is a browser redirect, not an HTTP 301/302.</p>
-  <h2>Published as static files</h2><p>GitHub Actions builds and deploys the generated files to GitHub Pages after a merge to <code>main</code>. The directory is built from the same map. A 404 page checks differently capitalized codes in the public map before showing an error.</p>
-  </article>`);
+const oldInfoPage = (section) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Guide · Short links</title><meta http-equiv="refresh" content="0; url=../guide/#${section}"><link rel="canonical" href="../guide/#${section}"></head><body><p><a href="../guide/#${section}">Continue to the guide</a></p></body></html>`;
 
 // GitHub Pages serves 404.html for anything unmatched. Catches codes that only
 // differ by case, plus typos.
@@ -452,7 +425,7 @@ for (const directory of directories.slice(1)) {
   await mkdir(join(OUT, ...directory.path), { recursive: true });
   await writeFile(join(OUT, ...directory.path, 'index.html'), directoryPage(directory));
 }
-for (const [name, page] of [['about', aboutPage], ['guide', guidePage], ['how-it-works', howPage]]) {
+for (const [name, page] of [['about', () => oldInfoPage('about')], ['guide', guidePage], ['how-it-works', () => oldInfoPage('how-it-works')]]) {
   await mkdir(join(OUT, name), { recursive: true });
   await writeFile(join(OUT, name, 'index.html'), page());
 }

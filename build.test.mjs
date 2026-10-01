@@ -57,7 +57,7 @@ Run:
     for (const path of ['links.json', '404.html', 'Run/index.html', 'Run.sh']) {
       assert.equal(await f.read(path), await json.read(path), `${source}: ${path}`);
     }
-    assert.match(await f.read('index.html'), new RegExp(`in <code>${source.replace('.', '\\.')}<\\/code>`));
+    assert.doesNotMatch(await f.read('index.html'), /Simple by design|Good links/);
     assert.match(await f.read('guide/index.html'), new RegExp(`<code>${source.replace('.', '\\.')}<\\/code>`));
     assert.deepEqual(JSON.parse(await f.read('links.json')), links);
   }
@@ -215,14 +215,21 @@ test('information pages use relative navigation and shared theme assets', async 
   assert.equal(f.build().status, 0);
   const home = await f.read('index.html');
   assert.match(home, /href="\.\/assets\/site\.css"/);
-  assert.match(home, /href="\.\/about\/"/);
+  assert.match(home, /href="\.\/guide\/"/);
+  assert.doesNotMatch(home, /href="\.\/about\/"|Simple by design|Good links/);
   for (const page of ['about', 'guide', 'how-it-works']) {
     const html = await f.read(`${page}/index.html`);
-    assert.match(html, /href="\.\.\/assets\/site\.css"/);
-    assert.match(html, /src="\.\.\/assets\/theme\.js"/);
-    assert.match(html, /href="\.\.\/"/);
+    if (page === 'guide') {
+      assert.match(html, /href="\.\.\/assets\/site\.css"/);
+      assert.match(html, /src="\.\.\/assets\/theme\.js"/);
+      assert.match(html, /href="\.\.\/"/);
+      for (const section of ['about', 'how-to-use', 'how-it-works']) assert.match(html, new RegExp(`id="${section}"`));
+    } else {
+      assert.match(html, new RegExp(`url=\\.\\.\\/guide\\/#${page}`));
+    }
   }
   assert.match(await f.read('assets/site.css'), /data-theme=dark/);
+  assert.match(await f.read('assets/site.css'), /--bg:#000/);
   assert.match(await f.read('assets/theme.js'), /shortlink-theme/);
   assert.match(await f.read('guide/index.html'), /github\.com\/ratrat64\/shortlink#readme/);
 });
