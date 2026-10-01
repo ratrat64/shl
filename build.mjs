@@ -154,10 +154,10 @@ const redirectPage = ({ url, title }) => `<!doctype html>
 `;
 
 const styles = `
-  :root{color-scheme:light;--bg:#fafafa;--panel:#fff;--ink:#171717;--muted:#555;--line:#dedede;--accent:#1755a0;--wash:#f0f2f4}
-  @media(prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#000;--panel:#0d0d0d;--ink:#f2f2f2;--muted:#aaa;--line:#303030;--accent:#9ac6ff;--wash:#191919}}
-  :root[data-theme=light]{color-scheme:light;--bg:#fafafa;--panel:#fff;--ink:#171717;--muted:#555;--line:#dedede;--accent:#1755a0;--wash:#f0f2f4}
-  :root[data-theme=dark]{color-scheme:dark;--bg:#000;--panel:#0d0d0d;--ink:#f2f2f2;--muted:#aaa;--line:#303030;--accent:#9ac6ff;--wash:#191919}
+  :root{color-scheme:light;--bg:#fafafa;--panel:#fff;--ink:#171717;--muted:#555;--line:#dedede;--accent:#1755a0;--script:#875000;--wash:#f0f2f4}
+  @media(prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#000;--panel:#0d0d0d;--ink:#f2f2f2;--muted:#aaa;--line:#303030;--accent:#9ac6ff;--script:#ffcb86;--wash:#191919}}
+  :root[data-theme=light]{color-scheme:light;--bg:#fafafa;--panel:#fff;--ink:#171717;--muted:#555;--line:#dedede;--accent:#1755a0;--script:#875000;--wash:#f0f2f4}
+  :root[data-theme=dark]{color-scheme:dark;--bg:#000;--panel:#0d0d0d;--ink:#f2f2f2;--muted:#aaa;--line:#303030;--accent:#9ac6ff;--script:#ffcb86;--wash:#191919}
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
   body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 ui-sans-serif,system-ui,-apple-system,sans-serif}
@@ -194,16 +194,18 @@ const styles = `
   .search input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .search-status{font-size:.9rem;color:var(--muted);margin:0 0 .5rem}
   .links{list-style:none;padding:0;margin:0}
-  .links li{border-bottom:1px solid var(--line);padding:.65rem 0;overflow-wrap:anywhere}
-  .links .links{margin:.35rem 0 0 .75rem;padding-left:1rem;border-left:1px solid var(--line)}
-  .links .links li:last-child{border-bottom:0}
+  .links li{padding:.65rem 0;overflow-wrap:anywhere}
+  .links .links{margin:.35rem 0 0 .75rem;padding-left:1rem}
   summary{cursor:pointer;color:var(--ink);font-weight:600}
   summary:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
-  .browse{margin:.25rem 0 0;font-size:.85rem}
-  .breadcrumbs{margin-bottom:1rem;color:var(--muted);font-size:.9rem}
+  summary a{color:inherit;text-decoration:none}
+  summary a:hover{text-decoration:underline}
+  .breadcrumbs{margin:0 0 1rem;color:var(--muted);font-size:.9rem}
   .link-row{display:grid;grid-template-columns:minmax(130px,22%) minmax(140px,26%) minmax(0,1fr);gap:1rem;align-items:baseline}
   .code{font:600 .94rem/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;text-decoration:none;color:var(--accent)}
   .code:hover{text-decoration:underline}
+  .script-link{color:var(--script)}
+  .script-label{font:600 .7rem/1.5 ui-sans-serif,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.04em;margin-left:.5rem}
   .link-title{color:var(--ink);font-size:.9rem}
   .destination{display:block;color:var(--muted);font-size:.85rem}
   .prose{max-width:740px}.prose section{border-top:1px solid var(--line);padding-top:1rem;margin-top:2.5rem;scroll-margin-top:1rem}.prose p,.prose li{color:var(--muted)}
@@ -291,14 +293,13 @@ const listing = (entries, prefix = '') => `<ul class="links">${Object.entries(en
   .map(([code, value]) => {
     const href = `./${prefix}${code}/`;
     if (typeof value === 'object' && !('url' in value)) return `
-      <li><details><summary>${esc(code)}</summary>
-        <p class="browse"><a href="${esc(href)}">Browse ${esc(code)}</a></p>
+      <li><details><summary><a href="${esc(href)}">${esc(code)}</a></summary>
         ${listing(value, `${prefix}${code}/`)}
       </details></li>`;
     const url = typeof value === 'string' ? value : value.url;
     const title = typeof value === 'string' ? '' : value.title;
     return `
-       <li><div class="link-row"><a class="code" href="${esc(href)}">${esc(code)}</a><span class="link-title">${esc(title || '')}</span>
+       <li><div class="link-row"><a class="code${value?.script === true ? ' script-link' : ''}" href="${esc(href)}">${esc(code)}${value?.script === true ? '<span class="script-label">script</span>' : ''}</a><span class="link-title">${esc(title || '')}</span>
          <span class="destination">${esc(url)}</span></div></li>`;
   }).join('')}</ul>`;
 
@@ -307,17 +308,21 @@ const searchableListing = (entries, depth) => `<div class="search" hidden>
      <input id="link-search" type="search" placeholder="Code, title or destination" autocomplete="off">
    </div>`;
 
-const directoryContents = (entries, depth, heading, count = '') => `<section aria-label="Links">
+const directoryContents = (entries, depth, heading, count = '', breadcrumbs = '') => `<section aria-label="Links">
   <div class="directory-tools"><div><h1>${heading}</h1>${count ? `<span class="count">${count}</span>` : ''}</div>${searchableListing(entries, depth)}</div>
+  ${breadcrumbs}
   <p id="search-status" class="search-status" role="status" hidden></p>
   ${listing(entries)}<script src="${depth}assets/search.js" defer></script></section>`;
 
 const indexPage = () => shell('Links', 'links', './', `
    ${links.length ? directoryContents(raw, './', 'Links', `${links.length} ${links.length === 1 ? 'link' : 'links'}`) : `<h1>Links</h1><p>No links available yet. Add your first entry to <code>${source}</code> and rebuild the site.</p>`}`);
 
-const directoryPage = ({ path, entries }) => shell(path.at(-1), 'links', '../'.repeat(path.length), `
-   <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="${'../'.repeat(path.length)}">Home</a>${path.map((code, i) => ` / ${i < path.length - 1 ? `<a href="${'../'.repeat(path.length - i - 1)}">${esc(code)}</a>` : esc(code)}`).join('')}</nav>
-   ${directoryContents(entries, '../'.repeat(path.length), esc(path.at(-1)))}`);
+const directoryPage = ({ path, entries }) => {
+  const depth = '../'.repeat(path.length);
+  const breadcrumbs = `<nav class="breadcrumbs" aria-label="Breadcrumb"><a href="${depth}">Home</a>${path.map((code, i) => ` / ${i < path.length - 1 ? `<a href="${'../'.repeat(path.length - i - 1)}">${esc(code)}</a>` : esc(code)}`).join('')}</nav>`;
+  return shell(path.at(-1), 'links', depth, `
+   ${directoryContents(entries, depth, esc(path.at(-1)), '', breadcrumbs)}`);
+};
 
 const guidePage = () => shell('Guide', 'guide', '../', `<article class="prose">
    <h1>Guide</h1>

@@ -4,6 +4,8 @@ description: A clear, static directory for short links.
 colors:
   action-light: "#1755a0"
   action-dark: "#9ac6ff"
+  script-light: "#875000"
+  script-dark: "#ffcb86"
   paper-light: "#fafafa"
   surface-light: "#fff"
   ink-light: "#171717"
@@ -40,13 +42,13 @@ rounded:
 A compact index puts codes, titles, destinations, and search above everything else. A single guide contains the practical information.
 
 **Key Characteristics:**
-- Ruled, three-column entries instead of cards for the directory.
-- One blue link color against grayscale surfaces.
+- Unruled, three-column entries instead of cards for the directory.
+- Blue links and amber script links against grayscale surfaces.
 - A true black dark background and a near-white light background.
 
 ## Colors
 
-The single action color is reserved for links and focus. Dark mode uses a black page and charcoal controls; light mode uses an off-white page and white controls. Hairline dividers and muted text have theme-specific contrast.
+Blue is reserved for standard links and focus; amber marks executable-script entries with a text label as a second cue. Dark mode uses a black page and charcoal controls; light mode uses an off-white page and white controls. Muted text has theme-specific contrast.
 
 ## Typography
 
@@ -54,15 +56,15 @@ The site uses the system sans for reading and modest headings. Codes and code sa
 
 ## Layout
 
-A centered 1160px container carries the directory across its full width. Search shares the title row on desktop; entries use code, title, and destination columns. Below 740px search and destinations stack, while the guide uses a narrower 740px column.
+A centered 1160px container carries the directory across its full width. Search shares the title row on desktop and in nested folders; breadcrumbs follow the title row. Entries use code, title, and destination columns. Below 740px search and destinations stack, while the guide uses a narrower 740px column.
 
 ## Elevation & Depth
 
-Flat by design: surfaces use color and a one-pixel rule instead of shadows.
+Flat by design: surfaces use color instead of shadows; directory entries are separated by space rather than rules.
 
 ## Shapes
 
-Directory rows and sections are square and ruled. Inputs and code blocks have subtle 4px corners.
+Directory rows are square and unruled. Inputs and code blocks have subtle 4px corners.
 
 ## Components
 
@@ -72,7 +74,7 @@ The header has only Links and Guide navigation. Current links are underlined. Th
 
 ### Directory rows
 
-A code links to its relative redirect page; the optional title and full destination share its row. A bottom rule separates entries. Codes and long destinations wrap rather than overflow.
+A code links to its relative redirect page; script-enabled codes use amber and a visible script label. Folder names link to their browseable pages while the disclosure marker expands the nested list. The optional title and full destination share a row. Codes and long destinations wrap rather than overflow.
 
 ## Do's and Don'ts
 
