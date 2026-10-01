@@ -120,15 +120,15 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
   const f = await fixture(t, links);
   assert.equal(f.build().status, 0);
   const home = await f.read('index.html');
-  assert.match(home, /<details><summary>tools<\/summary>/);
-  assert.match(home, /href="\.\/tools\/">Browse tools<\/a>/);
+  assert.match(home, /<details><summary><a href="\.\/tools\/">tools<\/a><\/summary>/);
   assert.match(home, /href="\.\/tools\/editors\/Code\/">Code<\/a>/);
   assert.match(home, /class="link-title">&lt;Editor&gt;/);
   assert.doesNotMatch(home, /<img>/);
   const tools = await f.read('tools/index.html');
   assert.match(tools, /href="\.\.\/assets\/site\.css"/);
   assert.match(tools, /href="\.\/git\/">git<\/a>/);
-  assert.match(tools, /href="\.\/editors\/">Browse editors<\/a>/);
+  assert.match(tools, /<summary><a href="\.\/editors\/">editors<\/a><\/summary>/);
+  assert.ok(tools.indexOf('class="directory-tools"') < tools.indexOf('class="breadcrumbs"'));
   const editors = await f.read('tools/editors/index.html');
   assert.match(editors, /href="\.\.\/\.\.\/assets\/site\.css"/);
   assert.match(editors, /href="\.\.\/\.\.\/">Home<\/a>/);
@@ -139,6 +139,8 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
   }
   assert.match(await f.read('tools/git/index.html'), /https:\/\/git-scm\.com\//);
   assert.match(await f.read('tools/editors/Code/index.html'), /&lt;img&gt;/);
+  const css = await f.read('assets/site.css');
+  assert.doesNotMatch(css, /\.links li\{[^}]*border-bottom|\.links \.links\{[^}]*border-left/);
   assert.deepEqual(JSON.parse(await f.read('links.json')), links);
   const yaml = await fixture(t, 'tools:\n  git: https://git-scm.com/\n  editors:\n    Code:\n      url: https://example.org/?x=<img>&q="\n      title: <Editor>\ngh: https://github.com/\n', 'links.yaml');
   assert.equal(yaml.build().status, 0);
@@ -254,6 +256,10 @@ test('script launchers are opt-in, quote URLs, forward arguments and statuses, a
   assert.equal(build.status, 0, build.stderr);
   const launcher = await f.read('Run.sh');
   assert.equal(await f.read('tools/Nested.sh'), launcher);
+  const home = await f.read('index.html');
+  assert.match(home, /class="code script-link" href="\.\/Run\/">Run<span class="script-label">script<\/span><\/a>/);
+  assert.match(home, /class="code" href="\.\/disabled\/">disabled<\/a>/);
+  assert.match(await f.read('assets/site.css'), /--script:#ffcb86/);
   assert.match(await f.read('tools/Nested/index.html'), /http-equiv="refresh"/);
   assert.match(await f.read('Run/index.html'), /http-equiv="refresh"/);
   await assert.rejects(f.read('disabled.sh'), { code: 'ENOENT' });
