@@ -123,6 +123,7 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
   assert.match(home, /<details><summary><a href="\.\/tools\/">tools<\/a><\/summary>/);
   assert.match(home, /href="\.\/tools\/editors\/Code\/" title="&lt;Editor&gt;">Code<\/a>/);
   assert.match(home, /data-title="&lt;Editor&gt;"/);
+  assert.match(home, /class="link-row" title="&lt;Editor&gt;"/);
   assert.doesNotMatch(home, /<img>/);
   const tools = await f.read('tools/index.html');
   assert.match(tools, /href="\.\.\/assets\/site\.css"/);
@@ -134,6 +135,7 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
   assert.match(editors, /href="\.\.\/\.\.\/">Home<\/a>/);
   assert.match(editors, /href="\.\.\/">tools<\/a>/);
   assert.match(editors, /href="\.\/Code\/" title="&lt;Editor&gt;">Code<\/a>/);
+  assert.match(editors, /class="link-row" title="&lt;Editor&gt;"/);
   for (const prefix of ['/', '/project/']) {
     assert.equal(new URL('./tools/editors/Code/', `https://example.org${prefix}`).pathname, `${prefix}tools/editors/Code/`);
   }
@@ -154,9 +156,11 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
 
 test('long destinations keep their trailing path beside single-line short codes', async (t) => {
   const url = 'https://raw.githubusercontent.com/ratrat64/homelab-public/refs/heads/main/scripts/ubuntu/oh-my-posh/setup.sh';
-  const f = await fixture(t, { setup: { url, title: 'Install shell prompt' } });
+  const f = await fixture(t, { setup: { url, title: 'Install shell prompt' }, plain: url });
   assert.equal(f.build().status, 0);
   const html = await f.read('index.html');
+  assert.match(html, /class="link-row" title="Install shell prompt"/);
+  assert.match(html, /class="destination"><span class="sr-only">https:\/\/raw\.githubusercontent\.com\/ratrat64/);
   assert.match(html, /class="destination" title="https:\/\/raw\.githubusercontent\.com\/ratrat64/);
   assert.match(html, /class="destination-start" aria-hidden="true">https:\/\/raw\.githubusercontent\.com\/.*\/ubuntu\//);
   assert.match(html, /class="destination-end" aria-hidden="true">oh-my-posh\/setup\.sh<\/span>/);

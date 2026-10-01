@@ -305,8 +305,8 @@ const listing = (entries, prefix = '') => `<ul class="links">${Object.entries(en
     const split = path.lastIndexOf('/', path.lastIndexOf('/') - 1);
     const cut = split > 0 ? originLength + split + 1 : url.length;
     return `
-        <li${title ? ` data-title="${esc(title)}"` : ''}><div class="link-row"><a class="code${value?.script === true ? ' script-link' : ''}" href="${esc(href)}"${title ? ` title="${esc(title)}"` : ''}>${esc(code)}${value?.script === true ? '<span class="script-label">script</span>' : ''}</a>
-          <span class="destination" title="${esc(url)}"><span class="sr-only">${esc(url)}</span><span class="destination-start" aria-hidden="true">${esc(url.slice(0, cut))}</span><span class="destination-end" aria-hidden="true">${esc(url.slice(cut))}</span></span></div></li>`;
+        <li${title ? ` data-title="${esc(title)}"` : ''}><div class="link-row"${title ? ` title="${esc(title)}"` : ''}><a class="code${value?.script === true ? ' script-link' : ''}" href="${esc(href)}"${title ? ` title="${esc(title)}"` : ''}>${esc(code)}${value?.script === true ? '<span class="script-label">script</span>' : ''}</a>
+          <span class="destination"${title ? '' : ` title="${esc(url)}"`}><span class="sr-only">${esc(url)}</span><span class="destination-start" aria-hidden="true">${esc(url.slice(0, cut))}</span><span class="destination-end" aria-hidden="true">${esc(url.slice(cut))}</span></span></div></li>`;
   }).join('')}</ul>`;
 
 const searchableListing = (entries, depth) => `<div class="search" hidden>
