@@ -4,8 +4,9 @@ A URL shortener that runs entirely on GitHub Pages. A JSON or YAML link map is
 the source of truth; a build step turns each entry into a static folder with an
 instant redirect, and GitHub Actions deploys it on every push to `main`.
 
-The generated site includes a browsable directory, an About page, a setup guide,
-and a How it works page. It follows the system light/dark preference; visitors
+The generated site includes a browsable directory and a guide with About, How to use,
+and How it works sections. The former `/about/` and `/how-it-works/` URLs forward
+to those sections. It follows the system light/dark preference; visitors
 can override it with the Theme button, saved in their browser.
 Search on the homepage and each directory page filters the visible links by code,
 title, or destination (including nested links). Browsing still works without JavaScript.
@@ -136,18 +137,21 @@ No approving review is required by this baseline; add one if your team needs it.
 Run the workflow on an initial PR if the check is not yet available in the picker.
 Merging to `main` triggers the existing production deployment.
 
-## Local build
+## Run locally
 
-Use Node.js 24; launcher tests also require Bash. Install the YAML parser once:
+From the repository root, run (requires npm; tests also require Bash):
 
 ```bash
 npm ci
-node --test build.test.mjs # validation and generated-script regression checks
-node build.mjs          # writes ./dist
-npx serve dist          # optional preview
+npx --yes node@24 build.mjs
+npx serve dist -c ../serve.json
 ```
 
-Run from the repository root. A successful build replaces `dist/` completely;
+Open the URL printed by `serve` (usually `http://localhost:3000/`). The
+`serve.json` config keeps dotted directory names such as `/dev.tools/` working.
+To run the regression checks: `npx --yes node@24 --test build.test.mjs`.
+
+A successful build replaces `dist/` completely;
 edit the templates in `build.mjs`, not the generated files. Validation fails
 before the old output is removed. URL syntax is checked, but destination
 reachability is not.
