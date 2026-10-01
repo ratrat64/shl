@@ -1,11 +1,14 @@
 # Working in this repository
 
+## Session startup
+- At the start of a new session, before tackling the first task, read `README.md`, `PRODUCT.md`, `DESIGN.md`, and `package.json`. Identify the relevant code paths, then briefly summarize how the project works and what you will inspect for the task.
+
 ## Branch and worktree workflow
 - Before creating a new branch or worktree, update local `main` from `origin/main` with a fast-forward pull.
 - Before making changes, create one task branch and a separate Git worktree; do the work and run checks there. Keep related features for the task together in that worktree.
 - Preserve existing uncommitted work when consolidating changes from other worktrees.
 - If `main` advances during feature work, check whether the feature needs changes to align with it; if so, make a plan for those changes before editing.
-- A feature is ready only after a pull request is opened and checked for merge conflicts against the current `main`.
+- For every task that changes repository files, after checks pass, commit and push the task branch and open a pull request against `main` without waiting for a separate request. Check the pull request for merge conflicts against the latest `main` and report its status.
 - If resolving a conflict needs user input, report the blocker and stop; do not mark the feature ready.
 
 ## Git permissions
