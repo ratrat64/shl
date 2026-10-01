@@ -144,11 +144,11 @@ From the repository root, run (requires npm; tests also require Bash):
 ```bash
 npm ci
 npx --yes node@24 build.mjs
-python3 -m http.server 3000 --directory dist
+npx serve dist -c ../serve.json
 ```
 
-Open `http://localhost:3000/`. Python's built-in server serves dotted directory
-names such as `/dev.tools/` correctly.
+Open the URL printed by `serve` (usually `http://localhost:3000/`). The
+`serve.json` config keeps dotted directory names such as `/dev.tools/` working.
 To run the regression checks: `npx --yes node@24 --test build.test.mjs`.
 
 A successful build replaces `dist/` completely;

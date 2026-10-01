@@ -16,7 +16,7 @@
 - CI installs dependencies, runs `node --test build.test.mjs`, then `node build.mjs`. Run from the repository root: build input and output paths are relative to the working directory. No lint or typecheck suite is configured.
 - Focused routing checks: `node --test --test-name-pattern="404" build.test.mjs`. Tests build in temporary directories and execute generated scripts with simulated browser APIs; actual Pages 404 behavior needs a deployed browser smoke test.
 - A successful build deletes and recreates `dist/`. Edit the templates in `build.mjs`, not generated files.
-- Optional local preview: `python3 -m http.server 3000 --directory dist` (serves dotted directory names such as `dev.tools`). Redirects use HTML meta refresh and JavaScript, not HTTP redirects; `curl -L` does not follow them.
+- Optional local preview: `npx serve dist -c ../serve.json` (`cleanUrls: false` keeps dotted directory names working). Redirects use HTML meta refresh and JavaScript, not HTTP redirects; `curl -L` does not follow them.
 
 ## Link and routing constraints
 - Exactly one of `links.json`, `links.yaml`, or `links.yml` must exist. Each accepts a URL string, a link object with `url`/optional `title`/optional `script`, or a nonempty nested object for a directory. All formats produce public `dist/links.json` for the browser-side 404 handler.
