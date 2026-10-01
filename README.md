@@ -137,18 +137,21 @@ No approving review is required by this baseline; add one if your team needs it.
 Run the workflow on an initial PR if the check is not yet available in the picker.
 Merging to `main` triggers the existing production deployment.
 
-## Local build
+## Run locally
 
-Use Node.js 24; launcher tests also require Bash. Install the YAML parser once:
+From the repository root, run (requires npm; tests also require Bash):
 
 ```bash
 npm ci
-node --test build.test.mjs # validation and generated-script regression checks
-node build.mjs          # writes ./dist
-npx serve dist          # optional preview
+npx --yes node@24 build.mjs
+python3 -m http.server 3000 --directory dist
 ```
 
-Run from the repository root. A successful build replaces `dist/` completely;
+Open `http://localhost:3000/`. Python's built-in server serves dotted directory
+names such as `/dev.tools/` correctly.
+To run the regression checks: `npx --yes node@24 --test build.test.mjs`.
+
+A successful build replaces `dist/` completely;
 edit the templates in `build.mjs`, not the generated files. Validation fails
 before the old output is removed. URL syntax is checked, but destination
 reachability is not.
