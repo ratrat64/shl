@@ -9,6 +9,7 @@
 - Preserve existing uncommitted work when consolidating changes from other worktrees.
 - If `main` advances during feature work, check whether the feature needs changes to align with it; if so, make a plan for those changes before editing.
 - For every task that changes repository files, after checks pass, commit and push the task branch and open a pull request against `main` without waiting for a separate request. Check the pull request for merge conflicts against the latest `main` and report its status.
+- Check the pull request's merge status before finishing and again in later sessions. Once it is merged, remove its local worktree and delete its local task branch; do not discard uncommitted work.
 - If resolving a conflict needs user input, report the blocker and stop; do not mark the feature ready.
 
 ## Git permissions
