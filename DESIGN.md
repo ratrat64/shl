@@ -39,10 +39,10 @@ rounded:
 
 **Creative North Star: "The Working Index"**
 
-A compact index puts codes, titles, destinations, and search above everything else. A single guide contains the practical information.
+A compact index puts codes, destinations, and search above everything else. Titles appear on hover and remain searchable. A single guide contains the practical information.
 
 **Key Characteristics:**
-- Unruled, three-column entries instead of cards for the directory.
+- Unruled, two-column entries instead of cards for the directory.
 - Blue links and amber script links against grayscale surfaces.
 - A true black dark background and a near-white light background.
 
@@ -52,11 +52,11 @@ Blue is reserved for standard links and focus; amber marks executable-script ent
 
 ## Typography
 
-The site uses the system sans for reading and modest headings. Codes and code samples use a system monospace. Destinations may wrap without truncation.
+The site uses the system sans for reading and modest headings. Codes and code samples use a system monospace. Codes stay on one line; long destinations truncate in the middle while their full value remains available on hover and to assistive technology.
 
 ## Layout
 
-A centered 1160px container carries the directory across its full width. Search shares the title row on desktop and in nested folders; breadcrumbs follow the title row. Entries use code, title, and destination columns. Below 740px search and destinations stack, while the guide uses a narrower 740px column.
+A centered 1160px container carries the directory across its full width. Search shares the heading row on desktop and in nested folders; breadcrumbs follow the heading row. Entries put code and destination side by side. Below 740px search stacks under the heading, while the guide uses a narrower 740px column.
 
 ## Elevation & Depth
 
@@ -74,7 +74,7 @@ The header has only Links and Guide navigation. Current links are underlined. Th
 
 ### Directory rows
 
-A code links to its relative redirect page; script-enabled codes use amber and a visible script label. Folder names link to their browseable pages while the disclosure marker expands the nested list. The optional title and full destination share a row. Codes and long destinations wrap rather than overflow.
+A code links to its relative redirect page; script-enabled codes use amber and a visible script label. Folder names link to their browseable pages while the disclosure marker expands the nested list. Optional titles appear on hover over codes and remain searchable. Destinations display their ends without wrapping and reveal the full URL on hover.
 
 ## Do's and Don'ts
 

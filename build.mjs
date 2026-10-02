@@ -201,13 +201,15 @@ const styles = `
   summary a{color:inherit;text-decoration:none}
   summary a:hover{text-decoration:underline}
   .breadcrumbs{margin:0 0 1rem;color:var(--muted);font-size:.9rem}
-  .link-row{display:grid;grid-template-columns:minmax(130px,22%) minmax(140px,26%) minmax(0,1fr);gap:1rem;align-items:baseline}
-  .code{font:600 .94rem/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;text-decoration:none;color:var(--accent)}
+  .link-row{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:1rem;align-items:baseline;overflow-x:auto}
+  .code{font:600 .94rem/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;text-decoration:none;color:var(--accent);white-space:nowrap}
   .code:hover{text-decoration:underline}
   .script-link{color:var(--script)}
   .script-label{font:600 .7rem/1.5 ui-sans-serif,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.04em;margin-left:.5rem}
-  .link-title{color:var(--ink);font-size:.9rem}
-  .destination{display:block;color:var(--muted);font-size:.85rem}
+  .destination{display:flex;min-width:0;color:var(--muted);font-size:.85rem;white-space:nowrap}
+  .destination-start{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .destination-end{flex-shrink:0;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   .prose{max-width:740px}.prose section{border-top:1px solid var(--line);padding-top:1rem;margin-top:2.5rem;scroll-margin-top:1rem}.prose p,.prose li{color:var(--muted)}
   .prose ol,.prose ul{padding-left:1.4rem}.prose li{padding-left:.35rem;margin-bottom:.8rem}
   .prose strong{color:var(--ink)}
@@ -216,7 +218,7 @@ const styles = `
   .prose pre code{overflow-wrap:normal}
   .footer{border-top:1px solid var(--line);padding-block:1.5rem;color:var(--muted);font-size:.87rem}
   .footer .wrap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}.footer p{margin:0}
-  @media(max-width:740px){.head-inner{flex-wrap:wrap;gap:.75rem}.nav{gap:1rem}.directory-tools{align-items:stretch;flex-direction:column}.search{width:100%}.link-row{grid-template-columns:minmax(0,1fr) auto;gap:.1rem .5rem}.link-title{grid-column:2;text-align:right}.destination{grid-column:1/-1}.footer .wrap{display:block}}
+  @media(max-width:740px){.head-inner{flex-wrap:wrap;gap:.75rem}.nav{gap:1rem}.directory-tools{align-items:stretch;flex-direction:column}.search{width:100%}.link-row{gap:.5rem}.footer .wrap{display:block}}
   @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 `;
 
@@ -257,7 +259,7 @@ const searchScript = `(() => {
         }
         count += found;
       } else {
-        const found = all || (path + item.textContent).toLowerCase().includes(query);
+        const found = all || (path + item.textContent + ' ' + (item.dataset.title || '')).toLowerCase().includes(query);
         item.hidden = !found;
         count += Number(found);
       }
@@ -298,9 +300,13 @@ const listing = (entries, prefix = '') => `<ul class="links">${Object.entries(en
       </details></li>`;
     const url = typeof value === 'string' ? value : value.url;
     const title = typeof value === 'string' ? '' : value.title;
+    const originLength = new URL(url).origin.length;
+    const path = url.slice(originLength).split(/[?#]/, 1)[0];
+    const split = path.lastIndexOf('/', path.lastIndexOf('/') - 1);
+    const cut = split > 0 ? originLength + split + 1 : url.length;
     return `
-       <li><div class="link-row"><a class="code${value?.script === true ? ' script-link' : ''}" href="${esc(href)}">${esc(code)}${value?.script === true ? '<span class="script-label">script</span>' : ''}</a><span class="link-title">${esc(title || '')}</span>
-         <span class="destination">${esc(url)}</span></div></li>`;
+        <li${title ? ` data-title="${esc(title)}"` : ''}><div class="link-row"${title ? ` title="${esc(title)}"` : ''}><a class="code${value?.script === true ? ' script-link' : ''}" href="${esc(href)}"${title ? ` title="${esc(title)}"` : ''}>${esc(code)}${value?.script === true ? '<span class="script-label">script</span>' : ''}</a>
+          <span class="destination"${title ? '' : ` title="${esc(url)}"`}><span class="sr-only">${esc(url)}</span><span class="destination-start" aria-hidden="true">${esc(url.slice(0, cut))}</span><span class="destination-end" aria-hidden="true">${esc(url.slice(cut))}</span></span></div></li>`;
   }).join('')}</ul>`;
 
 const searchableListing = (entries, depth) => `<div class="search" hidden>

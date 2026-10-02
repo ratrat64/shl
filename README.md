@@ -174,7 +174,8 @@ from GitHub Pages.
 - `dist/404.html` — GitHub Pages serves this for anything unmatched. It reads
   `links.json` client-side and catches wrong-case codes before giving up.
 - `dist/index.html` — a directory with expandable nested groups, sorted by name,
-  showing optional link titles and destinations. Select a code to follow its short
+  showing short codes beside destinations (with long URLs shortened visually in the middle).
+  Hover a code for its optional title; titles remain searchable. Select a code to follow its short
   link or browse a directory page. It updates on each deployment.
 
 Routing supports both user-site roots and project-site prefixes. Wrong-case

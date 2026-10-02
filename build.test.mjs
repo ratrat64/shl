@@ -34,8 +34,8 @@ test('build produces a minimal site, copies the map and CNAME, and cleans stale 
   assert.equal(await f.read('CNAME'), 'go.example.com\n');
   assert.equal(await f.read('.nojekyll'), '');
   await assert.rejects(f.read('stale.html'), { code: 'ENOENT' });
-  assert.match(await f.read('index.html'), /href="\.\/Mixed\/">Mixed<\/a>/);
-  assert.match(await f.read('index.html'), /class="link-title">Example/);
+  assert.match(await f.read('index.html'), /href="\.\/Mixed\/" title="Example">Mixed<\/a>/);
+  assert.match(await f.read('index.html'), /data-title="Example"/);
   assert.match(await f.read('Mixed/index.html'), /http-equiv="refresh"/);
   assert.match(await f.read('plain/index.html'), /http:\/\/example.org\//);
 });
@@ -100,7 +100,7 @@ test('homepage lists sorted links safely with project-relative URLs and handles 
   const f = await fixture(t, { zebra: url, Alpha: { url, title: '<script>title</script>' }, beta: { url, title: '' } });
   assert.equal(f.build().status, 0);
   const html = await f.read('index.html');
-  const codes = [...html.matchAll(/class="code" href="([^"]+)">([^<]+)<\/a>/g)];
+  const codes = [...html.matchAll(/class="code" href="([^"]+)"(?: title="[^"]*")?>([^<]+)<\/a>/g)];
   assert.deepEqual(codes.map((match) => match[2]), ['Alpha', 'beta', 'zebra']);
   for (const [, href, code] of codes) {
     for (const prefix of ['/', '/project/']) {
@@ -121,8 +121,9 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
   assert.equal(f.build().status, 0);
   const home = await f.read('index.html');
   assert.match(home, /<details><summary><a href="\.\/tools\/">tools<\/a><\/summary>/);
-  assert.match(home, /href="\.\/tools\/editors\/Code\/">Code<\/a>/);
-  assert.match(home, /class="link-title">&lt;Editor&gt;/);
+  assert.match(home, /href="\.\/tools\/editors\/Code\/" title="&lt;Editor&gt;">Code<\/a>/);
+  assert.match(home, /data-title="&lt;Editor&gt;"/);
+  assert.match(home, /class="link-row" title="&lt;Editor&gt;"/);
   assert.doesNotMatch(home, /<img>/);
   const tools = await f.read('tools/index.html');
   assert.match(tools, /href="\.\.\/assets\/site\.css"/);
@@ -133,7 +134,8 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
   assert.match(editors, /href="\.\.\/\.\.\/assets\/site\.css"/);
   assert.match(editors, /href="\.\.\/\.\.\/">Home<\/a>/);
   assert.match(editors, /href="\.\.\/">tools<\/a>/);
-  assert.match(editors, /href="\.\/Code\/">Code<\/a>/);
+  assert.match(editors, /href="\.\/Code\/" title="&lt;Editor&gt;">Code<\/a>/);
+  assert.match(editors, /class="link-row" title="&lt;Editor&gt;"/);
   for (const prefix of ['/', '/project/']) {
     assert.equal(new URL('./tools/editors/Code/', `https://example.org${prefix}`).pathname, `${prefix}tools/editors/Code/`);
   }
@@ -141,13 +143,28 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
   assert.match(await f.read('tools/editors/Code/index.html'), /&lt;img&gt;/);
   const css = await f.read('assets/site.css');
   assert.doesNotMatch(css, /\.links li\{[^}]*border-bottom|\.links \.links\{[^}]*border-left/);
+  assert.match(css, /\.code\{[^}]*white-space:nowrap/);
+  assert.match(css, /\.destination-start\{[^}]*text-overflow:ellipsis/);
   assert.deepEqual(JSON.parse(await f.read('links.json')), links);
   const yaml = await fixture(t, 'tools:\n  git: https://git-scm.com/\n  editors:\n    Code:\n      url: https://example.org/?x=<img>&q="\n      title: <Editor>\ngh: https://github.com/\n', 'links.yaml');
   assert.equal(yaml.build().status, 0);
   for (const path of ['links.json', 'tools/editors/Code/index.html']) {
     assert.equal(await yaml.read(path), await f.read(path), path);
   }
-  assert.match(await yaml.read('tools/editors/index.html'), /href="\.\/Code\/">Code<\/a>/);
+  assert.match(await yaml.read('tools/editors/index.html'), /href="\.\/Code\/" title="&lt;Editor&gt;">Code<\/a>/);
+});
+
+test('long destinations keep their trailing path beside single-line short codes', async (t) => {
+  const url = 'https://raw.githubusercontent.com/ratrat64/homelab-public/refs/heads/main/scripts/ubuntu/oh-my-posh/setup.sh';
+  const f = await fixture(t, { setup: { url, title: 'Install shell prompt' }, plain: url });
+  assert.equal(f.build().status, 0);
+  const html = await f.read('index.html');
+  assert.match(html, /class="link-row" title="Install shell prompt"/);
+  assert.match(html, /class="destination"><span class="sr-only">https:\/\/raw\.githubusercontent\.com\/ratrat64/);
+  assert.match(html, /class="destination" title="https:\/\/raw\.githubusercontent\.com\/ratrat64/);
+  assert.match(html, /class="destination-start" aria-hidden="true">https:\/\/raw\.githubusercontent\.com\/.*\/ubuntu\//);
+  assert.match(html, /class="destination-end" aria-hidden="true">oh-my-posh\/setup\.sh<\/span>/);
+  assert.doesNotMatch(html, /class="link-title"/);
 });
 
 test('search filters nested links on the homepage and directory pages', async (t) => {
@@ -160,14 +177,14 @@ test('search filters nested links on the homepage and directory pages', async (t
     assert.match(html, /id="search-status"[^>]*role="status" hidden/);
   }
 
-  const leaf = (text) => ({ firstElementChild: { tagName: 'DIV' }, textContent: text, hidden: false });
+  const leaf = (text, title = '') => ({ firstElementChild: { tagName: 'DIV' }, textContent: text, dataset: { title }, hidden: false });
   const group = (name, ...children) => {
     const details = { tagName: 'DETAILS', open: false, querySelector: (selector) => selector === 'summary' ? { textContent: name } : { children } };
     return { firstElementChild: details, hidden: false };
   };
   const gh = leaf('gh https://github.com/');
   const git = leaf('git https://git-scm.com/');
-  const code = leaf('Code VS Code https://example.org/');
+  const code = leaf('Code https://example.org/', 'VS Code');
   const editors = group('editors', code);
   const tools = group('tools', git, editors);
   const list = { children: [gh, tools] };
