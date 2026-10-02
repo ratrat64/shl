@@ -5,9 +5,6 @@ docs:
 psgallery:
   url: https://www.powershellgallery.com/
   title: PowerShell Gallery
-ohmyposh-setup-stable:
-  url: https://raw.githubusercontent.com/ratrat64/homelab-public/refs/heads/main/scripts/ubuntu/oh-my-posh/setup.sh
-  script: true
 
 dev.tools:
   git-cli: https://git-scm.com/
@@ -46,6 +43,9 @@ references:
     node-docs: https://nodejs.org/en/docs
 
 scripts:
-  ohmyposh-setup:
+  ohmyposh-setup-latest:
     url: https://raw.githubusercontent.com/ratrat64/homelab-public/refs/heads/main/scripts/ubuntu/oh-my-posh/setup.sh
+    script: true
+  ohmyposh-setup-stable:
+    url: https://raw.githubusercontent.com/ratrat64/homelab-public/9a32b5a83044bbbb0f7b01a7b76bb5e929950b80/scripts/ubuntu/oh-my-posh/setup.sh
     script: true
