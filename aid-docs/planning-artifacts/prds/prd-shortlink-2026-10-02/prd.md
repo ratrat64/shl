@@ -63,7 +63,7 @@ Currently a personal tool, intended for small-to-medium teams. The intended main
 
 The existing visual direction is a compact, flat "Working Index": codes, destinations, and search take priority over decorative cards. `DESIGN.md` defines its system typography, theme colors, and responsive layout.
 
-**FR-10 — Search the current subtree.** With JavaScript enabled, homepage and directory-page search filters their entries and descendants case-insensitively by short code, title, destination URL, and nested folder names. Matching descendants become visible in expanded groups. Show a matching-link count or a no-match message; clearing the query restores visibility. This is text filtering, not destination-content indexing or ranked search. A directory page does not search outside its subtree.
+**FR-10 — Search the current subtree.** With JavaScript enabled, search on the homepage or a directory page filters that page's entries and descendants case-insensitively by short code, title, destination URL, and nested folder names. Matching descendants become visible in expanded groups. Show a matching-link count or a no-match message; clearing the query restores visibility. This is text filtering, not destination-content indexing or ranked search. A directory page does not search outside its subtree.
 
 **FR-11 — Read guidance and choose a theme.** A guide explains the product, usage, and operation. Former About and How-it-works URLs forward to guide sections. Directory and guide pages follow the system light/dark preference and allow a browser-saved override when storage is available.
 
@@ -81,7 +81,7 @@ The existing visual direction is a compact, flat "Working Index": codes, destina
 - **Public data:** Published entries, destinations, redirect pages, launchers, and the generated link map are public. No application-level authentication or authorization exists. Any destination access restrictions belong to its host; a launcher does not supply private-resource credentials.
 - **Validation and output integrity:** Invalid link-map input fails before existing output is replaced. Successful builds regenerate the output completely; there is no claim of atomic recovery from subsequent write failures.
 - **Untrusted values:** Display configured values as escaped text and quote destinations safely in generated HTML, inline scripts, and Bash launchers.
-- **Usability and accessibility:** Existing pages use labeled search, a status announcement, visible keyboard focus, semantic links/disclosures, responsive layouts, and non-color-only script identification. Browsing works without JavaScript; search and wrong-case recovery do not. These are observed affordances, not a claim of audited accessibility conformance.
+- **Usability and accessibility:** Existing pages use labeled search, a status announcement, visible keyboard focus, semantic links/disclosures, responsive layouts, and script identification that does not rely on color alone. Browsing works without JavaScript; search and wrong-case recovery do not. These are observed affordances, not a claim of audited accessibility conformance.
 - **Scale:** Observe search responsiveness with hundreds of links before claiming scale performance. No latency, availability, or maximum-library-size guarantee has been established.
 
 ## 6. Current Scope and Non-Goals
