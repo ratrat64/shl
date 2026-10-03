@@ -46,6 +46,7 @@ Construct the case-insensitive byte matcher as `re.compile(bytes.fromhex('53 6f 
 - No history rewrite or force-push is necessary: the current installation was never committed, and scanned history contains no matching content.
 - The initial prepublication snapshot recorded unchanged local/cached remote refs and commit identifiers relative to the cleanup inventory. That statement describes the cleanup verification boundary, not a promise that refs remain unchanged after publication. Planned new documentation commits may advance the task branch and add Git objects; they do not rewrite existing history. Only this evidence and the specification are intended for publication; the copied installation and personal configuration must stay local.
 - An installation refresh can restore the removed text from upstream files. After each refresh, rerun the same repository-local scan and literal-substring removal, then verify again.
+- Published the sanitized task documents in [PR #24](https://github.com/ratrat64/shortlink/pull/24). The original installation edits remain local and untracked; no installation files or private inventory were staged.
 
 ## Local reproducibility artifacts
 

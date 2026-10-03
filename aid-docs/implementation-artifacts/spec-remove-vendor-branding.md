@@ -2,7 +2,7 @@
 title: Remove vendor branding from local AID installation
 type: chore
 created: 2026-10-03
-status: in-review
+status: done
 baseline_commit: 565f20c90a0688224e8b73d26d7c29c0b1c6c618
 route: dispatch
 review_loop_iteration: 0
@@ -49,7 +49,7 @@ The user has authorized editing the existing uncommitted AID installation while 
 - [x] Inventory original bytes and tracking state; confirm remote branch/tag tips are represented in the historical scan. All 15 branch tips from the prior live inventory match cached refs; no remote tags were listed.
 - [x] Apply case-insensitive substring deletion in the task copy using file patches, then verify exact byte-preserving transformations.
 - [x] Run relevant AID and brainstorming checks; apply validated patches back to the original installation and verify all active worktrees and history are clean. All 225 tests passed using an isolated temporary test environment; exact-byte and history verification passed again afterward.
-- [ ] Publish only the task specification and completion evidence through the task branch; do not add the user's untracked installation to version control.
+- [x] Publish only the task specification and completion evidence through the task branch; do not add the user's untracked installation to version control. Published in GitHub PR #24; the cleaned installation remains local and untracked.
 
 **Acceptance Criteria:**
 - Given installed files containing the target in any casing, when cleanup finishes, then no occurrence remains in repository-local files or inspected historical objects.
@@ -86,7 +86,7 @@ Edge-case review returned no findings. Verification-gap review returned no gaps.
 
 ## Verification
 
-Implementation cleanup and full-suite verification are complete; publication remains pending. See [completion evidence](verification-remove-vendor-branding.md) for exact checks, results, and scope. No history rewrite was needed.
+Implementation cleanup, full-suite verification, and publication are complete. See [completion evidence](verification-remove-vendor-branding.md) for exact checks, results, and scope. No history rewrite was needed.
 
 - Complete case-insensitive filesystem scan including hidden/ignored files, excluding Git object internals from the filesystem traversal.
 - Raw Git object scan over all refs and reflogs, including blob, commit, tree, and tag bytes.
