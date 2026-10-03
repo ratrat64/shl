@@ -1,6 +1,6 @@
 ---
 title: Shortlink — Current Product
-status: draft
+status: final
 created: 2026-10-02
 updated: 2026-10-03
 ---
@@ -9,7 +9,7 @@ updated: 2026-10-03
 
 ## 1. Purpose and Vision
 
-Capture Shortlink's existing capabilities for maintainers and downstream planning, without turning future ideas into current requirements. This draft combines the maintainer's Vision + Features coaching decisions with the implementation at commit `565f20c`. `README.md` supplies usage guidance; `DESIGN.md` supplies the existing visual direction. Technical details and future possibilities are preserved in [addendum.md](addendum.md).
+Capture Shortlink's existing capabilities for maintainers and downstream planning, without turning future ideas into current requirements. This PRD combines the maintainer's Vision + Features coaching decisions with the implementation at commit `565f20c`. `README.md` supplies usage guidance; `DESIGN.md` supplies the existing visual direction. Technical details and future possibilities are preserved in [addendum.md](addendum.md).
 
 **Vision:** Help engineers and small-to-medium teams organize scattered project resources behind memorable, stable short links, making everyday setup and automation easier to repeat and share.
 
@@ -103,7 +103,7 @@ These are maintainer-defined qualitative outcomes, not measured results:
 
 ## 8. Open Items and Assumptions
 
-No unresolved product-scope blocker remains in the draft. The maintainer still needs to approve this consolidated interpretation before finalization.
+The maintainer approved this consolidated interpretation. No unresolved product-scope blocker remains; the following evidence items are deferred with owners and revisit conditions.
 
 - **Scale evidence:** No numeric search-performance target or representative hundreds-of-links measurement exists. Owner: maintainer. Revisit when growing the library or investigating slow search.
 - **Automation evidence:** GitHub API editing is the selected external approach; credentials, API permissions, and a working automation are outside the current application's implementation. Owner: automation maintainer. Revisit when setting up the first automated writer.
