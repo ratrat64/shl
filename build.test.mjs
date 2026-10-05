@@ -178,7 +178,7 @@ test('hidden links and hidden-only folders are hidden by default but keep their 
     assert.match(html, /id="hidden-toggle"[^>]*hidden>Show hidden links/);
     assert.doesNotMatch(html, /aria-pressed=/);
     assert.match(html, /<li data-hidden="true" hidden><details><summary><a href="\.\/.*(?:private|hiddenOnly|onlyHidden)\/">/);
-    assert.match(html, /<li data-hidden="true" hidden><div class="link-row"[^>]*><a class="code[^>]* href="\.\/.*(?:secret|SecretCode|HiddenDeep)\/"/);
+    assert.match(html, /<li data-hidden="true" hidden data-search="[^"]+"><div class="link-row"[^>]*><a class="code[^>]* href="\.\/.*(?:secret|SecretCode|HiddenDeep)\/"/);
   }
   const home = await f.read('index.html');
   assert.match(home, /data-visible="4" data-total="8">4 links/);
@@ -220,11 +220,68 @@ test('long destinations keep their trailing path beside single-line short codes'
   assert.equal(f.build().status, 0);
   const html = await f.read('index.html');
   assert.match(html, /class="link-row" title="Install shell prompt"/);
-  assert.match(html, /class="destination"><span class="sr-only">https:\/\/raw\.githubusercontent\.com\/ratrat64/);
-  assert.match(html, /class="destination" title="https:\/\/raw\.githubusercontent\.com\/ratrat64/);
+  assert.match(html, /class="destination" href="https:\/\/raw\.githubusercontent\.com\/ratrat64/);
+  assert.match(html, /class="destination"[^>]* title="https:\/\/raw\.githubusercontent\.com\/ratrat64/);
+  assert.match(html, /<span class="sr-only">https:\/\/raw\.githubusercontent\.com\/ratrat64/);
   assert.match(html, /class="destination-start" aria-hidden="true">https:\/\/raw\.githubusercontent\.com\/.*\/ubuntu\//);
-  assert.match(html, /class="destination-end" aria-hidden="true">oh-my-posh\/setup\.sh<\/span>/);
+  assert.match(html, /class="destination-end" aria-hidden="true">oh-my-posh\/setup\.sh<\/span><\/a><a class="visit" href="https:\/\/raw\.githubusercontent\.com\/ratrat64[^>]*>Open<\/a>/);
   assert.doesNotMatch(html, /class="link-title"/);
+});
+
+test('directory clicks copy full short or long URLs while Open follows the destination', async (t) => {
+  const url = 'https://example.com/a/b/setup.sh?q=<tag>&x=\'"';
+  const f = await fixture(t, { tools: { Setup: { url, hidden: true } } });
+  assert.equal(f.build().status, 0);
+  const script = await f.read('assets/copy.js');
+  for (const [page, prefix, shortHref] of [
+    ['index.html', '/project/', './tools/Setup/'],
+    ['tools/index.html', '/project/tools/', './Setup/'],
+  ]) {
+    const html = await f.read(page);
+    assert.match(html, /id="copy-status"[^>]*role="status"/);
+    assert.match(html, new RegExp(`src="${page === 'index.html' ? './' : '../'}assets/copy\\.js"`));
+    assert.ok(html.includes(`class="code" href="${shortHref}"`));
+    assert.match(html, /class="destination" href="https:\/\/example\.com\/a\/b\/setup\.sh\?q=&lt;tag&gt;&amp;x=&#39;&quot;"/);
+    assert.match(html, /class="visit" href="https:\/\/example\.com\/a\/b\/setup\.sh\?q=&lt;tag&gt;&amp;x=&#39;&quot;"[^>]*>Open<\/a>/);
+
+    const copied = [];
+    const status = { textContent: '' };
+    const list = { addEventListener: (_, listener) => { list.click = listener; } };
+    runInNewContext(script, {
+      document: { querySelector: (selector) => ({ '.links': list, '#copy-status': status })[selector] },
+      navigator: { clipboard: { writeText: async (text) => { copied.push(text); } } },
+    });
+    const anchor = (kind, href) => ({
+      href: new URL(href, `https://short.example${prefix}`).href,
+      classList: { contains: (value) => value === kind },
+      getAttribute: () => href,
+    });
+    const click = async (target, options = {}) => {
+      let prevented = false;
+      await list.click({ button: 0, target: { closest: () => target.classList.contains('visit') ? null : target }, preventDefault: () => { prevented = true; }, ...options });
+      return prevented;
+    };
+    assert.equal(await click(anchor('code', shortHref)), true);
+    assert.equal(copied.at(-1), 'https://short.example/project/tools/Setup/');
+    assert.equal(status.textContent, 'Short link copied.');
+    assert.equal(await click(anchor('destination', url)), true);
+    assert.equal(copied.at(-1), url);
+    assert.equal(status.textContent, 'Destination copied.');
+    assert.equal(await click(anchor('visit', url)), false);
+    assert.equal(await click(anchor('code', shortHref), { ctrlKey: true }), false);
+    assert.equal(copied.length, 2);
+  }
+
+  const status = { textContent: '' };
+  const list = { addEventListener: (_, listener) => { list.click = listener; } };
+  runInNewContext(script, {
+    document: { querySelector: (selector) => ({ '.links': list, '#copy-status': status })[selector] },
+    navigator: { clipboard: { writeText: async () => { throw new Error('permission denied'); } } },
+  });
+  let prevented = false;
+  await list.click({ button: 0, target: { closest: () => ({ href: 'https://short.example/project/tools/Setup/', classList: { contains: () => true } }) }, preventDefault: () => { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.match(status.textContent, /Could not copy/);
 });
 
 test('search filters nested links on the homepage and directory pages', async (t) => {
@@ -243,7 +300,8 @@ test('search filters nested links on the homepage and directory pages', async (t
     const details = { tagName: 'DETAILS', open: false, querySelector: (selector) => selector === 'summary' ? { textContent: name } : { children } };
     return { firstElementChild: details, dataset: {}, hidden: false };
   };
-  const gh = leaf('gh https://github.com/');
+  const gh = leaf('gh https://github.com/ Open');
+  gh.dataset.search = 'gh https://github.com/';
   const git = leaf('git https://git-scm.com/');
   const code = leaf('Code https://example.org/', 'VS Code');
   const editors = group('editors', code);
@@ -281,6 +339,10 @@ test('search filters nested links on the homepage and directory pages', async (t
   input.update();
   assert.equal(status.textContent, 'No links match your search.');
   assert.equal(tools.hidden, true);
+
+  input.value = 'open';
+  input.update();
+  assert.equal(gh.hidden, true);
 
   input.value = '';
   input.update();
@@ -454,7 +516,7 @@ test('script launchers are opt-in, quote URLs, forward arguments and statuses, a
   const launcher = await f.read('Run.sh');
   assert.equal(await f.read('tools/Nested.sh'), launcher);
   const home = await f.read('index.html');
-  assert.match(home, /<li data-hidden="true" hidden><div class="link-row"><a class="code script-link" href="\.\/Run\/">Run<span class="script-label">/);
+  assert.match(home, /<li data-hidden="true" hidden data-search="Run script [^"]+"><div class="link-row"><a class="code script-link" href="\.\/Run\/">Run<span class="script-label">/);
   assert.match(home, /3 links/);
   assert.match(home, /class="code" href="\.\/disabled\/">disabled<\/a>/);
   assert.match(await f.read('assets/site.css'), /--script:#ffcb86/);

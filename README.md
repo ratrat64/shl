@@ -12,7 +12,9 @@ Search on the homepage and each directory page filters the listed links by code,
 title, or destination (including nested links). Pages with hidden links have a
 Show hidden links button to include them in listings and search; the homepage
 link count updates too.
-Browsing visible links still works without JavaScript; hidden links stay hidden.
+Click a short code to copy its full short URL, or a destination to copy its full URL;
+use **Open** beside the destination to visit it. Without JavaScript, the links
+remain navigable and hidden links stay hidden.
 
 ## Setup
 
@@ -190,8 +192,9 @@ from GitHub Pages.
 - `dist/index.html` — a directory with expandable nested groups, sorted by name,
   showing visible short codes beside destinations (with long URLs shortened visually in the middle).
   Show hidden links reveals hidden entries and hidden-only groups on the homepage and eligible directory pages.
-  Hover a code for its optional title; titles remain searchable. Select a code to follow its short
-  link or browse a directory page. It updates on each deployment.
+  Hover a code for its optional title; titles remain searchable. Select a code to copy its
+  short link, select a destination to copy its full URL, or use Open to visit the destination.
+  Folder names still open directory pages. It updates on each deployment.
 
 Routing supports both user-site roots and project-site prefixes. Wrong-case
 requests rely on Pages serving `404.html`; JavaScript fetches the public link map
