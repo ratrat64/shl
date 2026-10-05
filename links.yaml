@@ -42,10 +42,12 @@ references:
     github-pages: https://docs.github.com/en/pages/getting-started-with-github-pages
     node-docs: https://nodejs.org/en/docs
 
-scripts:
-  ohmyposh-setup-latest:
-    url: https://raw.githubusercontent.com/ratrat64/homelab-public/refs/heads/main/scripts/ubuntu/oh-my-posh/setup.sh
-    script: true
-  ohmyposh-setup-stable:
-    url: https://raw.githubusercontent.com/ratrat64/homelab-public/9a32b5a83044bbbb0f7b01a7b76bb5e929950b80/scripts/ubuntu/oh-my-posh/setup.sh
-    script: true
+setup:
+  ohmyposh:
+    latest:
+      url: https://raw.githubusercontent.com/ratrat64/homelab-public/refs/heads/main/scripts/ubuntu/oh-my-posh/setup.sh
+      script: true
+      hidden: true
+    stable:
+      url: https://raw.githubusercontent.com/ratrat64/homelab-public/9a32b5a83044bbbb0f7b01a7b76bb5e929950b80/scripts/ubuntu/oh-my-posh/setup.sh
+      script: true
