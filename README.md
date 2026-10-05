@@ -10,7 +10,8 @@ to those sections. It follows the system light/dark preference; visitors
 can override it with the Theme button, saved in their browser.
 Search on the homepage and each directory page filters the listed links by code,
 title, or destination (including nested links). Pages with hidden links have a
-Show hidden links button to include them in the listing, search, and count.
+Show hidden links button to include them in listings and search; the homepage
+link count updates too.
 Browsing visible links still works without JavaScript; hidden links stay hidden.
 
 ## Setup

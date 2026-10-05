@@ -175,7 +175,8 @@ test('hidden links and hidden-only folders are hidden by default but keep their 
   assert.equal(f.build().status, 0);
   for (const page of ['index.html', 'tools/index.html']) {
     const html = await f.read(page);
-    assert.match(html, /id="hidden-toggle"[^>]*aria-pressed="false" hidden>Show hidden links/);
+    assert.match(html, /id="hidden-toggle"[^>]*hidden>Show hidden links/);
+    assert.doesNotMatch(html, /aria-pressed=/);
     assert.match(html, /<li data-hidden="true" hidden><details><summary><a href="\.\/.*(?:private|hiddenOnly|onlyHidden)\/">/);
     assert.match(html, /<li data-hidden="true" hidden><div class="link-row"[^>]*><a class="code[^>]* href="\.\/.*(?:secret|SecretCode|HiddenDeep)\/"/);
   }
@@ -290,7 +291,7 @@ test('search filters nested links on the homepage and directory pages', async (t
 });
 
 test('toggle updates hidden rows, nested search, counts, and hidden-only empty state', async (t) => {
-  const f = await fixture(t, { public: 'https://example.com/public', secret: { url: 'https://example.com/private', hidden: true }, folder: { visible: 'https://example.com/visible', private: { deep: { url: 'https://example.com/deep', hidden: true } } }, onlyHidden: { nested: { code: { url: 'https://example.com/code', hidden: true } } } });
+  const f = await fixture(t, { public: 'https://example.com/public', secret: { url: 'https://example.com/private', title: 'Private notes', hidden: true }, folder: { visible: 'https://example.com/visible', private: { deep: { url: 'https://example.com/deep', hidden: true } } }, onlyHidden: { nested: { code: { url: 'https://example.com/code', hidden: true } } } });
   assert.equal(f.build().status, 0);
   const script = await f.read('assets/search.js');
   const leaf = (name, hidden = false) => ({ firstElementChild: { tagName: 'DIV' }, textContent: name, dataset: hidden ? { hidden: 'true' } : {}, hidden });
@@ -300,13 +301,14 @@ test('toggle updates hidden rows, nested search, counts, and hidden-only empty s
   });
   const exercise = async (page, children, visible, total, site = f) => {
     const html = await site.read(page);
-    assert.match(html, /id="hidden-toggle"[^>]*aria-pressed="false" hidden/);
+    assert.match(html, /id="hidden-toggle"[^>]*hidden>Show hidden links/);
+    assert.doesNotMatch(html, /aria-pressed=/);
     const wrapper = { hidden: !visible };
     const list = { children, parentElement: wrapper };
     const search = { hidden: true };
     const input = { value: '', parentElement: search, addEventListener: (_, callback) => { input.update = callback; } };
     const status = { hidden: true, textContent: '' };
-    const toggle = { hidden: true, textContent: 'Show hidden links', setAttribute: (name, value) => { toggle[name] = value; }, addEventListener: (_, callback) => { toggle.click = callback; } };
+    const toggle = { hidden: true, textContent: 'Show hidden links', addEventListener: (_, callback) => { toggle.click = callback; } };
     const count = page === 'index.html' ? { dataset: { visible: String(visible), total: String(total) }, hidden: !visible, textContent: visible ? `${visible} links` : '' } : null;
     const empty = visible ? null : { hidden: false };
     const elements = { '#link-search': input, '.links': list, '#search-status': status, '#hidden-toggle': toggle, '#link-count': count, '#empty-directory': empty };
@@ -316,7 +318,14 @@ test('toggle updates hidden rows, nested search, counts, and hidden-only empty s
     return { html, input, status, toggle, count, empty, wrapper };
   };
 
-  const secret = leaf('secret https://example.com/private', true);
+  const homeMarkup = await f.read('index.html');
+  const titled = homeMarkup.match(/<li([^>]*)><div class="link-row" title="Private notes"><a class="code" href="([^"]+)" title="Private notes">secret<\/a>/);
+  assert.ok(titled, 'generated hidden titled link is present');
+  const [, attributes, secretHref] = titled;
+  assert.match(attributes, /data-hidden="true" hidden data-title="Private notes"/);
+  const secret = leaf('secret https://example.com/private');
+  secret.dataset = { hidden: attributes.match(/data-hidden="([^"]+)"/)?.[1], title: attributes.match(/data-title="([^"]+)"/)?.[1] };
+  secret.hidden = attributes.includes(' hidden');
   const deep = leaf('deep https://example.com/deep', true);
   const privateGroup = group('private', [deep], true);
   const visibleLeaf = leaf('visible https://example.com/visible');
@@ -325,19 +334,24 @@ test('toggle updates hidden rows, nested search, counts, and hidden-only empty s
   const hiddenGroup = group('onlyHidden', [group('nested', [nestedCode], true)], true);
   const home = await exercise('index.html', [folder, hiddenGroup, leaf('public https://example.com/public'), secret], 2, 5);
   assert.match(home.html, /<li data-hidden="true" hidden><details><summary><a href="\.\/onlyHidden\/">/);
-  assert.match(home.html, /<li data-hidden="true" hidden><div class="link-row"><a class="code" href="\.\/secret\/">/);
+  const deepHref = home.html.match(/href="(\.\/folder\/private\/deep\/)"/)?.[1];
+  assert.ok(deepHref, 'nested short link was generated');
   for (const prefix of ['/', '/project/']) {
-    assert.equal(new URL('./folder/private/deep/', `https://example.org${prefix}`).pathname, `${prefix}folder/private/deep/`);
+    assert.equal(new URL(secretHref, `https://example.org${prefix}`).pathname, `${prefix}secret/`);
+    assert.equal(new URL(deepHref, `https://example.org${prefix}`).pathname, `${prefix}folder/private/deep/`);
   }
-  home.input.value = 'private';
+  home.input.value = 'private notes';
   home.input.update();
   assert.equal(home.status.textContent, 'No links match your search.');
   assert.equal(privateGroup.hidden, true);
   assert.equal(secret.hidden, true);
   home.toggle.click();
-  assert.equal(home.toggle['aria-pressed'], 'true');
   assert.equal(home.toggle.textContent, 'Hide hidden links');
   assert.equal(home.count.textContent, '5 links');
+  assert.equal(home.status.textContent, '1 matching link.');
+  assert.equal(secret.hidden, false);
+  home.input.value = 'private';
+  home.input.update();
   assert.equal(home.status.textContent, '2 matching links.');
   assert.equal(secret.hidden, false);
   assert.equal(privateGroup.hidden, false);
@@ -346,9 +360,12 @@ test('toggle updates hidden rows, nested search, counts, and hidden-only empty s
   home.input.update();
   assert.equal(hiddenGroup.hidden, false);
   assert.equal(nestedCode.hidden, false);
+  home.input.value = 'private notes';
+  home.input.update();
   home.toggle.click();
-  assert.equal(home.toggle['aria-pressed'], 'false');
+  assert.equal(home.toggle.textContent, 'Show hidden links');
   assert.equal(home.count.textContent, '2 links');
+  assert.equal(home.status.textContent, 'No links match your search.');
   assert.equal(secret.hidden, true);
   assert.equal(hiddenGroup.hidden, true);
   assert.equal(privateGroup.hidden, true);

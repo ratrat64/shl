@@ -300,7 +300,6 @@ const searchScript = `(() => {
   if (toggle) toggle.addEventListener('click', () => {
     showHidden = !showHidden;
     toggle.textContent = showHidden ? 'Hide hidden links' : 'Show hidden links';
-    toggle.setAttribute('aria-pressed', String(showHidden));
     update();
   });
 })();`;
@@ -349,7 +348,7 @@ const directoryContents = (entries, depth, heading, count = null, breadcrumbs = 
   const visible = visibleCount(entries);
   const total = visibleCount(entries, true);
   return `<section aria-label="Links">
-   <div class="directory-tools"><div><h1>${heading}</h1>${count !== null ? `<span id="link-count" class="count" data-visible="${visible}" data-total="${total}"${visible ? '' : ' hidden'}>${count}</span>` : ''}${total > visible ? '<button id="hidden-toggle" class="theme-toggle" type="button" aria-pressed="false" hidden>Show hidden links</button>' : ''}</div>${total ? searchableListing(entries, depth) : ''}</div>
+    <div class="directory-tools"><div><h1>${heading}</h1>${count !== null ? `<span id="link-count" class="count" data-visible="${visible}" data-total="${total}"${visible ? '' : ' hidden'}>${count}</span>` : ''}${total > visible ? '<button id="hidden-toggle" class="theme-toggle" type="button" hidden>Show hidden links</button>' : ''}</div>${total ? searchableListing(entries, depth) : ''}</div>
    ${breadcrumbs}
    ${total ? `<p id="search-status" class="search-status" role="status" hidden></p>
    ${visible ? '' : '<p id="empty-directory">No links listed here.</p>'}
