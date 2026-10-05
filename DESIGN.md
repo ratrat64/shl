@@ -74,7 +74,7 @@ The header has only Links and Guide navigation. Current links are underlined. Th
 
 ### Directory rows
 
-A code links to its relative redirect page; script-enabled codes use amber and a visible script label. Folder names link to their browseable pages while the disclosure marker expands the nested list. Optional titles appear on hover over codes and remain searchable. Destinations display their ends without wrapping and reveal the full URL on hover.
+A code copies its full short URL on click; script-enabled codes use amber and a visible script label. Destinations copy their full URL on click, and an Open control at the row end follows it. Folder names link to their browseable pages while the disclosure marker expands the nested list. Optional titles appear on hover over codes and remain searchable. Destinations display their ends without wrapping and reveal the full URL on hover.
 
 ## Do's and Don'ts
 

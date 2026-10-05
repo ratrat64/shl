@@ -205,14 +205,18 @@ const styles = `
   summary a{color:inherit;text-decoration:none}
   summary a:hover{text-decoration:underline}
   .breadcrumbs{margin:0 0 1rem;color:var(--muted);font-size:.9rem}
-  .link-row{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:1rem;align-items:baseline;overflow-x:auto}
+  .link-row{display:grid;grid-template-columns:max-content minmax(0,1fr) max-content;gap:1rem;align-items:center;overflow-x:auto}
   .code{font:600 .94rem/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;text-decoration:none;color:var(--accent);white-space:nowrap}
   .code:hover{text-decoration:underline}
   .script-link{color:var(--script)}
   .script-label{font:600 .7rem/1.5 ui-sans-serif,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.04em;margin-left:.5rem}
-  .destination{display:flex;min-width:0;color:var(--muted);font-size:.85rem;white-space:nowrap}
+  .destination{display:flex;min-width:0;color:var(--muted);font-size:.85rem;white-space:nowrap;text-decoration:none}
+  .destination:hover{text-decoration:underline;color:var(--accent)}
   .destination-start{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .destination-end{flex-shrink:0;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .visit{border:1px solid var(--line);border-radius:4px;padding:.2rem .55rem;text-decoration:none;font-size:.85rem;white-space:nowrap}
+  .visit:hover{background:var(--wash)}
+  #copy-status:empty{display:none}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   .prose{max-width:740px}.prose section{border-top:1px solid var(--line);padding-top:1rem;margin-top:2.5rem;scroll-margin-top:1rem}.prose p,.prose li{color:var(--muted)}
   .prose ol,.prose ul{padding-left:1.4rem}.prose li{padding-left:.35rem;margin-bottom:.8rem}
@@ -269,7 +273,7 @@ const searchScript = `(() => {
         }
         count += found;
       } else {
-        const found = all || (path + item.textContent + ' ' + (item.dataset.title || '')).toLowerCase().includes(query);
+        const found = all || (path + (item.dataset.search || item.textContent) + ' ' + (item.dataset.title || '')).toLowerCase().includes(query);
         item.hidden = !found;
         count += Number(found);
       }
@@ -304,6 +308,24 @@ const searchScript = `(() => {
   });
 })();`;
 
+const copyScript = `(() => {
+  const list = document.querySelector('.links');
+  const status = document.querySelector('#copy-status');
+  list.addEventListener('click', async (event) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const link = event.target.closest('a.code, a.destination');
+    if (!link) return;
+    event.preventDefault();
+    status.textContent = '';
+    try {
+      await navigator.clipboard.writeText(link.classList.contains('code') ? link.href : link.getAttribute('href'));
+      status.textContent = link.classList.contains('code') ? 'Short link copied.' : 'Destination copied.';
+    } catch {
+      status.textContent = 'Could not copy the link. Try your browser’s copy-link action.';
+    }
+  });
+})();`;
+
 const shell = (title, active, depth, content) => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark"><title>${esc(title)} · Short links</title>
@@ -335,8 +357,8 @@ const listing = (entries, prefix = '') => `<ul class="links">${Object.entries(en
     const split = path.lastIndexOf('/', path.lastIndexOf('/') - 1);
     const cut = split > 0 ? originLength + split + 1 : url.length;
     return `
-        <li${value?.hidden === true ? ' data-hidden="true" hidden' : ''}${title ? ` data-title="${esc(title)}"` : ''}><div class="link-row"${title ? ` title="${esc(title)}"` : ''}><a class="code${value?.script === true ? ' script-link' : ''}" href="${esc(href)}"${title ? ` title="${esc(title)}"` : ''}>${esc(code)}${value?.script === true ? '<span class="script-label">script</span>' : ''}</a>
-          <span class="destination"${title ? '' : ` title="${esc(url)}"`}><span class="sr-only">${esc(url)}</span><span class="destination-start" aria-hidden="true">${esc(url.slice(0, cut))}</span><span class="destination-end" aria-hidden="true">${esc(url.slice(cut))}</span></span></div></li>`;
+        <li${value?.hidden === true ? ' data-hidden="true" hidden' : ''}${title ? ` data-title="${esc(title)}"` : ''} data-search="${esc(`${code} ${value?.script === true ? 'script ' : ''}${url}`)}"><div class="link-row"${title ? ` title="${esc(title)}"` : ''}><a class="code${value?.script === true ? ' script-link' : ''}" href="${esc(href)}"${title ? ` title="${esc(title)}"` : ''}>${esc(code)}${value?.script === true ? '<span class="script-label">script</span>' : ''}</a>
+          <a class="destination" href="${esc(url)}" aria-label="Copy destination: ${esc(url)}"${title ? '' : ` title="${esc(url)}"`}><span class="sr-only">${esc(url)}</span><span class="destination-start" aria-hidden="true">${esc(url.slice(0, cut))}</span><span class="destination-end" aria-hidden="true">${esc(url.slice(cut))}</span></a><a class="visit" href="${esc(url)}" aria-label="Open destination for ${esc(code)}">Open</a></div></li>`;
   }).join('')}</ul>`;
 
 const searchableListing = (entries, depth) => `<div class="search" hidden>
@@ -350,9 +372,9 @@ const directoryContents = (entries, depth, heading, count = null, breadcrumbs = 
   return `<section aria-label="Links">
     <div class="directory-tools"><div><h1>${heading}</h1>${count !== null ? `<span id="link-count" class="count" data-visible="${visible}" data-total="${total}"${visible ? '' : ' hidden'}>${count}</span>` : ''}${total > visible ? '<button id="hidden-toggle" class="theme-toggle" type="button" hidden>Show hidden links</button>' : ''}</div>${total ? searchableListing(entries, depth) : ''}</div>
    ${breadcrumbs}
-   ${total ? `<p id="search-status" class="search-status" role="status" hidden></p>
-   ${visible ? '' : '<p id="empty-directory">No links listed here.</p>'}
-   <div${visible ? '' : ' hidden'}>${listing(entries)}</div><script src="${depth}assets/search.js" defer></script>` : '<p>No links listed here.</p>'}</section>`;
+   ${total ? `<p id="search-status" class="search-status" role="status" hidden></p><p id="copy-status" class="search-status" role="status" aria-live="polite"></p>
+    ${visible ? '' : '<p id="empty-directory">No links listed here.</p>'}
+    <div${visible ? '' : ' hidden'}>${listing(entries)}</div><script src="${depth}assets/search.js" defer></script><script src="${depth}assets/copy.js" defer></script>` : '<p>No links listed here.</p>'}</section>`;
 };
 
 const indexPage = () => {
@@ -463,6 +485,7 @@ await mkdir(join(OUT, 'assets'), { recursive: true });
 await writeFile(join(OUT, 'assets', 'site.css'), styles);
 await writeFile(join(OUT, 'assets', 'theme.js'), themeScript);
 await writeFile(join(OUT, 'assets', 'search.js'), searchScript);
+await writeFile(join(OUT, 'assets', 'copy.js'), copyScript);
 
 for (const link of links) {
   await mkdir(join(OUT, link.code), { recursive: true });
