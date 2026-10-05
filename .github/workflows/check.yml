@@ -1,0 +1,45 @@
+name: Check pull request
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: PR validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Check changed files
+        id: changes
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if git diff --quiet "$BASE" HEAD -- . ':(exclude)AGENTS.md'; then
+            echo 'AGENTS.md-only change; skipping tests and build'
+            echo 'run_checks=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'run_checks=true' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-node@v7.0.0
+        if: steps.changes.outputs.run_checks == 'true'
+        with:
+          node-version: 24
+      - name: Install dependencies
+        if: steps.changes.outputs.run_checks == 'true'
+        run: npm ci
+      - name: Test
+        if: steps.changes.outputs.run_checks == 'true'
+        run: node --test build.test.mjs
+      - name: Build
+        if: steps.changes.outputs.run_checks == 'true'
+        run: node build.mjs

@@ -1,1 +1,14 @@
 dist/
+.impeccable/review/
+node_modules/
+
+# Installer-managed AID framework
+/.agents/skills/aid-*/
+/.claude/skills/aid-*/
+/.opencode/commands/aid-*.md
+/.aid/*
+!/.aid/custom/
+
+# AID — personal config, not shared
+.aid/config.user.toml
+.aid/custom/*.user.toml

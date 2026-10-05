@@ -1,0 +1,51 @@
+gh: https://github.com/
+docs:
+  url: https://docs.github.com/en/pages
+  title: GitHub Pages docs
+psgallery:
+  url: https://www.powershellgallery.com/
+  title: PowerShell Gallery
+
+dev.tools:
+  git-cli: https://git-scm.com/
+  git-guide:
+    url: https://git-scm.com/book/en/v2
+    title: Pro Git book
+  editors:
+    VS_Code:
+      url: https://code.visualstudio.com/
+      title: Visual Studio Code
+      script: false
+    Neovim: https://neovim.io/
+    emacs: https://www.gnu.org/software/emacs/
+  languages:
+    Node_JS: https://nodejs.org/en
+    Python: https://www.python.org/
+    Rust: https://www.rust-lang.org/
+    Go: https://go.dev/
+  source:
+    gh-cli: https://cli.github.com/
+    git-hosting: https://github.com/features
+
+references:
+  web:
+    mdn: https://developer.mozilla.org/
+    html: https://developer.mozilla.org/en-US/docs/Web/HTML
+    css: https://developer.mozilla.org/en-US/docs/Web/CSS
+    javascript: https://developer.mozilla.org/en-US/docs/Web/JavaScript
+    http: https://developer.mozilla.org/en-US/docs/Web/HTTP
+  standards:
+    accessibility: https://www.w3.org/WAI/fundamentals/accessibility-intro/
+    yaml-1.2: https://yaml.org/spec/1.2.2/
+  platforms:
+    github-actions: https://docs.github.com/en/actions
+    github-pages: https://docs.github.com/en/pages/getting-started-with-github-pages
+    node-docs: https://nodejs.org/en/docs
+
+scripts:
+  ohmyposh-setup-latest:
+    url: https://raw.githubusercontent.com/ratrat64/homelab-public/refs/heads/main/scripts/ubuntu/oh-my-posh/setup.sh
+    script: true
+  ohmyposh-setup-stable:
+    url: https://raw.githubusercontent.com/ratrat64/homelab-public/9a32b5a83044bbbb0f7b01a7b76bb5e929950b80/scripts/ubuntu/oh-my-posh/setup.sh
+    script: true
