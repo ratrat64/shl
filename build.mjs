@@ -189,8 +189,8 @@ const styles = `
   .section-head{display:flex;justify-content:space-between;gap:1rem;align-items:baseline;border-bottom:1px solid var(--line);padding-bottom:.6rem}
   .section-head h2{margin:0}.count{color:var(--muted);font-size:.85rem;font-variant-numeric:tabular-nums}
   .directory-tools{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1rem}
-   .directory-tools h1{margin:0}.directory-tools .count{margin-left:.5rem}
-   #hidden-toggle{margin-left:.75rem}
+  .directory-tools h1{margin:0}.directory-tools .count{margin-left:.5rem}
+  #hidden-toggle{margin-left:.75rem}
   .search{width:min(100%,360px)}
   .search label{display:block;font-size:.82rem;color:var(--muted);margin-bottom:.2rem}
   .search input{width:100%;font:inherit;padding:.45rem .7rem;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--ink);caret-color:var(--accent)}

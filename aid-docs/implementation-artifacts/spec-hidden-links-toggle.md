@@ -2,7 +2,7 @@
 title: 'Toggle hidden links in the directory'
 type: 'feature'
 created: '2026-10-06'
-status: 'in-progress'
+status: 'done'
 baseline_revision: 16a4a0719fa752cd0b42c461dbc6e1c22bd96061
 baseline_commit: 16a4a0719fa752cd0b42c461dbc6e1c22bd96061
 review_loop_iteration: 0
@@ -64,6 +64,18 @@ All relative code paths and verification commands below refer to the task worktr
 
 ## Review Triage Log
 
+### 2026-10-06 — Review pass
+- verdicts: 8 findings — high 0, medium 0, low 6, false 2, maybe-false 0
+- findings:
+  - `[low]` `[patch]` Changing action label with `aria-pressed` was redundant — removed `aria-pressed` and kept the descriptive Show/Hide label.
+  - `[low]` `[patch]` README implied every directory displayed a count — clarified that only the homepage count updates.
+  - `[false]` `[reject]` Hidden rows appear in HTML source — they already exist in the public link map and redirects; default display is hidden, as requested, with no secrecy guarantee.
+  - `[low]` `[patch]` Synthetic rows and hard-coded hrefs could miss markup/script integration — asserted generated titled row attributes and resolved generated hrefs under both prefixes.
+  - `[low]` `[patch]` PRODUCT.md described omission as permanent — updated it to say by default and mention the toggle.
+  - `[low]` `[reject]` Code Map line references and task-worktree path age after implementation — this build's spec is an implementation record; editing it solely to fix a review finding is disallowed.
+  - `[low]` `[patch]` Titled hidden links lacked integrated markup/search coverage — tested emitted `data-hidden`, `hidden`, and `data-title` through the search toggle.
+  - `[false]` `[reject]` Auditor noted browser behavior is tested through generated HTML and simulated DOM rather than a deployed browser — no observed behavior diverges from the visitor-facing intent; deployment smoke testing requires deployment.
+
 ## Verification
 
 **Commands:**
@@ -71,3 +83,15 @@ All relative code paths and verification commands below refer to the task worktr
 - `node --test build.test.mjs` — expected: all tests pass.
 - `node build.mjs` — expected: site generates successfully.
 - `git diff --check` — expected: no whitespace errors.
+
+## Auto Run Result
+
+Status: done
+
+Implemented a directory button that reveals and re-hides hidden links and hidden-only folders; default listings remain hidden, and search, homepage count, and empty states follow the toggle.
+
+Files changed: `build.mjs` (generated UI and browser script), `build.test.mjs` (markup and interaction coverage), `README.md` and `PRODUCT.md` (behavior documentation), and this spec (implementation record).
+
+Review: five low-severity patch findings addressed (four distinct fixes); no deferred items. One low-severity spec-only finding was rejected under the review rule. Two findings were rejected as false: hidden links were already publicly discoverable, and the tested interaction shows no demonstrated browser divergence. Patched counts: high 0, medium 0, low 5. Follow-up review recommended: false.
+
+Verification: `npm ci`, Node.js 24 `--test build.test.mjs` (14 passed), Node.js 24 `build.mjs` (26 links built), and `git diff --check` passed. Residual risk: deployed-browser rendering has not been smoke-tested before deployment.
