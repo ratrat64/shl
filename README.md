@@ -36,10 +36,15 @@ gh: https://github.com/
 docs:
   url: https://docs.github.com/en/pages
   title: GitHub Pages docs
+automation:
+  url: https://example.com/setup.sh
+  hidden: true
 ```
 
 Short form is just `code: https://example.com/`. Long form adds an optional string `title` shown
-on the redirect fallback page. You can edit the file in GitHub's web editor;
+on the redirect fallback page, or a boolean `hidden` (default `false`). Set `hidden: true`
+to omit a link from directory listings, counts, and search. Its redirect and optional
+script launcher still work. You can edit the file in GitHub's web editor;
 choose to create a branch and pull request. The links become live after the merge
 to `main` finishes deploying.
 
@@ -61,8 +66,9 @@ keep their URLs. Directory names are their display labels, and a directory must
 contain at least one entry. A path cannot be both a directory and a redirect.
 The checked-in `links.yaml` includes flat and nested examples, optional titles,
 `script: true` and `script: false`, and codes using dots, underscores and hyphens.
-All entries are public in the directory and generated `links.json`; hidden links
-are not supported.
+Directories without visible descendants are omitted from parent listings, but
+their URLs still open without listing hidden links. If every link is hidden, the
+directory displays an empty state.
 
 Each path segment starts with an ASCII letter or number, followed by letters,
 numbers, `.`, `_`, or `-`. `index`, `404`, `assets`, `links`, `about`, `guide`,
@@ -77,13 +83,16 @@ link entries as JSON:
 ```json
 {
   "gh": "https://github.com/",
-  "docs": { "url": "https://docs.github.com/en/pages", "title": "GitHub Pages docs" }
+  "docs": { "url": "https://docs.github.com/en/pages", "title": "GitHub Pages docs" },
+  "automation": { "url": "https://example.com/setup.sh", "hidden": true }
 }
 ```
 
 Keep **exactly one** of `links.json`, `links.yaml`, and `links.yml` in the root.
 The build rejects missing or multiple sources. Both formats use the same link
 validation; the generated site always publishes a `links.json` for browser routing.
+Hidden links and destinations remain in that public file and can be recovered by
+the 404 handler. Hiding controls discoverability, not secrecy.
 
 ## Running Bash scripts
 
@@ -174,7 +183,7 @@ from GitHub Pages.
 - `dist/404.html` — GitHub Pages serves this for anything unmatched. It reads
   `links.json` client-side and catches wrong-case codes before giving up.
 - `dist/index.html` — a directory with expandable nested groups, sorted by name,
-  showing short codes beside destinations (with long URLs shortened visually in the middle).
+  showing visible short codes beside destinations (with long URLs shortened visually in the middle).
   Hover a code for its optional title; titles remain searchable. Select a code to follow its short
   link or browse a directory page. It updates on each deployment.
 
@@ -185,7 +194,7 @@ variable is required.
 
 ## Limits
 
-Published destinations are public, including `links.json` and redirect pages,
-and the homepage lists all links. There is no backend, database,
+Published destinations are public, including hidden links in `links.json` and redirect pages.
+The homepage lists visible links. There is no backend, database,
 anonymous link submission, or built-in click tracking. Managing links is a
 repository edit followed by a deployment.

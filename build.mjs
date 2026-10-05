@@ -87,6 +87,9 @@ function collect(entries, path = []) {
     if (typeof value === 'object' && value && 'script' in value && typeof value.script !== 'boolean') {
       problems.push(`"${name}" — script must be a boolean`);
     }
+    if (typeof value === 'object' && value && 'hidden' in value && typeof value.hidden !== 'boolean') {
+      problems.push(`"${name}" — hidden must be a boolean`);
+    }
     try {
       if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) throw new Error();
       const parsed = new URL(url);
@@ -94,7 +97,7 @@ function collect(entries, path = []) {
     } catch {
       problems.push(`"${name}" — destination must be a valid absolute HTTP or HTTPS URL`);
     }
-    links.push({ code: name, url, title, script: value?.script === true });
+    links.push({ code: name, url, title, script: value?.script === true, hidden: value?.hidden === true });
     if (value?.script === true) launchers.push(code);
   }
   for (const code of launchers) {
@@ -290,7 +293,11 @@ const shell = (title, active, depth, content) => `<!doctype html>
  <footer class="footer"><div class="wrap"><p>Shortlink</p><p><a href="${depth}guide/">Guide</a> · <a href="https://github.com/ratrat64/shortlink#readme">Repository</a></p></div></footer>
 </body></html>`;
 
+const visibleCount = (entries) => Object.values(entries).reduce((count, value) =>
+  count + (typeof value === 'object' && !('url' in value) ? visibleCount(value) : Number(value?.hidden !== true)), 0);
+
 const listing = (entries, prefix = '') => `<ul class="links">${Object.entries(entries)
+  .filter(([, value]) => typeof value === 'object' && !('url' in value) ? visibleCount(value) > 0 : value?.hidden !== true)
   .sort(([a], [b]) => a.toLowerCase() < b.toLowerCase() ? -1 : 1)
   .map(([code, value]) => {
     const href = `./${prefix}${code}/`;
@@ -314,14 +321,20 @@ const searchableListing = (entries, depth) => `<div class="search" hidden>
      <input id="link-search" type="search" placeholder="Code, title or destination" autocomplete="off">
    </div>`;
 
-const directoryContents = (entries, depth, heading, count = '', breadcrumbs = '') => `<section aria-label="Links">
-  <div class="directory-tools"><div><h1>${heading}</h1>${count ? `<span class="count">${count}</span>` : ''}</div>${searchableListing(entries, depth)}</div>
+const directoryContents = (entries, depth, heading, count = '', breadcrumbs = '') => {
+  const visible = visibleCount(entries);
+  return `<section aria-label="Links">
+  <div class="directory-tools"><div><h1>${heading}</h1>${count ? `<span class="count">${count}</span>` : ''}</div>${visible ? searchableListing(entries, depth) : ''}</div>
   ${breadcrumbs}
-  <p id="search-status" class="search-status" role="status" hidden></p>
-  ${listing(entries)}<script src="${depth}assets/search.js" defer></script></section>`;
+  ${visible ? `<p id="search-status" class="search-status" role="status" hidden></p>
+  ${listing(entries)}<script src="${depth}assets/search.js" defer></script>` : '<p>No links listed here.</p>'}</section>`;
+};
 
-const indexPage = () => shell('Links', 'links', './', `
-   ${links.length ? directoryContents(raw, './', 'Links', `${links.length} ${links.length === 1 ? 'link' : 'links'}`) : `<h1>Links</h1><p>No links available yet. Add your first entry to <code>${source}</code> and rebuild the site.</p>`}`);
+const indexPage = () => {
+  const visible = links.filter((link) => !link.hidden).length;
+  return shell('Links', 'links', './', `
+    ${links.length ? directoryContents(raw, './', 'Links', visible ? `${visible} ${visible === 1 ? 'link' : 'links'}` : '') : `<h1>Links</h1><p>No links available yet. Add your first entry to <code>${source}</code> and rebuild the site.</p>`}`);
+};
 
 const directoryPage = ({ path, entries }) => {
   const depth = '../'.repeat(path.length);
@@ -345,8 +358,9 @@ docs:
   title: GitHub Pages docs</code></pre><ol start="3">
      <li>Open a pull request, pass checks, and merge. After deployment, visit <code>https://&lt;user&gt;.github.io/&lt;repo&gt;/gh/</code>.</li>
    </ol>
-   <p>Change a URL to retarget a code; delete its entry to remove it. Nest objects for directories. Codes start with a letter or number and may also contain dots, underscores, and hyphens; sibling names cannot differ only by case.</p>
-   <p>Optional: <code>script: true</code> builds a <code>&lt;path&gt;.sh</code> launcher. Use exact casing and no trailing slash; only run scripts from trusted sources.</p></section>
+    <p>Change a URL to retarget a code; delete its entry to remove it. Nest objects for directories. Codes start with a letter or number and may also contain dots, underscores, and hyphens; sibling names cannot differ only by case.</p>
+    <p>Optional: <code>script: true</code> builds a <code>&lt;path&gt;.sh</code> launcher. Use exact casing and no trailing slash; only run scripts from trusted sources.</p>
+    <p>Set <code>hidden: true</code> on a link object to omit it from directory listings, counts, and search. Its redirect and optional launcher still work, and the destination remains public in <code>links.json</code>. Hiding controls discoverability, not secrecy.</p></section>
    <section id="how-it-works"><h2>How it works</h2>
    <p>The build validates codes, collisions, and URL syntax before replacing output. Each link gets a redirect page with JavaScript, meta refresh, and a clickable fallback. Directories get browsable pages.</p>
    <p>GitHub Actions deploys the files after merges to <code>main</code>. The 404 page checks the public link map for differently capitalized codes.</p>
