@@ -41,12 +41,13 @@ test('build produces a minimal site, copies the map and CNAME, and cleans stale 
 });
 
 test('YAML sources generate the same site and public JSON map as JSON', async (t) => {
-  const links = { gh: 'https://github.com/', Run: { url: 'https://example.com/setup.sh', title: 'Setup #1', script: true } };
+  const links = { gh: 'https://github.com/', Run: { url: 'https://example.com/setup.sh', title: 'Setup #1', script: true, hidden: true } };
   const yaml = `gh: https://github.com/
 Run:
   url: https://example.com/setup.sh
   title: 'Setup #1'
   script: true
+  hidden: true
 `;
   const json = await fixture(t, links);
   assert.equal(json.build().status, 0);
@@ -54,7 +55,7 @@ Run:
     const f = await fixture(t, yaml, source);
     const result = f.build();
     assert.equal(result.status, 0, result.stderr);
-    for (const path of ['links.json', '404.html', 'Run/index.html', 'Run.sh']) {
+    for (const path of ['links.json', '404.html', 'Run/index.html', 'Run.sh', 'index.html']) {
       assert.equal(await f.read(path), await json.read(path), `${source}: ${path}`);
     }
     assert.doesNotMatch(await f.read('index.html'), /Simple by design|Good links/);
@@ -152,6 +153,49 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
     assert.equal(await yaml.read(path), await f.read(path), path);
   }
   assert.match(await yaml.read('tools/editors/index.html'), /href="\.\/Code\/" title="&lt;Editor&gt;">Code<\/a>/);
+});
+
+test('hidden links and hidden-only folders disappear from listings and counts but keep their resources', async (t) => {
+  const links = {
+    visible: 'https://example.com/visible',
+    shown: { url: 'https://example.com/shown', hidden: false },
+    secret: { url: 'https://example.com/secret', hidden: true, script: true },
+    tools: {
+      public: 'https://example.com/public',
+      private: { deep: { SecretCode: { url: 'https://example.com/deep', hidden: true } } },
+    },
+    onlyHidden: { nested: { OtherSecret: { url: 'https://example.com/other', hidden: true } } },
+  };
+  const f = await fixture(t, links);
+  assert.equal(f.build().status, 0);
+  for (const page of ['index.html', 'tools/index.html']) {
+    const html = await f.read(page);
+    assert.doesNotMatch(html, /SecretCode|OtherSecret|onlyHidden|private|https:\/\/example\.com\/(secret|deep|other)/);
+    assert.doesNotMatch(html, /href="\.\/secret\/"/);
+  }
+  const home = await f.read('index.html');
+  assert.match(home, /3 links/);
+  assert.match(home, /href="\.\/shown\/">shown<\/a>/);
+  assert.match(home, /href="\.\/visible\/">visible<\/a>/);
+  assert.match(home, /href="\.\/tools\/public\/">public<\/a>/);
+  assert.match(await f.read('tools/index.html'), /href="\.\/public\/">public<\/a>/);
+  for (const page of ['onlyHidden/index.html', 'onlyHidden/nested/index.html', 'tools/private/index.html', 'tools/private/deep/index.html']) {
+    const html = await f.read(page);
+    assert.match(html, /No links listed here\./);
+    assert.doesNotMatch(html, /SecretCode|OtherSecret|href="\.\/nested\/"|href="\.\/deep\/"/);
+    assert.doesNotMatch(html, /id="link-search"/);
+  }
+  assert.match(await f.read('secret/index.html'), /https:\/\/example\.com\/secret/);
+  assert.match(await f.read('tools/private/deep/SecretCode/index.html'), /https:\/\/example\.com\/deep/);
+  assert.match(await f.read('secret.sh'), /curl -fsSL/);
+  assert.deepEqual(JSON.parse(await f.read('links.json')), links);
+
+  const allHidden = await fixture(t, { private: { nested: { code: { url: 'https://example.com/', hidden: true } } } });
+  assert.equal(allHidden.build().status, 0);
+  assert.match(await allHidden.read('index.html'), /No links listed here\./);
+  assert.doesNotMatch(await allHidden.read('index.html'), /Add your first entry|private|\d+ links/);
+  assert.match(await allHidden.read('private/nested/index.html'), /No links listed here\./);
+  assert.match(await allHidden.read('private/nested/code/index.html'), /https:\/\/example\.com/);
 });
 
 test('long destinations keep their trailing path beside single-line short codes', async (t) => {
@@ -268,13 +312,14 @@ test('redirect script safely preserves destinations containing HTML and quotes',
 
 test('script launchers are opt-in, quote URLs, forward arguments and statuses, and clean up', async (t) => {
   const url = 'https://example.com/setup.sh?q=\'";printf injected;#$(printf expanded)&x=`printf backticks`\\path\nnext';
-  const f = await fixture(t, { Run: { url, script: true }, tools: { Nested: { url, script: true } }, disabled: { url, script: false }, plain: url });
+  const f = await fixture(t, { Run: { url, script: true, hidden: true }, tools: { Nested: { url, script: true } }, disabled: { url, script: false }, plain: url });
   const build = f.build();
   assert.equal(build.status, 0, build.stderr);
   const launcher = await f.read('Run.sh');
   assert.equal(await f.read('tools/Nested.sh'), launcher);
   const home = await f.read('index.html');
-  assert.match(home, /class="code script-link" href="\.\/Run\/">Run<span class="script-label">script<\/span><\/a>/);
+  assert.doesNotMatch(home, /href="\.\/Run\/"|Run<span class="script-label">/);
+  assert.match(home, /3 links/);
   assert.match(home, /class="code" href="\.\/disabled\/">disabled<\/a>/);
   assert.match(await f.read('assets/site.css'), /--script:#ffcb86/);
   assert.match(await f.read('tools/Nested/index.html'), /http-equiv="refresh"/);
@@ -332,6 +377,9 @@ test('invalid input fails before replacing an existing build', async (t) => {
     { tools: { git: 'https://example.com', 'GIT.SH': {} } },
     { tools: {} }, { tools: { git: { title: 'missing URL' } } },
     ...[null, 'true', 1, [], {}].map((script) => ({ code: { url: 'https://example.com', script } })),
+    ...[null, 'true', 1, [], {}].map((hidden) => ({ code: { url: 'https://example.com', hidden } })),
+    { code: { url: 'https://example.com', hidden: true }, CODE: 'https://example.org' },
+    { code: { url: 'https://example.com', hidden: true, script: true }, 'CODE.SH': 'https://example.org' },
     { code: { url: 'https://example.com', script: true }, 'code.sh': 'https://example.org' },
     { 'CODE.SH': 'https://example.org', code: { url: 'https://example.com', script: true } },
     { tools: { run: { url: 'https://example.com', script: true }, 'RUN.SH': { git: 'https://example.org' } } },
@@ -344,6 +392,7 @@ test('invalid input fails before replacing an existing build', async (t) => {
     const result = f.build();
     assert.equal(result.status, 1, JSON.stringify(value));
     assert.match(result.stderr, /Build stopped/);
+    if (value?.code && typeof value.code === 'object' && 'hidden' in value.code && typeof value.code.hidden !== 'boolean') assert.match(result.stderr, /"code" — hidden must be a boolean/);
     assert.equal(await f.read('marker'), 'preserved');
   }
   await writeFile(join(f.cwd, 'links.json'), '{broken');
@@ -352,8 +401,8 @@ test('invalid input fails before replacing an existing build', async (t) => {
 
 test('404 resolves root and nested paths under user and project sites', async (t) => {
   const map = {
-    tools: { Git: 'https://git-scm.com/', editors: { Code: { url: 'https://example.org/' } } },
-    Mixed: { url: 'https://example.com/', script: true }, plain: 'https://example.org/',
+    tools: { Git: 'https://git-scm.com/', editors: { Code: { url: 'https://example.org/', hidden: true } }, hiddenOnly: { Secret: { url: 'https://example.com/secret', hidden: true } } },
+    Mixed: { url: 'https://example.com/', script: true, hidden: true }, plain: 'https://example.org/',
   };
   const f = await fixture(t, map);
   assert.equal(f.build().status, 0);
@@ -377,6 +426,7 @@ test('404 resolves root and nested paths under user and project sites', async (t
     for (const [path, expected] of [
       ['TOOLS/git/', map.tools.Git], ['tools/EDITORS/code', map.tools.editors.Code.url],
       ['TOOLS/editors/', prefix + 'tools/editors/'],
+      ['TOOLS/HIDDENONLY/secret', map.tools.hiddenOnly.Secret.url], ['tools/HIDDENONLY/', prefix + 'tools/hiddenOnly/'],
       ...['Mixed', 'mixed', 'MIXED/'].map((code) => [code, map.Mixed.url]),
       ['plain', map.plain], ['PLAIN/', map.plain],
     ]) {
