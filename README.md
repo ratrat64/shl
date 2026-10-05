@@ -8,8 +8,11 @@ The generated site includes a browsable directory and a guide with About, How to
 and How it works sections. The former `/about/` and `/how-it-works/` URLs forward
 to those sections. It follows the system light/dark preference; visitors
 can override it with the Theme button, saved in their browser.
-Search on the homepage and each directory page filters the visible links by code,
-title, or destination (including nested links). Browsing still works without JavaScript.
+Search on the homepage and each directory page filters the listed links by code,
+title, or destination (including nested links). Pages with hidden links have a
+Show hidden links button to include them in listings and search; the homepage
+link count updates too.
+Browsing visible links still works without JavaScript; hidden links stay hidden.
 
 ## Setup
 
@@ -43,8 +46,9 @@ automation:
 
 Short form is just `code: https://example.com/`. Long form adds an optional string `title` shown
 on the redirect fallback page, or a boolean `hidden` (default `false`). Set `hidden: true`
-to omit a link from directory listings, counts, and search. Its redirect and optional
-script launcher still work. You can edit the file in GitHub's web editor;
+to omit a link from directory listings, counts, and search by default. Visitors can
+use Show hidden links to reveal it. Its redirect and optional script launcher still
+work. You can edit the file in GitHub's web editor;
 choose to create a branch and pull request. The links become live after the merge
 to `main` finishes deploying.
 
@@ -66,9 +70,10 @@ keep their URLs. Directory names are their display labels, and a directory must
 contain at least one entry. A path cannot be both a directory and a redirect.
 The checked-in `links.yaml` includes flat and nested examples, optional titles,
 `script: true` and `script: false`, and codes using dots, underscores and hyphens.
-Directories without visible descendants are omitted from parent listings, but
-their URLs still open without listing hidden links. If every link is hidden, the
-directory displays an empty state.
+Directories without visible descendants are hidden in parent listings by default,
+but their URLs still open. Show hidden links reveals those directories and their
+links. If every link is hidden, the directory initially displays an empty state
+and the toggle; with JavaScript disabled, hidden entries stay out of view.
 
 Each path segment starts with an ASCII letter or number, followed by letters,
 numbers, `.`, `_`, or `-`. `index`, `404`, `assets`, `links`, `about`, `guide`,
@@ -184,6 +189,7 @@ from GitHub Pages.
   `links.json` client-side and catches wrong-case codes before giving up.
 - `dist/index.html` — a directory with expandable nested groups, sorted by name,
   showing visible short codes beside destinations (with long URLs shortened visually in the middle).
+  Show hidden links reveals hidden entries and hidden-only groups on the homepage and eligible directory pages.
   Hover a code for its optional title; titles remain searchable. Select a code to follow its short
   link or browse a directory page. It updates on each deployment.
 
@@ -195,6 +201,6 @@ variable is required.
 ## Limits
 
 Published destinations are public, including hidden links in `links.json` and redirect pages.
-The homepage lists visible links. There is no backend, database,
+The homepage lists visible links by default. There is no backend, database,
 anonymous link submission, or built-in click tracking. Managing links is a
 repository edit followed by a deployment.

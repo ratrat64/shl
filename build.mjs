@@ -190,6 +190,7 @@ const styles = `
   .section-head h2{margin:0}.count{color:var(--muted);font-size:.85rem;font-variant-numeric:tabular-nums}
   .directory-tools{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1rem}
   .directory-tools h1{margin:0}.directory-tools .count{margin-left:.5rem}
+  #hidden-toggle{margin-left:.75rem}
   .search{width:min(100%,360px)}
   .search label{display:block;font-size:.82rem;color:var(--muted);margin-bottom:.2rem}
   .search input{width:100%;font:inherit;padding:.45rem .7rem;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--ink);caret-color:var(--accent)}
@@ -245,12 +246,18 @@ const searchScript = `(() => {
   if (!input) return;
   const list = document.querySelector('.links');
   const status = document.querySelector('#search-status');
+  const toggle = document.querySelector('#hidden-toggle');
+  const countLabel = document.querySelector('#link-count');
+  const empty = document.querySelector('#empty-directory');
   const opened = new Map();
-  input.parentElement.hidden = false;
+  let showHidden = false;
+  input.parentElement.hidden = !!empty;
+  if (toggle) toggle.hidden = false;
 
   function filter(list, query, path = '', all = false) {
     let count = 0;
     for (const item of list.children) {
+      if (item.dataset.hidden === 'true' && !showHidden) { item.hidden = true; continue; }
       const details = item.firstElementChild;
       if (details.tagName === 'DETAILS') {
         const next = path + details.querySelector('summary').textContent + '/';
@@ -270,13 +277,30 @@ const searchScript = `(() => {
     return count;
   }
 
-  input.addEventListener('input', () => {
+  function update() {
     for (const [details, wasOpen] of opened) details.open = wasOpen;
     opened.clear();
     const query = input.value.trim().toLowerCase();
     const count = filter(list, query);
-    status.hidden = !query;
+    status.hidden = !query || (!!empty && !showHidden);
     status.textContent = !query ? '' : count ? count + ' matching link' + (count === 1 ? '.' : 's.') : 'No links match your search.';
+    if (empty) {
+      empty.hidden = showHidden;
+      list.parentElement.hidden = !showHidden;
+      input.parentElement.hidden = !showHidden;
+    }
+    if (countLabel) {
+      const total = Number(countLabel.dataset[showHidden ? 'total' : 'visible']);
+      countLabel.hidden = !total;
+      countLabel.textContent = total + ' link' + (total === 1 ? '' : 's');
+    }
+  }
+
+  input.addEventListener('input', update);
+  if (toggle) toggle.addEventListener('click', () => {
+    showHidden = !showHidden;
+    toggle.textContent = showHidden ? 'Hide hidden links' : 'Show hidden links';
+    update();
   });
 })();`;
 
@@ -293,16 +317,15 @@ const shell = (title, active, depth, content) => `<!doctype html>
  <footer class="footer"><div class="wrap"><p>Shortlink</p><p><a href="${depth}guide/">Guide</a> · <a href="https://github.com/ratrat64/shortlink#readme">Repository</a></p></div></footer>
 </body></html>`;
 
-const visibleCount = (entries) => Object.values(entries).reduce((count, value) =>
-  count + (typeof value === 'object' && !('url' in value) ? visibleCount(value) : Number(value?.hidden !== true)), 0);
+const visibleCount = (entries, includeHidden = false) => Object.values(entries).reduce((count, value) =>
+  count + (typeof value === 'object' && !('url' in value) ? visibleCount(value, includeHidden) : Number(includeHidden || value?.hidden !== true)), 0);
 
 const listing = (entries, prefix = '') => `<ul class="links">${Object.entries(entries)
-  .filter(([, value]) => typeof value === 'object' && !('url' in value) ? visibleCount(value) > 0 : value?.hidden !== true)
   .sort(([a], [b]) => a.toLowerCase() < b.toLowerCase() ? -1 : 1)
   .map(([code, value]) => {
     const href = `./${prefix}${code}/`;
     if (typeof value === 'object' && !('url' in value)) return `
-      <li><details><summary><a href="${esc(href)}">${esc(code)}</a></summary>
+      <li${visibleCount(value) ? '' : ' data-hidden="true" hidden'}><details><summary><a href="${esc(href)}">${esc(code)}</a></summary>
         ${listing(value, `${prefix}${code}/`)}
       </details></li>`;
     const url = typeof value === 'string' ? value : value.url;
@@ -312,7 +335,7 @@ const listing = (entries, prefix = '') => `<ul class="links">${Object.entries(en
     const split = path.lastIndexOf('/', path.lastIndexOf('/') - 1);
     const cut = split > 0 ? originLength + split + 1 : url.length;
     return `
-        <li${title ? ` data-title="${esc(title)}"` : ''}><div class="link-row"${title ? ` title="${esc(title)}"` : ''}><a class="code${value?.script === true ? ' script-link' : ''}" href="${esc(href)}"${title ? ` title="${esc(title)}"` : ''}>${esc(code)}${value?.script === true ? '<span class="script-label">script</span>' : ''}</a>
+        <li${value?.hidden === true ? ' data-hidden="true" hidden' : ''}${title ? ` data-title="${esc(title)}"` : ''}><div class="link-row"${title ? ` title="${esc(title)}"` : ''}><a class="code${value?.script === true ? ' script-link' : ''}" href="${esc(href)}"${title ? ` title="${esc(title)}"` : ''}>${esc(code)}${value?.script === true ? '<span class="script-label">script</span>' : ''}</a>
           <span class="destination"${title ? '' : ` title="${esc(url)}"`}><span class="sr-only">${esc(url)}</span><span class="destination-start" aria-hidden="true">${esc(url.slice(0, cut))}</span><span class="destination-end" aria-hidden="true">${esc(url.slice(cut))}</span></span></div></li>`;
   }).join('')}</ul>`;
 
@@ -321,13 +344,15 @@ const searchableListing = (entries, depth) => `<div class="search" hidden>
      <input id="link-search" type="search" placeholder="Code, title or destination" autocomplete="off">
    </div>`;
 
-const directoryContents = (entries, depth, heading, count = '', breadcrumbs = '') => {
+const directoryContents = (entries, depth, heading, count = null, breadcrumbs = '') => {
   const visible = visibleCount(entries);
+  const total = visibleCount(entries, true);
   return `<section aria-label="Links">
-  <div class="directory-tools"><div><h1>${heading}</h1>${count ? `<span class="count">${count}</span>` : ''}</div>${visible ? searchableListing(entries, depth) : ''}</div>
-  ${breadcrumbs}
-  ${visible ? `<p id="search-status" class="search-status" role="status" hidden></p>
-  ${listing(entries)}<script src="${depth}assets/search.js" defer></script>` : '<p>No links listed here.</p>'}</section>`;
+    <div class="directory-tools"><div><h1>${heading}</h1>${count !== null ? `<span id="link-count" class="count" data-visible="${visible}" data-total="${total}"${visible ? '' : ' hidden'}>${count}</span>` : ''}${total > visible ? '<button id="hidden-toggle" class="theme-toggle" type="button" hidden>Show hidden links</button>' : ''}</div>${total ? searchableListing(entries, depth) : ''}</div>
+   ${breadcrumbs}
+   ${total ? `<p id="search-status" class="search-status" role="status" hidden></p>
+   ${visible ? '' : '<p id="empty-directory">No links listed here.</p>'}
+   <div${visible ? '' : ' hidden'}>${listing(entries)}</div><script src="${depth}assets/search.js" defer></script>` : '<p>No links listed here.</p>'}</section>`;
 };
 
 const indexPage = () => {
@@ -340,7 +365,7 @@ const directoryPage = ({ path, entries }) => {
   const depth = '../'.repeat(path.length);
   const breadcrumbs = `<nav class="breadcrumbs" aria-label="Breadcrumb"><a href="${depth}">Home</a>${path.map((code, i) => ` / ${i < path.length - 1 ? `<a href="${'../'.repeat(path.length - i - 1)}">${esc(code)}</a>` : esc(code)}`).join('')}</nav>`;
   return shell(path.at(-1), 'links', depth, `
-   ${directoryContents(entries, depth, esc(path.at(-1)), '', breadcrumbs)}`);
+   ${directoryContents(entries, depth, esc(path.at(-1)), null, breadcrumbs)}`);
 };
 
 const guidePage = () => shell('Guide', 'guide', '../', `<article class="prose">
@@ -360,7 +385,7 @@ docs:
    </ol>
     <p>Change a URL to retarget a code; delete its entry to remove it. Nest objects for directories. Codes start with a letter or number and may also contain dots, underscores, and hyphens; sibling names cannot differ only by case.</p>
     <p>Optional: <code>script: true</code> builds a <code>&lt;path&gt;.sh</code> launcher. Use exact casing and no trailing slash; only run scripts from trusted sources.</p>
-    <p>Set <code>hidden: true</code> on a link object to omit it from directory listings, counts, and search. Its redirect and optional launcher still work, and the destination remains public in <code>links.json</code>. Hiding controls discoverability, not secrecy.</p></section>
+    <p>Set <code>hidden: true</code> on a link object to omit it from directory listings, counts, and search by default. Use Show hidden links on a directory page to reveal hidden entries. Its redirect and optional launcher still work, and the destination remains public in <code>links.json</code>. Hiding controls discoverability, not secrecy.</p></section>
    <section id="how-it-works"><h2>How it works</h2>
    <p>The build validates codes, collisions, and URL syntax before replacing output. Each link gets a redirect page with JavaScript, meta refresh, and a clickable fallback. Directories get browsable pages.</p>
    <p>GitHub Actions deploys the files after merges to <code>main</code>. The 404 page checks the public link map for differently capitalized codes.</p>

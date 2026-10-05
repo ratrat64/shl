@@ -156,7 +156,7 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
   assert.match(await yaml.read('tools/editors/index.html'), /href="\.\/Code\/" title="&lt;Editor&gt;">Code<\/a>/);
 });
 
-test('hidden links and hidden-only folders disappear from listings and counts but keep their resources', async (t) => {
+test('hidden links and hidden-only folders are hidden by default but keep their resources', async (t) => {
   const links = {
     visible: 'https://example.com/visible',
     shown: { url: 'https://example.com/shown', hidden: false },
@@ -175,11 +175,13 @@ test('hidden links and hidden-only folders disappear from listings and counts bu
   assert.equal(f.build().status, 0);
   for (const page of ['index.html', 'tools/index.html']) {
     const html = await f.read(page);
-    assert.doesNotMatch(html, /SecretCode|OtherSecret|HiddenDeep|onlyHidden|private|hiddenOnly|https:\/\/example\.com\/(secret|deep|other|hidden-deep)/);
-    assert.doesNotMatch(html, /href="\.\/secret\/"/);
+    assert.match(html, /id="hidden-toggle"[^>]*hidden>Show hidden links/);
+    assert.doesNotMatch(html, /aria-pressed=/);
+    assert.match(html, /<li data-hidden="true" hidden><details><summary><a href="\.\/.*(?:private|hiddenOnly|onlyHidden)\/">/);
+    assert.match(html, /<li data-hidden="true" hidden><div class="link-row"[^>]*><a class="code[^>]* href="\.\/.*(?:secret|SecretCode|HiddenDeep)\/"/);
   }
   const home = await f.read('index.html');
-  assert.match(home, /4 links/);
+  assert.match(home, /data-visible="4" data-total="8">4 links/);
   assert.match(home, /href="\.\/tools\/nested\/">nested<\/a>/);
   assert.match(home, /href="\.\/tools\/nested\/branch\/further\/VisibleDeep\/">VisibleDeep<\/a>/);
   assert.match(home, /href="\.\/shown\/">shown<\/a>/);
@@ -188,14 +190,15 @@ test('hidden links and hidden-only folders disappear from listings and counts bu
   assert.match(await f.read('tools/index.html'), /href="\.\/public\/">public<\/a>/);
   assert.match(await f.read('tools/index.html'), /href="\.\/nested\/">nested<\/a>/);
   assert.match(await f.read('tools/nested/index.html'), /href="\.\/branch\/">branch<\/a>/);
-  assert.doesNotMatch(await f.read('tools/nested/index.html'), /hiddenOnly|HiddenDeep/);
+  assert.match(await f.read('tools/nested/index.html'), /<li data-hidden="true" hidden><details><summary><a href="\.\/hiddenOnly\/">hiddenOnly/);
   assert.match(await f.read('tools/nested/branch/index.html'), /href="\.\/further\/">further<\/a>/);
   assert.match(await f.read('tools/nested/branch/further/index.html'), /href="\.\/VisibleDeep\/">VisibleDeep<\/a>/);
   for (const page of ['onlyHidden/index.html', 'onlyHidden/nested/index.html', 'tools/private/index.html', 'tools/private/deep/index.html']) {
     const html = await f.read(page);
-    assert.match(html, /No links listed here\./);
-    assert.doesNotMatch(html, /SecretCode|OtherSecret|href="\.\/nested\/"|href="\.\/deep\/"/);
-    assert.doesNotMatch(html, /id="link-search"/);
+    assert.match(html, /<p id="empty-directory">No links listed here\.<\/p>/);
+    assert.match(html, /<div hidden><ul class="links">/);
+    assert.match(html, /id="hidden-toggle"[^>]*hidden>Show hidden links/);
+    assert.match(html, /id="link-search"/);
   }
   assert.match(await f.read('secret/index.html'), /https:\/\/example\.com\/secret/);
   assert.match(await f.read('tools/private/deep/SecretCode/index.html'), /https:\/\/example\.com\/deep/);
@@ -205,7 +208,8 @@ test('hidden links and hidden-only folders disappear from listings and counts bu
   const allHidden = await fixture(t, { private: { nested: { code: { url: 'https://example.com/', hidden: true } } } });
   assert.equal(allHidden.build().status, 0);
   assert.match(await allHidden.read('index.html'), /No links listed here\./);
-  assert.doesNotMatch(await allHidden.read('index.html'), /Add your first entry|private|\d+ links/);
+  assert.match(await allHidden.read('index.html'), /data-visible="0" data-total="1" hidden/);
+  assert.match(await allHidden.read('index.html'), /<li data-hidden="true" hidden><details><summary><a href="\.\/private\/">/);
   assert.match(await allHidden.read('private/nested/index.html'), /No links listed here\./);
   assert.match(await allHidden.read('private/nested/code/index.html'), /https:\/\/example\.com/);
 });
@@ -231,12 +235,13 @@ test('search filters nested links on the homepage and directory pages', async (t
     assert.match(html, /<div class="search" hidden>\s*<label for="link-search">Search links<\/label>/);
     assert.match(html, new RegExp(`src="${depth.replaceAll('.', '\\.')}assets/search\\.js"`));
     assert.match(html, /id="search-status"[^>]*role="status" hidden/);
+    assert.doesNotMatch(html, /id="hidden-toggle"/);
   }
 
   const leaf = (text, title = '') => ({ firstElementChild: { tagName: 'DIV' }, textContent: text, dataset: { title }, hidden: false });
   const group = (name, ...children) => {
     const details = { tagName: 'DETAILS', open: false, querySelector: (selector) => selector === 'summary' ? { textContent: name } : { children } };
-    return { firstElementChild: details, hidden: false };
+    return { firstElementChild: details, dataset: {}, hidden: false };
   };
   const gh = leaf('gh https://github.com/');
   const git = leaf('git https://git-scm.com/');
@@ -285,6 +290,125 @@ test('search filters nested links on the homepage and directory pages', async (t
   assert.equal(tools.firstElementChild.open, true);
 });
 
+test('toggle updates hidden rows, nested search, counts, and hidden-only empty state', async (t) => {
+  const f = await fixture(t, { public: 'https://example.com/public', secret: { url: 'https://example.com/private', title: 'Private notes', hidden: true }, folder: { visible: 'https://example.com/visible', private: { deep: { url: 'https://example.com/deep', hidden: true } } }, onlyHidden: { nested: { code: { url: 'https://example.com/code', hidden: true } } } });
+  assert.equal(f.build().status, 0);
+  const script = await f.read('assets/search.js');
+  const leaf = (name, hidden = false) => ({ firstElementChild: { tagName: 'DIV' }, textContent: name, dataset: hidden ? { hidden: 'true' } : {}, hidden });
+  const group = (name, children, hidden = false) => ({
+    firstElementChild: { tagName: 'DETAILS', open: false, querySelector: (selector) => selector === 'summary' ? { textContent: name } : { children } },
+    dataset: hidden ? { hidden: 'true' } : {}, hidden,
+  });
+  const exercise = async (page, children, visible, total, site = f) => {
+    const html = await site.read(page);
+    assert.match(html, /id="hidden-toggle"[^>]*hidden>Show hidden links/);
+    assert.doesNotMatch(html, /aria-pressed=/);
+    const wrapper = { hidden: !visible };
+    const list = { children, parentElement: wrapper };
+    const search = { hidden: true };
+    const input = { value: '', parentElement: search, addEventListener: (_, callback) => { input.update = callback; } };
+    const status = { hidden: true, textContent: '' };
+    const toggle = { hidden: true, textContent: 'Show hidden links', addEventListener: (_, callback) => { toggle.click = callback; } };
+    const count = page === 'index.html' ? { dataset: { visible: String(visible), total: String(total) }, hidden: !visible, textContent: visible ? `${visible} links` : '' } : null;
+    const empty = visible ? null : { hidden: false };
+    const elements = { '#link-search': input, '.links': list, '#search-status': status, '#hidden-toggle': toggle, '#link-count': count, '#empty-directory': empty };
+    runInNewContext(script, { document: { querySelector: (selector) => elements[selector] } });
+    assert.equal(toggle.hidden, false);
+    assert.equal(search.hidden, !visible);
+    return { html, input, status, toggle, count, empty, wrapper };
+  };
+
+  const homeMarkup = await f.read('index.html');
+  const titled = homeMarkup.match(/<li([^>]*)><div class="link-row" title="Private notes"><a class="code" href="([^"]+)" title="Private notes">secret<\/a>/);
+  assert.ok(titled, 'generated hidden titled link is present');
+  const [, attributes, secretHref] = titled;
+  assert.match(attributes, /data-hidden="true" hidden data-title="Private notes"/);
+  const secret = leaf('secret https://example.com/private');
+  secret.dataset = { hidden: attributes.match(/data-hidden="([^"]+)"/)?.[1], title: attributes.match(/data-title="([^"]+)"/)?.[1] };
+  secret.hidden = attributes.includes(' hidden');
+  const deep = leaf('deep https://example.com/deep', true);
+  const privateGroup = group('private', [deep], true);
+  const visibleLeaf = leaf('visible https://example.com/visible');
+  const folder = group('folder', [visibleLeaf, privateGroup]);
+  const nestedCode = leaf('code https://example.com/code', true);
+  const hiddenGroup = group('onlyHidden', [group('nested', [nestedCode], true)], true);
+  const home = await exercise('index.html', [folder, hiddenGroup, leaf('public https://example.com/public'), secret], 2, 5);
+  assert.match(home.html, /<li data-hidden="true" hidden><details><summary><a href="\.\/onlyHidden\/">/);
+  const deepHref = home.html.match(/href="(\.\/folder\/private\/deep\/)"/)?.[1];
+  assert.ok(deepHref, 'nested short link was generated');
+  for (const prefix of ['/', '/project/']) {
+    assert.equal(new URL(secretHref, `https://example.org${prefix}`).pathname, `${prefix}secret/`);
+    assert.equal(new URL(deepHref, `https://example.org${prefix}`).pathname, `${prefix}folder/private/deep/`);
+  }
+  home.input.value = 'private notes';
+  home.input.update();
+  assert.equal(home.status.textContent, 'No links match your search.');
+  assert.equal(privateGroup.hidden, true);
+  assert.equal(secret.hidden, true);
+  home.toggle.click();
+  assert.equal(home.toggle.textContent, 'Hide hidden links');
+  assert.equal(home.count.textContent, '5 links');
+  assert.equal(home.status.textContent, '1 matching link.');
+  assert.equal(secret.hidden, false);
+  home.input.value = 'private';
+  home.input.update();
+  assert.equal(home.status.textContent, '2 matching links.');
+  assert.equal(secret.hidden, false);
+  assert.equal(privateGroup.hidden, false);
+  assert.equal(deep.hidden, false);
+  home.input.value = '';
+  home.input.update();
+  assert.equal(hiddenGroup.hidden, false);
+  assert.equal(nestedCode.hidden, false);
+  home.input.value = 'private notes';
+  home.input.update();
+  home.toggle.click();
+  assert.equal(home.toggle.textContent, 'Show hidden links');
+  assert.equal(home.count.textContent, '2 links');
+  assert.equal(home.status.textContent, 'No links match your search.');
+  assert.equal(secret.hidden, true);
+  assert.equal(hiddenGroup.hidden, true);
+  assert.equal(privateGroup.hidden, true);
+
+  const nested = group('private', [leaf('deep https://example.com/deep', true)], true);
+  const directory = await exercise('folder/index.html', [nested, leaf('visible https://example.com/visible')], 1, 2);
+  assert.match(directory.html, /href="\.\/private\/"/);
+  directory.toggle.click();
+  assert.equal(nested.hidden, false);
+  directory.toggle.click();
+  assert.equal(nested.hidden, true);
+
+  const only = group('nested', [leaf('code https://example.com/code', true)], true);
+  const hiddenPage = await exercise('onlyHidden/index.html', [only], 0, 1);
+  assert.match(hiddenPage.html, /<div hidden><ul class="links">/);
+  assert.equal(hiddenPage.empty.hidden, false);
+  hiddenPage.toggle.click();
+  assert.equal(hiddenPage.empty.hidden, true);
+  assert.equal(hiddenPage.wrapper.hidden, false);
+  assert.equal(hiddenPage.input.parentElement.hidden, false);
+  assert.equal(only.hidden, false);
+  hiddenPage.input.value = 'code';
+  hiddenPage.input.update();
+  assert.equal(hiddenPage.status.textContent, '1 matching link.');
+  hiddenPage.toggle.click();
+  assert.equal(hiddenPage.empty.hidden, false);
+  assert.equal(hiddenPage.wrapper.hidden, true);
+  assert.equal(hiddenPage.input.parentElement.hidden, true);
+  assert.equal(hiddenPage.status.hidden, true);
+  assert.equal(hiddenPage.status.textContent, 'No links match your search.');
+
+  const allHidden = await fixture(t, { secret: { url: 'https://example.com/', hidden: true } });
+  assert.equal(allHidden.build().status, 0);
+  const root = await exercise('index.html', [leaf('secret https://example.com/', true)], 0, 1, allHidden);
+  assert.equal(root.count.hidden, true);
+  root.toggle.click();
+  assert.equal(root.count.textContent, '1 link');
+  assert.equal(root.count.hidden, false);
+  root.toggle.click();
+  assert.equal(root.count.hidden, true);
+  assert.equal(root.empty.hidden, false);
+});
+
 test('information pages use relative navigation and shared theme assets', async (t) => {
   const f = await fixture(t, { aboutme: 'https://example.org/' });
   assert.equal(f.build().status, 0);
@@ -330,7 +454,7 @@ test('script launchers are opt-in, quote URLs, forward arguments and statuses, a
   const launcher = await f.read('Run.sh');
   assert.equal(await f.read('tools/Nested.sh'), launcher);
   const home = await f.read('index.html');
-  assert.doesNotMatch(home, /href="\.\/Run\/"|Run<span class="script-label">/);
+  assert.match(home, /<li data-hidden="true" hidden><div class="link-row"><a class="code script-link" href="\.\/Run\/">Run<span class="script-label">/);
   assert.match(home, /3 links/);
   assert.match(home, /class="code" href="\.\/disabled\/">disabled<\/a>/);
   assert.match(await f.read('assets/site.css'), /--script:#ffcb86/);
