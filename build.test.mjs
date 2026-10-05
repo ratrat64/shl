@@ -83,6 +83,7 @@ test('missing, conflicting, malformed, or invalid YAML input preserves the prior
     ['Run: [', /Fix links\.yaml/],
     ['Run: https://example.com/\nRun: https://example.org/\n', /unique|duplicate/i],
     ['Run:\n  url: https://example.com/\n  script: yes\n', /script must be a boolean/],
+    ['Run:\n  url: https://example.com/\n  hidden: yes\n', /hidden must be a boolean/],
     ['- https://example.com/\n', /expected an object mapping/],
     ['!!set {Run: null}\n', /expected an object mapping/],
     ['tools: &tools\n  again: *tools\n', /directory cannot contain itself/],
@@ -163,6 +164,10 @@ test('hidden links and hidden-only folders disappear from listings and counts bu
     tools: {
       public: 'https://example.com/public',
       private: { deep: { SecretCode: { url: 'https://example.com/deep', hidden: true } } },
+      nested: {
+        hiddenOnly: { HiddenDeep: { url: 'https://example.com/hidden-deep', hidden: true } },
+        branch: { further: { VisibleDeep: 'https://example.com/visible-deep' } },
+      },
     },
     onlyHidden: { nested: { OtherSecret: { url: 'https://example.com/other', hidden: true } } },
   };
@@ -170,15 +175,22 @@ test('hidden links and hidden-only folders disappear from listings and counts bu
   assert.equal(f.build().status, 0);
   for (const page of ['index.html', 'tools/index.html']) {
     const html = await f.read(page);
-    assert.doesNotMatch(html, /SecretCode|OtherSecret|onlyHidden|private|https:\/\/example\.com\/(secret|deep|other)/);
+    assert.doesNotMatch(html, /SecretCode|OtherSecret|HiddenDeep|onlyHidden|private|hiddenOnly|https:\/\/example\.com\/(secret|deep|other|hidden-deep)/);
     assert.doesNotMatch(html, /href="\.\/secret\/"/);
   }
   const home = await f.read('index.html');
-  assert.match(home, /3 links/);
+  assert.match(home, /4 links/);
+  assert.match(home, /href="\.\/tools\/nested\/">nested<\/a>/);
+  assert.match(home, /href="\.\/tools\/nested\/branch\/further\/VisibleDeep\/">VisibleDeep<\/a>/);
   assert.match(home, /href="\.\/shown\/">shown<\/a>/);
   assert.match(home, /href="\.\/visible\/">visible<\/a>/);
   assert.match(home, /href="\.\/tools\/public\/">public<\/a>/);
   assert.match(await f.read('tools/index.html'), /href="\.\/public\/">public<\/a>/);
+  assert.match(await f.read('tools/index.html'), /href="\.\/nested\/">nested<\/a>/);
+  assert.match(await f.read('tools/nested/index.html'), /href="\.\/branch\/">branch<\/a>/);
+  assert.doesNotMatch(await f.read('tools/nested/index.html'), /hiddenOnly|HiddenDeep/);
+  assert.match(await f.read('tools/nested/branch/index.html'), /href="\.\/further\/">further<\/a>/);
+  assert.match(await f.read('tools/nested/branch/further/index.html'), /href="\.\/VisibleDeep\/">VisibleDeep<\/a>/);
   for (const page of ['onlyHidden/index.html', 'onlyHidden/nested/index.html', 'tools/private/index.html', 'tools/private/deep/index.html']) {
     const html = await f.read(page);
     assert.match(html, /No links listed here\./);
