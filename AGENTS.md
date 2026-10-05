@@ -1,5 +1,8 @@
 # Working in this repository
 
+## Git workflow
+- The agent may write commit messages, push commits, and publish new branches for requested work. Use a task branch for changes intended for a pull request; do not push directly to `main`.
+
 ## Session startup
 - At the start of a new session, before tackling the first task, read `README.md`, `PRODUCT.md`, `DESIGN.md`, and `package.json`. Identify the relevant code paths, then briefly summarize how the project works and what you will inspect for the task.
 
