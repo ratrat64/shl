@@ -517,9 +517,11 @@ test('script launchers are opt-in, quote URLs, forward arguments and statuses, a
   assert.equal(await f.read('tools/Nested.sh'), launcher);
   const home = await f.read('index.html');
   assert.match(home, /<li data-hidden="true" hidden data-search="Run script [^"]+"><div class="link-row"><a class="code script-link" href="\.\/Run\/">Run<span class="script-label">/);
+  assert.match(home, /class="download" href="https:\/\/example\.com\/setup\.sh/);
   assert.match(home, /3 links/);
   assert.match(home, /class="code" href="\.\/disabled\/">disabled<\/a>/);
   assert.match(await f.read('assets/site.css'), /--script:#ffcb86/);
+  assert.match(await f.read('assets/site.css'), /\.download\{/);
   assert.match(await f.read('tools/Nested/index.html'), /http-equiv="refresh"/);
   assert.match(await f.read('Run/index.html'), /http-equiv="refresh"/);
   await assert.rejects(f.read('disabled.sh'), { code: 'ENOENT' });
