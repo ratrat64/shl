@@ -78,7 +78,7 @@ The header has only Links and Guide navigation. Current links are underlined. Th
 
 ### Directory tools
 
-The count is every directory page's visual heading, not a small aside or a second search-result number. Keep the search label accessible but visually hidden; the visible placeholder is "Search link, title or tag". Keep the hidden-links toggle compact and adjacent to search within the grouped controls. The same count responds to searching and to the hidden-links toggle; see EXPERIENCE.md for states and announcements.
+The count is every directory page's visual heading, not a small aside or a second search-result number. Keep the search label accessible but visually hidden; the visible placeholder is "Search link, title or tag". Reserve the same search and toggle columns on every directory page so the search size and position do not shift when a toggle is absent. Where hidden links exist, place their compact toggle beside search on desktop and below it, right-aligned, on mobile. The same count responds to searching and to the hidden-links toggle; see EXPERIENCE.md for states and announcements.
 
 ### Directory rows
 

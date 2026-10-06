@@ -138,6 +138,7 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
   assert.doesNotMatch(home, /<img>/);
   const tools = await f.read('tools/index.html');
   assert.match(tools, /href="\.\.\/assets\/site\.css"/);
+  for (const page of [home, tools]) assert.match(page, /<div class="directory-toggles"><\/div><\/div>/);
   assert.match(tools, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">2 links<\/h1>/);
   assert.equal([...tools.matchAll(/<h1\b/g)].length, 1);
   assert.doesNotMatch(tools, /<h1>tools<\/h1>/);
@@ -163,7 +164,6 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
   assert.match(css, /\.directory-page \.site-head,\.directory-page \.footer\{border:0\}/);
   assert.match(css, /\.footer\{border-top:1px solid var\(--line\)/);
   assert.match(css, /\.prose section\{border-top:1px solid var\(--line\)/);
-  assert.match(css, /@media\(max-width:740px\)\{[^\n]*\.directory-tools\{align-items:stretch;flex-direction:column\}\.directory-actions\{justify-content:flex-start\}\.search\{width:100%\}/);
   assert.match(css, /\.code\{[^}]*white-space:nowrap/);
   assert.match(css, /\.destination-start\{[^}]*text-overflow:ellipsis/);
   assert.deepEqual(JSON.parse(await f.read('links.json')), links);
@@ -313,6 +313,7 @@ test('hidden links and hidden-only folders are hidden by default but keep their 
   assert.equal(f.build().status, 0);
   for (const page of ['index.html', 'tools/index.html']) {
     const html = await f.read(page);
+    assert.match(html, /<div class="directory-toggles"><button id="hidden-toggle"/);
     assert.match(html, /id="hidden-toggle"[^>]*aria-pressed="false" hidden>Show hidden links/);
     assert.doesNotMatch(html, /data-visible=|data-total=/);
     assert.match(html, /<li data-hidden="true" hidden><details><summary><a href="\.\/.*(?:private|hiddenOnly|onlyHidden)\/" data-directory-link>/);

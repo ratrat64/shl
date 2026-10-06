@@ -75,9 +75,10 @@ export const styles = `
   .directory-tools{display:flex;align-items:flex-start;justify-content:space-between;gap:1.5rem;margin-bottom:1.4rem}
   .directory-tools h1{margin:0}
   .count{font-variant-numeric:tabular-nums}
-  .directory-actions{display:flex;align-items:center;justify-content:flex-end;gap:.65rem;flex-wrap:wrap;min-width:0}
-  .directory-toggles{display:flex;align-items:center;gap:.5rem}
-  .search{width:min(100%,330px)}
+  .directory-actions{display:grid;grid-template-columns:minmax(0,1fr) 9rem;align-items:center;gap:.65rem;width:min(100%,30rem);min-width:0}
+  .directory-toggles{grid-column:2;display:flex;align-items:center;justify-content:flex-end;gap:.5rem}
+  .directory-toggles:empty{display:none}
+  .search{grid-column:1;min-width:0}
   .search input{width:100%;font:inherit;padding:.45rem .7rem;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--ink);caret-color:var(--accent)}
   .search input::placeholder{color:var(--muted)}
   .search input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -116,7 +117,7 @@ export const styles = `
   .prose pre code{overflow-wrap:normal}
   .footer{border-top:1px solid var(--line);padding-block:1.5rem;color:var(--muted);font-size:.87rem}
   .footer .wrap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}.footer p{margin:0}
-  @media(max-width:740px){.head-inner{flex-wrap:wrap;gap:.75rem}.nav{gap:1rem}.directory-tools{align-items:stretch;flex-direction:column}.directory-actions{justify-content:flex-start}.search{width:100%}.link-row{gap:.5rem}.footer .wrap{display:block}}
+  @media(max-width:740px){.head-inner{flex-wrap:wrap;gap:.75rem}.nav{gap:1rem}.directory-tools{align-items:stretch;flex-direction:column}.directory-actions{width:100%;grid-template-columns:minmax(0,1fr)}.directory-toggles{grid-column:1}.link-row{gap:.5rem}.footer .wrap{display:block}}
   @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 `;
 
@@ -324,7 +325,7 @@ const directoryContents = (entries, depth, breadcrumbs = '') => {
   const total = visibleCount(entries, true);
   return `<section aria-label="Links">
     <div class="directory-tools"><h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">${visible} link${visible === 1 ? '' : 's'}</h1>
-    ${total ? `<div class="directory-actions">${searchableListing()}${total > visible ? '<div class="directory-toggles"><button id="hidden-toggle" class="theme-toggle" type="button" aria-pressed="false" hidden>Show hidden links</button></div>' : ''}</div>` : ''}</div>
+    ${total ? `<div class="directory-actions">${searchableListing()}<div class="directory-toggles">${total > visible ? '<button id="hidden-toggle" class="theme-toggle" type="button" aria-pressed="false" hidden>Show hidden links</button>' : ''}</div></div>` : ''}</div>
    ${breadcrumbs}
    ${total ? `<p id="search-status" class="search-status" role="status" hidden></p><p id="copy-status" class="search-status" role="status" aria-live="polite"></p>
     ${visible ? '' : '<p id="empty-directory">No links listed here.</p>'}
