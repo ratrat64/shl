@@ -20,13 +20,13 @@
 
 ## Build and verification
 - Use Node.js 24 (the CI version) and `npm ci` to install the YAML parser. Launcher tests also require Bash.
-- CI installs dependencies, runs `node --test build.test.mjs`, then `node build.mjs`. Run from the repository root: build input and output paths are relative to the working directory. No lint or typecheck suite is configured.
-- Focused routing checks: `node --test --test-name-pattern="404" build.test.mjs`. Tests build in temporary directories and execute generated scripts with simulated browser APIs; actual Pages 404 behavior needs a deployed browser smoke test.
-- A successful build deletes and recreates `dist/`. Edit the templates in `build.mjs`, not generated files.
-- Optional local preview: `npx serve dist -c ../serve.json` (`cleanUrls: false` keeps dotted directory names working). Redirects use HTML meta refresh and JavaScript, not HTTP redirects; `curl -L` does not follow them.
+- CI installs dependencies, runs `node --test test/build.test.mjs`, then `node build.mjs`. Run from the repository root: build input and output paths are relative to the working directory. No lint or typecheck suite is configured.
+- Focused routing checks: `node --test --test-name-pattern="404" test/build.test.mjs`. Tests build in temporary directories and execute generated scripts with simulated browser APIs; actual Pages 404 behavior needs a deployed browser smoke test.
+- A successful build deletes and recreates `dist/`. Edit the templates in `src/pages.mjs`, not generated files; input validation lives in `src/links.mjs`, and `src/build.mjs` writes the site.
+- Optional local preview: `npx serve dist -c ../config/serve.json` (`cleanUrls: false` keeps dotted directory names working). Redirects use HTML meta refresh and JavaScript, not HTTP redirects; `curl -L` does not follow them.
 
 ## Link and routing constraints
-- Exactly one of `links.json`, `links.yaml`, or `links.yml` must exist. Each accepts a URL string, a link object with `url`/optional `title`/optional `script`, or a nonempty nested object for a directory. All formats produce public `dist/links.json` for the browser-side 404 handler.
+- Exactly one of `links.json`, `links.yaml`, or `links.yml` must exist. Each accepts a URL string, a link object with `url`, optional `title`, boolean `script` and `hidden`, and an optional `tags` array of nonblank strings, or a nonempty nested object for a directory. All formats produce public `dist/links.json` for the browser-side 404 handler.
 - `script: true` adds a `<code>.sh` Bash launcher. Launcher URLs require exact casing and no trailing slash; filename collisions with codes are rejected case-insensitively before output is removed.
 - Every path segment must match `^[A-Za-z0-9][A-Za-z0-9._-]*$`. Reserved names and case-insensitive collisions are rejected among siblings, including generated filenames such as `index.html` and launcher `.sh` files. A directory cannot also be a redirect.
 - Destination validation requires an absolute HTTP(S) URL parsed by `URL`; it does not check reachability. Validation completes before output is removed.

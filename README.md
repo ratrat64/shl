@@ -143,7 +143,7 @@ short code or directory in the same folder, regardless of casing.
 ## Pull request checks
 
 Every pull request targeting `main` runs **Check pull request**, using Node.js 24
-on Ubuntu. The **PR validation** job runs `node --test build.test.mjs` followed by
+on Ubuntu. The **PR validation** job runs `node --test test/build.test.mjs` followed by
 `node build.mjs`: tests cover regression cases, and the build validates the proposed
 link file. New commits rerun checks and cancel older runs for the same PR.
 PR checks have read-only repository permissions and do not deploy the site.
@@ -164,19 +164,19 @@ From the repository root, run (requires npm; tests also require Bash):
 ```bash
 npm ci
 npx --yes node@24 build.mjs
-npx serve dist -c ../serve.json
+npx serve dist -c ../config/serve.json
 ```
 
 Open the URL printed by `serve` (usually `http://localhost:3000/`). The
 `serve.json` config keeps dotted directory names such as `/dev.tools/` working.
-To run the regression checks: `npx --yes node@24 --test build.test.mjs`.
+To run the regression checks: `npx --yes node@24 --test test/build.test.mjs`.
 
-A successful build replaces `dist/` completely;
-edit the templates in `build.mjs`, not the generated files. Validation fails
-before the old output is removed. URL syntax is checked, but destination
-reachability is not.
+A successful build replaces `dist/` completely; edit the templates in
+`src/pages.mjs`, input validation in `src/links.mjs`, and output generation in
+`src/build.mjs`, not the generated files. Validation fails before the old
+output is removed. URL syntax is checked, but destination reachability is not.
 
-For a focused check: `node --test --test-name-pattern="404" build.test.mjs`.
+For a focused check: `node --test --test-name-pattern="404" test/build.test.mjs`.
 The checks execute generated JavaScript in Node with simulated browser APIs,
 and Bash launchers with a stubbed downloader.
 After deploying, smoke-test a known code, a wrong-case code (with and without a

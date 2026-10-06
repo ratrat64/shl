@@ -4,3 +4,6 @@
 - source_spec: `aid-docs/implementation-artifacts/spec-hidden-links.md`
   summary: Update the README launcher examples when choosing the final published oh-my-posh link paths.
   evidence: The existing README examples use paths that already differ from the baseline map; publishing the uncommitted map reorganization would add another mismatch.
+- source_spec: `aid-docs/implementation-artifacts/spec-organize-project-root.md`
+  summary: Investigate local serve preview of dotted directory paths.
+  evidence: Both before and after the file move, `serve` returns a directory listing for `/dev.tools/` while `/dev.tools/index.html` returns the generated directory page; build/test routing does not exercise the preview server.

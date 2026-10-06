@@ -24,7 +24,7 @@ One JSON or YAML link map is the source of truth. The build validates it and gen
 
 ## Capabilities and Constraints
 
-- Link entries accept an absolute HTTP(S) destination, an optional title, an optional `script: true` flag for a `.sh` launcher, and an optional boolean `hidden` flag to omit a link from directory listings, counts, and search by default. Visitors can reveal hidden links with the directory toggle.
+- Link entries accept an absolute HTTP(S) destination, an optional title, an optional `script: true` flag for a `.sh` launcher, an optional boolean `hidden` flag to omit a link from directory listings, counts, and search by default, and optional tags displayed under entries and included in search. Visitors can reveal hidden links with the directory toggle.
 - Published links and destinations, including hidden links, remain public in `links.json`, redirect pages, and optional launchers. Hiding controls discoverability, not secrecy. There is no backend, database, anonymous submission, click tracking, or HTTP 301/302 redirect.
 - Short codes are case-insensitively unique and follow the documented reserved-name rules. Destination syntax is validated, not reachability.
 - Node.js 24 runs the build and checks after `npm ci` installs the YAML parser; no frontend framework is wanted.
@@ -33,8 +33,8 @@ One JSON or YAML link map is the source of truth. The build validates it and gen
 ## Evidence on Hand
 
 - `README.md` documents setup, link editing, deployment, behavior, and limits.
-- `links.json` contains example entries, including a title and script launcher.
-- `build.mjs` contains the site templates; `build.test.mjs` covers validation and generated behavior.
+- `links.yaml` contains example entries, including a title and script launcher.
+- `build.mjs` forwards to `src/build.mjs`; `src/links.mjs` validates input, `src/pages.mjs` contains the site templates, and `test/build.test.mjs` covers validation and generated behavior.
 - No testimonials, usage metrics, or performance claims are supplied.
 
 ## Product Principles

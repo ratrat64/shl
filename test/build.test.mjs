@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { runInNewContext } from 'node:vm';
 
-const buildScript = fileURLToPath(new URL('./build.mjs', import.meta.url));
+const buildScript = fileURLToPath(new URL('../build.mjs', import.meta.url));
 
 async function fixture(t, links, source = 'links.json') {
   const cwd = await mkdtemp(join(tmpdir(), 'shortlink-'));
