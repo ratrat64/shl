@@ -72,7 +72,7 @@ export const styles = cssVariables + `
   .directory-page .site-head,.directory-page .footer{border:0}
   .directory-tools{display:flex;align-items:flex-start;justify-content:space-between;gap:1.5rem;margin-bottom:1.4rem}
   .directory-tools h1{margin:0}
-  .count{font-variant-numeric:tabular-nums}
+  .count{font-variant-numeric:tabular-nums;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;min-width:10ch;display:inline-block;text-align:right}
   .directory-actions{display:grid;grid-template-columns:minmax(0,1fr) 9rem;align-items:center;gap:.65rem;width:min(100%,30rem);min-width:0}
   .directory-toggles{grid-column:2;display:flex;align-items:center;justify-content:flex-end;gap:.5rem}
   .search{grid-column:1;min-width:0}
