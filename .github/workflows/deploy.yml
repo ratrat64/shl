@@ -1,4 +1,4 @@
-name: Deploy short links
+name: Deploy shl
 
 on:
   push:

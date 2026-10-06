@@ -12,7 +12,7 @@ Visitors browse the public link directory and follow short URLs. Repository main
 
 ## Product Purpose
 
-Publish maintainable short links as a static GitHub Pages site. A maintainer changes the link map in a pull request; merging to `main` deploys updated redirects.
+Publish maintainable short links with shl, a static GitHub Pages site. A maintainer changes the link map in a pull request; merging to `main` deploys updated redirects.
 
 ## Positioning
 
@@ -32,7 +32,7 @@ One JSON or YAML link map is the source of truth. The build validates it and gen
 
 ## Evidence on Hand
 
-- `README.md` documents setup, link editing, deployment, behavior, and limits.
+- `README.md` documents shl setup, link editing, deployment, behavior, and limits.
 - `links.yaml` contains example entries, including a title and script launcher.
 - `build.mjs` forwards to `src/build.mjs`; `src/links.mjs` validates input, `src/pages.mjs` contains the site templates, and `test/build.test.mjs` covers validation and generated behavior.
 - No testimonials, usage metrics, or performance claims are supplied.
