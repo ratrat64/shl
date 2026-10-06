@@ -185,8 +185,12 @@ export const searchScript = `globalThis.initSearch = () => {
     }
     const numberEl = countLabel.querySelector('.count-number');
     const labelEl = countLabel.querySelector('.count-label');
-    if (numberEl) numberEl.textContent = count;
-    if (labelEl) labelEl.textContent = count === 1 ? ' link' : ' links';
+    if (numberEl && labelEl) {
+      numberEl.textContent = count;
+      labelEl.textContent = count === 1 ? ' link' : ' links';
+    } else {
+      countLabel.textContent = count + ' link' + (count === 1 ? '' : 's');
+    }
   }
 
   input.addEventListener('input', update);
