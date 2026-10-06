@@ -72,7 +72,9 @@ export const styles = cssVariables + `
   .directory-page .site-head,.directory-page .footer{border:0}
   .directory-tools{display:flex;align-items:flex-start;justify-content:space-between;gap:1.5rem;margin-bottom:1.4rem}
   .directory-tools h1{margin:0}
-  .count{font-variant-numeric:tabular-nums;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;min-width:10ch;display:inline-block;text-align:right}
+  .count{font-variant-numeric:tabular-nums;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;display:inline-flex;align-items:center;gap:.35rem}
+.count-number{min-width:4ch;text-align:right;display:inline-block}
+.count-label{white-space:nowrap}
   .directory-actions{display:grid;grid-template-columns:minmax(0,1fr) 9rem;align-items:center;gap:.65rem;width:min(100%,30rem);min-width:0}
   .directory-toggles{grid-column:2;display:flex;align-items:center;justify-content:flex-end;gap:.5rem}
   .search{grid-column:1;min-width:0}
@@ -181,7 +183,18 @@ export const searchScript = `globalThis.initSearch = () => {
       list.parentElement.hidden = !showHidden;
       input.parentElement.hidden = !showHidden;
     }
-    countLabel.textContent = count + ' link' + (count === 1 ? '' : 's');
+    if (countLabel.querySelector) {
+      const numberEl = countLabel.querySelector('.count-number');
+      const labelEl = countLabel.querySelector('.count-label');
+      if (numberEl && labelEl) {
+        numberEl.textContent = count;
+        labelEl.textContent = count === 1 ? ' link' : ' links';
+      } else {
+        countLabel.textContent = count + ' link' + (count === 1 ? '' : 's');
+      }
+    } else {
+      countLabel.textContent = count + ' link' + (count === 1 ? '' : 's');
+    }
   }
 
   input.addEventListener('input', update);
@@ -276,40 +289,85 @@ export const navigationScript = `(() => {
   });
 })();`;
 
-const shell = (title, active, depth, content) => `<!doctype html>
+export const NAV_ITEMS = [
+  { label: 'Links', path: '', key: 'links' },
+  { label: 'Guide', path: 'guide/', key: 'guide' }
+];
+
+const header = (active, depth) => `<header class="site-head"><div class="wrap head-inner">
+ <a class="brand" href="${depth}"${active === 'links' ? ' data-directory-link' : ''}>shl</a>
+ <nav class="nav" aria-label="Main navigation">
+ ${NAV_ITEMS.map(({ label, path, key }) => `<a href="${depth}${path}"${active === 'links' && key === 'links' ? ' data-directory-link' : ''}${active === key ? ' aria-current="page"' : ''}>${label}</a>`).join('')}
+ </nav><button class="theme-toggle" type="button" aria-label="Change color theme">Theme: system</button></div></header>`;
+
+const footer = (depth) => `<footer class="footer"><div class="wrap"><p>shl</p><p><a href="${depth}guide/">Guide</a> · <a href="https://github.com/ratrat64/shortlink#readme">Repository</a></p></div></footer>`;
+
+export const page = (title, active, depth, content) => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark"><title>${esc(title)} · shl</title>
 <link rel="stylesheet" href="${depth}assets/site.css"><script src="${depth}assets/theme.js" defer></script>${active === 'links' ? `<script src="${depth}assets/navigation.js" defer></script>` : ''}</head>
-<body${active === 'links' ? ' class="directory-page"' : ''}><header class="site-head"><div class="wrap head-inner">
- <a class="brand" href="${depth}"${active === 'links' ? ' data-directory-link' : ''}>shl</a>
- <nav class="nav" aria-label="Main navigation">
- ${[['Links', '', 'links'], ['Guide', 'guide/', 'guide']].map(([label, path, key]) => `<a href="${depth}${path}"${active === 'links' && key === 'links' ? ' data-directory-link' : ''}${active === key ? ' aria-current="page"' : ''}>${label}</a>`).join('')}
- </nav><button class="theme-toggle" type="button" aria-label="Change color theme">Theme: system</button></div></header>
- <main class="wrap"${active === 'links' ? ' data-directory' : ''}>${content}</main>
- <footer class="footer"><div class="wrap"><p>shl</p><p><a href="${depth}guide/">Guide</a> · <a href="https://github.com/ratrat64/shortlink#readme">Repository</a></p></div></footer>
+<body${active === 'links' ? ' class="directory-page"' : ''}>${header(active, depth)}
+<main class="wrap"${active === 'links' ? ' data-directory' : ''}>${content}</main>
+${footer(depth)}
 </body></html>`;
 
-const visibleCount = (entries, includeHidden = false) => Object.values(entries).reduce((count, value) =>
-  count + (typeof value === 'object' && !('url' in value) ? visibleCount(value, includeHidden) : Number(includeHidden || value?.hidden !== true)), 0);
+const shell = (title, active, depth, content) => page(title, active, depth, content);
+
+const visibleCount = (entries, includeHidden = false) =>
+  [...walkEntries(entries)].filter(e => !e.isDirectory && (includeHidden || !e.hidden)).length;
+
+export const walkEntries = function* (entries, prefix = '') {
+  for (const [code, value] of Object.entries(entries).sort(([a], [b]) => a.toLowerCase() < b.toLowerCase() ? -1 : 1)) {
+    const href = `./${prefix}${code}/`;
+    if (typeof value === 'object' && !('url' in value)) {
+      yield { code, value, prefix, href, isDirectory: true, path: [...(prefix ? prefix.split('/').filter(Boolean) : []), code] };
+      yield* walkEntries(value, `${prefix}${code}/`);
+    } else {
+      const url = typeof value === 'string' ? value : value.url;
+      const title = typeof value === 'string' ? '' : value.title;
+      const tags = Array.isArray(value?.tags) ? value.tags.map((tag) => tag.trim()) : [];
+      yield { code, value, url, title, tags, script: value?.script === true, hidden: value?.hidden === true, prefix, href, isDirectory: false };
+    }
+  }
+};
+
+const renderDirectoryNode = ({ code, entries, prefix, visible }) => `
+  <li${visible ? '' : ' data-hidden="true" hidden'}><details><summary><a href="${esc(`./${prefix}${code}/`)}" data-directory-link>${esc(code)}</a></summary>
+    ${listing(entries, `${prefix}${code}/`)}
+  </details></li>`;
+
+const renderLinkRow = ({ code, url, title, script, tags, hidden, prefix, href }) => {
+  const originLength = new URL(url).origin.length;
+  const path = url.slice(originLength).split(/[?#]/, 1)[0];
+  const split = path.lastIndexOf('/', path.lastIndexOf('/') - 1);
+  const cut = split > 0 ? originLength + split + 1 : url.length;
+  const searchText = `${code} ${script ? 'script ' : ''}${url} ${tags.join(' ')} ${tags.map((tag) => `#${tag}`).join(' ')}`.trim();
+  return `
+       <li${hidden ? ' data-hidden="true" hidden' : ''}${title ? ` data-title="${esc(title)}"` : ''} data-search="${esc(searchText)}"><div class="link-row${script ? ' script-row' : ''}"${title ? ` title="${esc(title)}"` : ''}><a class="code${script ? ' script-link' : ''}" href="${esc(href)}"${title ? ` title="${esc(title)}"` : ''}>${esc(code)}${script ? '<span class="script-label">script</span>' : ''}</a>
+            <a class="destination" href="${esc(url)}" aria-label="Copy destination: ${esc(url)}"${title ? '' : ` title="${esc(url)}"`}><span class="sr-only">${esc(url)}</span><span class="destination-start" aria-hidden="true">${esc(url.slice(0, cut))}</span><span class="destination-end" aria-hidden="true">${esc(url.slice(cut))}</span></a>${script ? `<a class="download" href="${esc(`./${prefix}${code}.sh`)}" aria-label="Download script for ${esc(code)}" download>Download</a>` : ''}<a class="visit" href="${esc(url)}" aria-label="Open destination for ${esc(code)}">Open</a></div>${tags.length ? `<span class="tags">${tags.map((tag) => `#${esc(tag)}`).join(' · ')}</span>` : ''}</li>`;
+};
 
 const listing = (entries, prefix = '') => `<ul class="links">${Object.entries(entries)
   .sort(([a], [b]) => a.toLowerCase() < b.toLowerCase() ? -1 : 1)
   .map(([code, value]) => {
     const href = `./${prefix}${code}/`;
-    if (typeof value === 'object' && !('url' in value)) return `
-      <li${visibleCount(value) ? '' : ' data-hidden="true" hidden'}><details><summary><a href="${esc(href)}" data-directory-link>${esc(code)}</a></summary>
-        ${listing(value, `${prefix}${code}/`)}
-      </details></li>`;
+    if (typeof value === 'object' && !('url' in value)) {
+      const visible = visibleCount(value);
+      return renderDirectoryNode({ code, entries: value, prefix, visible });
+    }
     const url = typeof value === 'string' ? value : value.url;
     const title = typeof value === 'string' ? '' : value.title;
     const tags = Array.isArray(value?.tags) ? value.tags.map((tag) => tag.trim()) : [];
-    const originLength = new URL(url).origin.length;
-    const path = url.slice(originLength).split(/[?#]/, 1)[0];
-    const split = path.lastIndexOf('/', path.lastIndexOf('/') - 1);
-    const cut = split > 0 ? originLength + split + 1 : url.length;
-    return `
-         <li${value?.hidden === true ? ' data-hidden="true" hidden' : ''}${title ? ` data-title="${esc(title)}"` : ''} data-search="${esc(`${code} ${value?.script === true ? 'script ' : ''}${url} ${tags.join(' ')} ${tags.map((tag) => `#${tag}`).join(' ')}`.trim())}"><div class="link-row${value?.script === true ? ' script-row' : ''}"${title ? ` title="${esc(title)}"` : ''}><a class="code${value?.script === true ? ' script-link' : ''}" href="${esc(href)}"${title ? ` title="${esc(title)}"` : ''}>${esc(code)}${value?.script === true ? '<span class="script-label">script</span>' : ''}</a>
-           <a class="destination" href="${esc(url)}" aria-label="Copy destination: ${esc(url)}"${title ? '' : ` title="${esc(url)}"`}><span class="sr-only">${esc(url)}</span><span class="destination-start" aria-hidden="true">${esc(url.slice(0, cut))}</span><span class="destination-end" aria-hidden="true">${esc(url.slice(cut))}</span></a>${value?.script === true ? `<a class="download" href="${esc(`./${prefix}${code}.sh`)}" aria-label="Download script for ${esc(code)}" download>Download</a>` : ''}<a class="visit" href="${esc(url)}" aria-label="Open destination for ${esc(code)}">Open</a></div>${tags.length ? `<span class="tags">${tags.map((tag) => `#${esc(tag)}`).join(' · ')}</span>` : ''}</li>`;
+    return renderLinkRow({
+      code,
+      url,
+      title,
+      script: value?.script === true,
+      tags,
+      hidden: value?.hidden === true,
+      prefix,
+      href
+    });
   }).join('')}</ul>`;
 
 const searchableListing = () => `<div class="search" hidden>
@@ -325,8 +383,8 @@ const directoryContents = (entries, depth, breadcrumbs = '', emptyMessage = 'No 
     <div class="directory-actions">${total ? searchableListing() : ''}<div class="directory-toggles"><button id="hidden-toggle" class="theme-toggle" type="button" aria-pressed="false" ${total > visible ? 'hidden' : 'disabled'}>Show hidden links</button></div></div></div>
     ${breadcrumbs || '<div class="breadcrumbs" aria-hidden="true"></div>'}
    ${total ? `<p id="search-status" class="search-status" role="status" hidden></p><p id="copy-status" class="search-status" role="status" aria-live="polite"></p>
-    ${visible ? '' : '<p id="empty-directory">No links listed here.</p>'}
-     <div${visible ? '' : ' hidden'}>${listing(entries)}</div><script src="${depth}assets/search.js" defer></script><script src="${depth}assets/copy.js" defer></script>` : `<p>${emptyMessage}</p>`}</section>`;
+     ${visible ? '' : '<p id="empty-directory">No links listed here.</p>'}
+      <div${visible ? '' : ' hidden'}>${listing(entries)}</div><script src="${depth}assets/search.js" defer></script><script src="${depth}assets/copy.js" defer></script>` : `<p>${emptyMessage}</p>`}</section>`;
 };
 
 export const indexPage = ({ raw, links, source }) => shell('Links', 'links', './', `
