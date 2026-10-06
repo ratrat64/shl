@@ -72,8 +72,8 @@ export const styles = `
   p{max-width:68ch}
   .lead{color:var(--muted);max-width:65ch;margin-bottom:2rem}
   .directory-page .site-head,.directory-page .footer{border:0}
-  .directory-tools{display:flex;align-items:center;justify-content:space-between;gap:1.5rem;margin-bottom:1.4rem}
-  .directory-summary{display:flex;align-items:baseline;gap:.75rem;flex-wrap:wrap}
+  .directory-tools{display:flex;align-items:flex-end;justify-content:space-between;gap:1.5rem;margin-bottom:1.4rem}
+  .directory-summary{display:flex;flex-direction:column;align-items:flex-start;gap:.25rem}
   .directory-summary h1{margin:0}
   .count{color:var(--ink);font-size:clamp(1.5rem,2.5vw,1.8rem);font-weight:600;font-variant-numeric:tabular-nums}
   h1.count{font-size:clamp(1.8rem,3vw,2.4rem)}
@@ -108,6 +108,7 @@ export const styles = `
   .download:hover{background:var(--wash)}
   .tags{display:block;color:var(--muted);font-size:.78rem;margin-top:.2rem}
   #copy-status:empty{display:none}
+  #copy-status:not(:empty){position:fixed;bottom:1rem;right:1rem;z-index:1;max-width:min(24rem,calc(100vw - 2rem));margin:0;padding:.55rem .8rem;background:var(--panel);border:1px solid var(--line);border-radius:4px;color:var(--ink)}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   .prose{max-width:740px}.prose section{border-top:1px solid var(--line);padding-top:1rem;margin-top:2.5rem;scroll-margin-top:1rem}.prose p,.prose li{color:var(--muted)}
   .prose ol,.prose ul{padding-left:1.4rem}.prose li{padding-left:.35rem;margin-bottom:.8rem}
@@ -200,11 +201,13 @@ globalThis.initSearch();`;
 export const copyScript = `globalThis.initCopy = () => {
   const list = document.querySelector('.links');
   const status = document.querySelector('#copy-status');
+  let timeout;
   list.addEventListener('click', async (event) => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const link = event.target.closest('a.code, a.destination');
     if (!link) return;
     event.preventDefault();
+    clearTimeout(timeout);
     status.textContent = '';
     try {
       await navigator.clipboard.writeText(link.classList.contains('code') ? link.href : link.getAttribute('href'));
@@ -212,6 +215,7 @@ export const copyScript = `globalThis.initCopy = () => {
     } catch {
       status.textContent = 'Could not copy the link. Try your browser\u2019s copy-link action.';
     }
+    timeout = setTimeout(() => { status.textContent = ''; }, 5000);
   });
 };
 globalThis.initCopy();`;

@@ -383,9 +383,13 @@ test('directory clicks copy full short or long URLs while Open follows the desti
     const copied = [];
     const status = { textContent: '' };
     const list = { addEventListener: (_, listener) => { list.click = listener; } };
+    const timers = new Map();
+    let nextTimer = 0;
     runInNewContext(script, {
       document: { querySelector: (selector) => ({ '.links': list, '#copy-status': status })[selector] },
       navigator: { clipboard: { writeText: async (text) => { copied.push(text); } } },
+      setTimeout: (callback, delay) => { assert.equal(delay, 5000); timers.set(++nextTimer, callback); return nextTimer; },
+      clearTimeout: (id) => timers.delete(id),
     });
     const anchor = (kind, href) => ({
       href: new URL(href, `https://short.example${prefix}`).href,
@@ -403,6 +407,9 @@ test('directory clicks copy full short or long URLs while Open follows the desti
     assert.equal(await click(anchor('destination', url)), true);
     assert.equal(copied.at(-1), url);
     assert.equal(status.textContent, 'Destination copied.');
+    assert.equal(timers.size, 1);
+    timers.values().next().value();
+    assert.equal(status.textContent, '');
     assert.equal(await click(anchor('visit', url)), false);
     assert.equal(await click(anchor('code', shortHref), { ctrlKey: true }), false);
     assert.equal(copied.length, 2);
@@ -410,14 +417,18 @@ test('directory clicks copy full short or long URLs while Open follows the desti
 
   const status = { textContent: '' };
   const list = { addEventListener: (_, listener) => { list.click = listener; } };
+  let dismiss;
   runInNewContext(script, {
     document: { querySelector: (selector) => ({ '.links': list, '#copy-status': status })[selector] },
     navigator: { clipboard: { writeText: async () => { throw new Error('permission denied'); } } },
+    setTimeout: (callback) => { dismiss = callback; }, clearTimeout: () => {},
   });
   let prevented = false;
   await list.click({ button: 0, target: { closest: () => ({ href: 'https://short.example/project/tools/Setup/', classList: { contains: () => true } }) }, preventDefault: () => { prevented = true; } });
   assert.equal(prevented, true);
   assert.match(status.textContent, /Could not copy/);
+  dismiss();
+  assert.equal(status.textContent, '');
 });
 
 test('search filters nested links on the homepage and directory pages', async (t) => {
