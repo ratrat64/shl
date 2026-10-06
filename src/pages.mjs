@@ -183,11 +183,15 @@ export const searchScript = `globalThis.initSearch = () => {
       list.parentElement.hidden = !showHidden;
       input.parentElement.hidden = !showHidden;
     }
-    const numberEl = countLabel.querySelector('.count-number');
-    const labelEl = countLabel.querySelector('.count-label');
-    if (numberEl && labelEl) {
-      numberEl.textContent = count;
-      labelEl.textContent = count === 1 ? ' link' : ' links';
+    if (countLabel.querySelector) {
+      const numberEl = countLabel.querySelector('.count-number');
+      const labelEl = countLabel.querySelector('.count-label');
+      if (numberEl && labelEl) {
+        numberEl.textContent = count;
+        labelEl.textContent = count === 1 ? ' link' : ' links';
+      } else {
+        countLabel.textContent = count + ' link' + (count === 1 ? '' : 's');
+      }
     } else {
       countLabel.textContent = count + ' link' + (count === 1 ? '' : 's');
     }
