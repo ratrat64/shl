@@ -123,6 +123,7 @@ test('homepage lists sorted links safely with project-relative URLs and handles 
   const emptyHtml = await empty.read('index.html');
   assert.match(emptyHtml, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">0 links<\/h1>/);
   assert.equal([...emptyHtml.matchAll(/<h1\b/g)].length, 1);
+  assert.match(emptyHtml, /id="hidden-toggle"[^>]*disabled>Show hidden links/);
   assert.match(emptyHtml, /No links available yet\./);
 });
 
@@ -138,7 +139,8 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
   assert.doesNotMatch(home, /<img>/);
   const tools = await f.read('tools/index.html');
   assert.match(tools, /href="\.\.\/assets\/site\.css"/);
-  for (const page of [home, tools]) assert.match(page, /<div class="directory-toggles"><\/div><\/div>/);
+  for (const page of [home, tools]) assert.match(page, /<div class="directory-toggles"><button id="hidden-toggle"[^>]*disabled>Show hidden links<\/button><\/div>/);
+  assert.match(home, /<div class="breadcrumbs" aria-hidden="true"><\/div>/);
   assert.match(tools, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">2 links<\/h1>/);
   assert.equal([...tools.matchAll(/<h1\b/g)].length, 1);
   assert.doesNotMatch(tools, /<h1>tools<\/h1>/);
@@ -444,7 +446,7 @@ test('search filters nested links on the homepage and directory pages', async (t
     assert.match(html, /id="link-count" class="count" aria-live="polite" aria-atomic="true"/);
     assert.match(html, new RegExp(`src="${depth.replaceAll('.', '\\.')}assets/search\\.js"`));
     assert.match(html, /id="search-status"[^>]*role="status" hidden/);
-    assert.doesNotMatch(html, /id="hidden-toggle"/);
+    assert.match(html, /id="hidden-toggle"[^>]*disabled>Show hidden links/);
   }
 
   const leaf = (text, title = '') => ({ firstElementChild: { tagName: 'DIV' }, textContent: text, dataset: { title }, hidden: false });
@@ -463,9 +465,11 @@ test('search filters nested links on the homepage and directory pages', async (t
   const input = { value: '', parentElement: search, addEventListener: (_, listener) => { input.update = listener; } };
   const status = { hidden: true, textContent: '' };
   const count = { textContent: '3 links' };
-  const elements = { '#link-search': input, '.links': list, '#search-status': status, '#link-count': count };
+  const disabledToggle = { disabled: true, hidden: false, addEventListener() { throw new Error('disabled toggle should not activate'); } };
+  const elements = { '#link-search': input, '.links': list, '#search-status': status, '#link-count': count, '#hidden-toggle': disabledToggle };
   runInNewContext(await f.read('assets/search.js'), { document: { querySelector: (selector) => elements[selector] } });
   assert.equal(search.hidden, false);
+  assert.equal(disabledToggle.hidden, false);
 
   tools.firstElementChild.open = true; // Preserve directories opened by the visitor.
   input.value = 'vs code';

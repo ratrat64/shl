@@ -58,7 +58,7 @@ The site uses the system sans for reading and modest headings. Codes and code sa
 
 ## Layout & Spacing
 
-A centered 1160px container carries the directory across its full width. On the homepage and in nested folders, a prominent live count ("N links", including "0 links") is the sole heading on the left, at the same size. A single-line search sits on the right, followed by a compact grouped area for Show hidden links and any future toggles. Nested pages use breadcrumbs below the count for folder orientation, without a separate folder-name heading. Entries put code and destination side by side. On narrow layouts, search and controls wrap beneath the count; below 740px the layout stacks. The guide uses a narrower 740px column.
+A centered 1160px container carries the directory across its full width. On the homepage and in nested folders, a prominent live count ("N links", including "0 links") is the sole heading on the left, at the same size. A single-line search sits on the right, followed by a compact grouped area for Show hidden links and any future toggles. Nested pages use breadcrumbs below the count for folder orientation, without a separate folder-name heading. Home reserves the same one-line breadcrumb space, keeping the list in place across navigation; long paths scroll horizontally rather than wrapping. Entries put code and destination side by side. On narrow layouts, search and controls wrap beneath the count; below 740px the layout stacks. The guide uses a narrower 740px column.
 
 The [homepage composition](mockups/directory.html) illustrates the alignment at desktop and narrow widths.
 
@@ -78,7 +78,7 @@ The header has only Links and Guide navigation. Current links are underlined. Th
 
 ### Directory tools
 
-The count is every directory page's visual heading, not a small aside or a second search-result number. Keep the search label accessible but visually hidden; the visible placeholder is "Search link, title or tag". Reserve the same search and toggle columns on every directory page so the search size and position do not shift when a toggle is absent. Where hidden links exist, place their compact toggle beside search on desktop and below it, right-aligned, on mobile. The same count responds to searching and to the hidden-links toggle; see EXPERIENCE.md for states and announcements.
+The count is every directory page's visual heading, not a small aside or a second search-result number. Keep the search label accessible but visually hidden; the visible placeholder is "Search link, title or tag". Reserve the same search and toggle columns on every directory page so the search size and position do not shift. The toggle stays visible but muted and disabled when there are no hidden links; otherwise it sits beside search on desktop and below it, right-aligned, on mobile. The same count responds to searching and to the hidden-links toggle; see EXPERIENCE.md for states and announcements.
 
 ### Directory rows
 

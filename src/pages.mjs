@@ -64,6 +64,7 @@ export const styles = `
   .nav a:hover{color:var(--accent)}
   .theme-toggle{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:4px;padding:.35rem .7rem;font-size:.85rem;white-space:nowrap}
   .theme-toggle:hover{background:var(--wash)}
+  .theme-toggle:disabled{background:var(--wash);color:var(--muted);cursor:default}
   main{padding-top:clamp(1.5rem,3vw,2.5rem);padding-bottom:4rem;min-height:70vh}
   h1,h2,h3,p{margin-top:0}
   h1{font-size:clamp(1.8rem,3vw,2.4rem);letter-spacing:-.035em;line-height:1.2;margin-bottom:1rem}
@@ -77,7 +78,6 @@ export const styles = `
   .count{font-variant-numeric:tabular-nums}
   .directory-actions{display:grid;grid-template-columns:minmax(0,1fr) 9rem;align-items:center;gap:.65rem;width:min(100%,30rem);min-width:0}
   .directory-toggles{grid-column:2;display:flex;align-items:center;justify-content:flex-end;gap:.5rem}
-  .directory-toggles:empty{display:none}
   .search{grid-column:1;min-width:0}
   .search input{width:100%;font:inherit;padding:.45rem .7rem;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--ink);caret-color:var(--accent)}
   .search input::placeholder{color:var(--muted)}
@@ -90,7 +90,7 @@ export const styles = `
   summary:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
   summary a{color:inherit;text-decoration:none}
   summary a:hover{text-decoration:underline}
-  .breadcrumbs{margin:0 0 1rem;color:var(--muted);font-size:.9rem}
+  .breadcrumbs{height:2rem;line-height:1.5rem;white-space:nowrap;overflow-x:auto;overflow-y:hidden;margin:0 0 .5rem;color:var(--muted);font-size:.9rem}
   .link-row{display:grid;grid-template-columns:max-content minmax(0,1fr) max-content;gap:1rem;align-items:center;overflow-x:auto}
   .link-row.script-row{grid-template-columns:max-content minmax(0,1fr) max-content max-content}
   .code{font:600 .94rem/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;text-decoration:none;color:var(--accent);white-space:nowrap}
@@ -147,7 +147,7 @@ export const searchScript = `globalThis.initSearch = () => {
   const opened = new Map();
   let showHidden = false;
   input.parentElement.hidden = !!empty;
-  if (toggle) toggle.hidden = false;
+  if (toggle && !toggle.disabled) toggle.hidden = false;
 
   function filter(list, query, path = '', all = false) {
     let count = 0;
@@ -188,7 +188,7 @@ export const searchScript = `globalThis.initSearch = () => {
   }
 
   input.addEventListener('input', update);
-  if (toggle) toggle.addEventListener('click', () => {
+  if (toggle && !toggle.disabled) toggle.addEventListener('click', () => {
     showHidden = !showHidden;
     toggle.textContent = showHidden ? 'Hide hidden links' : 'Show hidden links';
     toggle.setAttribute('aria-pressed', String(showHidden));
@@ -320,20 +320,20 @@ const searchableListing = () => `<div class="search" hidden>
       <input id="link-search" type="search" placeholder="Search link, title or tag" autocomplete="off">
     </div>`;
 
-const directoryContents = (entries, depth, breadcrumbs = '') => {
+const directoryContents = (entries, depth, breadcrumbs = '', emptyMessage = 'No links listed here.') => {
   const visible = visibleCount(entries);
   const total = visibleCount(entries, true);
   return `<section aria-label="Links">
     <div class="directory-tools"><h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">${visible} link${visible === 1 ? '' : 's'}</h1>
-    ${total ? `<div class="directory-actions">${searchableListing()}<div class="directory-toggles">${total > visible ? '<button id="hidden-toggle" class="theme-toggle" type="button" aria-pressed="false" hidden>Show hidden links</button>' : ''}</div></div>` : ''}</div>
-   ${breadcrumbs}
+    <div class="directory-actions">${total ? searchableListing() : ''}<div class="directory-toggles"><button id="hidden-toggle" class="theme-toggle" type="button" aria-pressed="false" ${total > visible ? 'hidden' : 'disabled'}>Show hidden links</button></div></div></div>
+    ${breadcrumbs || '<div class="breadcrumbs" aria-hidden="true"></div>'}
    ${total ? `<p id="search-status" class="search-status" role="status" hidden></p><p id="copy-status" class="search-status" role="status" aria-live="polite"></p>
     ${visible ? '' : '<p id="empty-directory">No links listed here.</p>'}
-    <div${visible ? '' : ' hidden'}>${listing(entries)}</div><script src="${depth}assets/search.js" defer></script><script src="${depth}assets/copy.js" defer></script>` : '<p>No links listed here.</p>'}</section>`;
+     <div${visible ? '' : ' hidden'}>${listing(entries)}</div><script src="${depth}assets/search.js" defer></script><script src="${depth}assets/copy.js" defer></script>` : `<p>${emptyMessage}</p>`}</section>`;
 };
 
 export const indexPage = ({ raw, links, source }) => shell('Links', 'links', './', `
-    ${links.length ? directoryContents(raw, './') : `<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">0 links</h1><p>No links available yet. Add your first entry to <code>${source}</code> and rebuild the site.</p>`}`);
+    ${directoryContents(raw, './', '', links.length ? 'No links listed here.' : `No links available yet. Add your first entry to <code>${esc(source)}</code> and rebuild the site.`)}`);
 
 export const directoryPage = ({ path, entries }) => {
   const depth = '../'.repeat(path.length);

@@ -18,7 +18,7 @@ The Working Index is a compact, static directory for finding and using public sh
 
 ## Information Architecture
 
-The homepage is the root subtree; each folder has a browseable directory page and nested folders remain expandable. Every directory page has the prominent "N links" count as its sole heading at the same size. Nested pages use breadcrumbs to show the folder path instead of repeating its name as a heading. Header navigation stays Links and Guide; the guide remains the informational page. Codes, destinations, optional titles and tags remain available in the directory as before.
+The homepage is the root subtree; each folder has a browseable directory page and nested folders remain expandable. Every directory page has the prominent "N links" count as its sole heading at the same size. Nested pages use breadcrumbs to show the folder path instead of repeating its name as a heading; home reserves the same breadcrumb row so the listing does not move on navigation. Header navigation stays Links and Guide; the guide remains the informational page. Codes, destinations, optional titles and tags remain available in the directory as before.
 
 Visual reference: [homepage directory](mockups/directory.html). The DESIGN.md and EXPERIENCE.md spines take precedence over the mock on any conflict; nested directory, guide, redirect and 404 surfaces follow these spines without separate mocks.
 
@@ -28,7 +28,7 @@ Use short, functional labels. The visible search placeholder is exactly "Search 
 
 ## Component Patterns
 
-- **Directory tools:** On every directory page the count is the sole heading on the left; a single-line search and a compact grouped area for the hidden-links toggle sit on the right. Reserve the same control columns even without hidden descendants: search retains its size and position, but no inapplicable toggle appears. Use the same {typography.display} size for home and nested counts, not the muted row metadata style; use the existing {colors.ink-light}/{colors.ink-dark} roles. Search uses {rounded.control} and existing surface/rule roles; no new palette.
+- **Directory tools:** On every directory page the count is the sole heading on the left; a single-line search and a compact grouped area for the hidden-links toggle sit on the right. Reserve the same control columns without hidden descendants: search retains its size and position, while Show hidden links stays visible, muted and disabled. Use the same {typography.display} size for home and nested counts, not the muted row metadata style; use the existing {colors.ink-light}/{colors.ink-dark} roles. Search uses {rounded.control} and existing surface/rule roles; no new palette.
 - **Directory rows:** Code and destination remain side by side; code copies the full short URL, destination copies its full URL, and Open visits the destination. Script links retain their visible script label and existing amber role. Folder names open their pages and disclosure expands the nested list. Optional titles remain available on hover and searchable; tags remain visible below entries. Keep the existing middle-truncation behavior for long destinations while preserving full values for copying and assistive technology.
 - **Navigation:** Keep Links and Guide, active-link underline, theme control and keyboard focus treatment. Remove directory-page framing rules below the header and above the footer; separate sections by space, as specified in DESIGN.md. Keep guide section rules.
 - **Copy feedback:** A polite status message appears after copying a code or destination (or a clipboard failure) in a fixed toast that never changes the listing's position; clear it after five seconds. A second copy resets the timer.
@@ -37,7 +37,7 @@ Use short, functional labels. The visible search placeholder is exactly "Search 
 
 - **Initial:** Show one count of visible links within the current subtree, including nested descendants; hidden links do not contribute. Display zero as "0 links". The listing and initial count remain usable without JavaScript.
 - **Search:** Match code, folder name, title, destination and tags (including nested links) case-insensitively. Update the same count to the number of matching links within the current subtree and active visibility pool; do not add a second visible numeric result. Expand matching nested groups as needed to show results. If nothing matches, show "0 links" and the short no-match message.
-- **Hidden toggle:** Only where hidden links exist, Show hidden links includes hidden entries and hidden-only folders in the listing, search pool and count; Hide hidden links restores the default pool and recalculates matches. With JavaScript unavailable, hidden links remain hidden and the default listing/count remain usable.
+- **Hidden toggle:** Show hidden links is disabled when the current subtree has no hidden descendants, including an empty site. Otherwise it includes hidden entries and hidden-only folders in the listing, search pool and count; Hide hidden links restores the default pool and recalculates matches. With JavaScript unavailable, enabled toggles stay hidden and hidden links remain out of view; disabled toggles remain visible.
 - **Empty subtree:** Keep the current empty-directory explanation and "0 links"; if hidden entries exist, toggling reveals them. A no-match message is for a search with zero matches, not the initial empty state.
 
 ## Interaction Primitives
@@ -50,7 +50,7 @@ Keep the search input programmatically labelled even with its visual label hidde
 
 ## Responsive & Platform
 
-Use the centered directory width in DESIGN.md on desktop; at narrow widths wrap search and grouped controls beneath the count, with search able to fill the available width. Preserve the two-column code/destination relationship where possible and the existing small-screen row behavior. Static GitHub Pages HTML remains the baseline; JavaScript enhances filtering, toggling, copying and in-page directory navigation.
+Use the centered directory width in DESIGN.md on desktop; at narrow widths wrap search and grouped controls beneath the count, with search able to fill the available width. Keep the breadcrumb row one line high, horizontally scrollable for long paths, and reserve it on home so rows do not shift. Preserve the two-column code/destination relationship where possible and the existing small-screen row behavior. Static GitHub Pages HTML remains the baseline; JavaScript enhances filtering, toggling, copying and in-page directory navigation.
 
 ## Key Flows
 
