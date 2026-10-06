@@ -91,6 +91,7 @@ export const styles = `
   summary a:hover{text-decoration:underline}
   .breadcrumbs{margin:0 0 1rem;color:var(--muted);font-size:.9rem}
   .link-row{display:grid;grid-template-columns:max-content minmax(0,1fr) max-content;gap:1rem;align-items:center;overflow-x:auto}
+  .link-row.script-row{grid-template-columns:max-content minmax(0,1fr) max-content max-content}
   .code{font:600 .94rem/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;text-decoration:none;color:var(--accent);white-space:nowrap}
   .code:hover{text-decoration:underline}
   .script-link{color:var(--script)}
@@ -103,6 +104,7 @@ export const styles = `
   .visit:hover{background:var(--wash)}
   .download{border:1px solid var(--line);border-radius:4px;padding:.2rem .55rem;text-decoration:none;font-size:.85rem;white-space:nowrap;color:var(--script)}
   .download:hover{background:var(--wash)}
+  .tags{display:block;color:var(--muted);font-size:.78rem;margin-top:.2rem}
   #copy-status:empty{display:none}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   .prose{max-width:740px}.prose section{border-top:1px solid var(--line);padding-top:1rem;margin-top:2.5rem;scroll-margin-top:1rem}.prose p,.prose li{color:var(--muted)}
@@ -239,18 +241,19 @@ const listing = (entries, prefix = '') => `<ul class="links">${Object.entries(en
       </details></li>`;
     const url = typeof value === 'string' ? value : value.url;
     const title = typeof value === 'string' ? '' : value.title;
+    const tags = Array.isArray(value?.tags) ? value.tags.map((tag) => tag.trim()) : [];
     const originLength = new URL(url).origin.length;
     const path = url.slice(originLength).split(/[?#]/, 1)[0];
     const split = path.lastIndexOf('/', path.lastIndexOf('/') - 1);
     const cut = split > 0 ? originLength + split + 1 : url.length;
     return `
-        <li${value?.hidden === true ? ' data-hidden="true" hidden' : ''}${title ? ` data-title="${esc(title)}"` : ''} data-search="${esc(`${code} ${value?.script === true ? 'script ' : ''}${url}`)}"><div class="link-row"${title ? ` title="${esc(title)}"` : ''}><a class="code${value?.script === true ? ' script-link' : ''}" href="${esc(href)}"${title ? ` title="${esc(title)}"` : ''}>${esc(code)}${value?.script === true ? '<span class="script-label">script</span>' : ''}</a>
-          <a class="destination" href="${esc(url)}" aria-label="Copy destination: ${esc(url)}"${title ? '' : ` title="${esc(url)}"`}><span class="sr-only">${esc(url)}</span><span class="destination-start" aria-hidden="true">${esc(url.slice(0, cut))}</span><span class="destination-end" aria-hidden="true">${esc(url.slice(cut))}</span></a>${value?.script === true ? `<a class="download" href="${esc(url)}" aria-label="Download script for ${esc(code)}" download>Download</a>` : ''}<a class="visit" href="${esc(url)}" aria-label="Open destination for ${esc(code)}">Open</a></div></li>`;
+         <li${value?.hidden === true ? ' data-hidden="true" hidden' : ''}${title ? ` data-title="${esc(title)}"` : ''} data-search="${esc(`${code} ${value?.script === true ? 'script ' : ''}${url} ${tags.join(' ')} ${tags.map((tag) => `#${tag}`).join(' ')}`.trim())}"><div class="link-row${value?.script === true ? ' script-row' : ''}"${title ? ` title="${esc(title)}"` : ''}><a class="code${value?.script === true ? ' script-link' : ''}" href="${esc(href)}"${title ? ` title="${esc(title)}"` : ''}>${esc(code)}${value?.script === true ? '<span class="script-label">script</span>' : ''}</a>
+           <a class="destination" href="${esc(url)}" aria-label="Copy destination: ${esc(url)}"${title ? '' : ` title="${esc(url)}"`}><span class="sr-only">${esc(url)}</span><span class="destination-start" aria-hidden="true">${esc(url.slice(0, cut))}</span><span class="destination-end" aria-hidden="true">${esc(url.slice(cut))}</span></a>${value?.script === true ? `<a class="download" href="${esc(`./${prefix}${code}.sh`)}" aria-label="Download script for ${esc(code)}" download>Download</a>` : ''}<a class="visit" href="${esc(url)}" aria-label="Open destination for ${esc(code)}">Open</a></div>${tags.length ? `<span class="tags">${tags.map((tag) => `#${esc(tag)}`).join(' · ')}</span>` : ''}</li>`;
   }).join('')}</ul>`;
 
 const searchableListing = (entries, depth) => `<div class="search" hidden>
      <label for="link-search">Search links</label>
-     <input id="link-search" type="search" placeholder="Code, title or destination" autocomplete="off">
+     <input id="link-search" type="search" placeholder="Code, title, destination or tag" autocomplete="off">
    </div>`;
 
 const directoryContents = (entries, depth, heading, count = null, breadcrumbs = '') => {
@@ -293,7 +296,8 @@ docs:
      <li>Open a pull request, pass checks, and merge. After deployment, visit <code>https://&lt;user&gt;.github.io/&lt;repo&gt;/gh/</code>.</li>
    </ol>
     <p>Change a URL to retarget a code; delete its entry to remove it. Nest objects for directories. Codes start with a letter or number and may also contain dots, underscores, and hyphens; sibling names cannot differ only by case.</p>
-    <p>Optional: <code>script: true</code> builds a <code>&lt;path&gt;.sh</code> launcher. Use exact casing and no trailing slash; only run scripts from trusted sources.</p>
+     <p>Optional: <code>script: true</code> builds a <code>&lt;path&gt;.sh</code> launcher. Use exact casing and no trailing slash; only run scripts from trusted sources.</p>
+     <p>Add <code>tags: [documentation, github]</code> to a link object to show topic labels under it. Search by tag name or by its displayed <code>#tag</code> label, including in nested directories.</p>
     <p>Set <code>hidden: true</code> on a link object to omit it from directory listings, counts, and search by default. Use Show hidden links on a directory page to reveal hidden entries. Its redirect and optional launcher still work, and the destination remains public in <code>links.json</code>. Hiding controls discoverability, not secrecy.</p></section>
    <section id="how-it-works"><h2>How it works</h2>
    <p>The build validates codes, collisions, and URL syntax before replacing output. Each link gets a redirect page with JavaScript, meta refresh, and a clickable fallback. Directories get browsable pages.</p>

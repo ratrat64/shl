@@ -9,7 +9,7 @@ and How it works sections. The former `/about/` and `/how-it-works/` URLs forwar
 to those sections. It follows the system light/dark preference; visitors
 can override it with the Theme button, saved in their browser.
 Search on the homepage and each directory page filters the listed links by code,
-title, or destination (including nested links). Pages with hidden links have a
+title, destination, or tag (including nested links). Pages with hidden links have a
 Show hidden links button to include them in listings and search; the homepage
 link count updates too.
 Click a short code to copy its full short URL, or a destination to copy its full URL;
@@ -41,13 +41,17 @@ gh: https://github.com/
 docs:
   url: https://docs.github.com/en/pages
   title: GitHub Pages docs
+  tags: [documentation, github]
 automation:
   url: https://example.com/setup.sh
   hidden: true
 ```
 
 Short form is just `code: https://example.com/`. Long form adds an optional string `title` shown
-on the redirect fallback page, or a boolean `hidden` (default `false`). Set `hidden: true`
+on the redirect fallback page, a `tags` array of nonblank strings, or a boolean `hidden` (default `false`).
+Tags appear under directory entries; type a tag (with or without its `#` prefix) in Search links to filter matching links
+(case-insensitive, including nested links). JSON entries use the same `"tags": ["documentation", "github"]` format.
+Set `hidden: true`
 to omit a link from directory listings, counts, and search by default. Visitors can
 use Show hidden links to reveal it. Its redirect and optional script launcher still
 work. You can edit the file in GitHub's web editor;

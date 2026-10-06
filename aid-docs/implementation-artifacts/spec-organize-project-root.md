@@ -55,6 +55,7 @@ context: []
 
 - Kept the root build command as a two-line forwarding entry point; moved the CWD-relative builder unchanged to `src/build.mjs` alongside its imports. The regression suite resolves the root entry point from `test/`.
 - Preview configuration and current documentation/CI paths follow the new layout. The builder-only scratch files were unreferenced and removed.
+- After `main` added tags and script-download row changes, merged it into this refactor and verified that both branches generate the same site and pass all 16 regression checks.
 
 ## Spec Change Log
 
@@ -70,7 +71,7 @@ context: []
 ## Verification
 
 **Commands:**
-- `npx --yes node@24 --test test/build.test.mjs` -- expected: 15 current regression checks pass.
+- `npx --yes node@24 --test test/build.test.mjs` -- expected: 16 regression checks pass after merging the tags feature.
 - `npx --yes node@24 build.mjs` -- expected: build succeeds from root with unchanged generated artifact bytes.
 - `git diff --check` -- expected: no whitespace errors.
 
