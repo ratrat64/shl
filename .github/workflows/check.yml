@@ -39,7 +39,7 @@ jobs:
         run: npm ci
       - name: Test
         if: steps.changes.outputs.run_checks == 'true'
-        run: node --test build.test.mjs
+        run: node --test test/build.test.mjs
       - name: Build
         if: steps.changes.outputs.run_checks == 'true'
         run: node build.mjs

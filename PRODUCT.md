@@ -33,8 +33,8 @@ One JSON or YAML link map is the source of truth. The build validates it and gen
 ## Evidence on Hand
 
 - `README.md` documents setup, link editing, deployment, behavior, and limits.
-- `links.json` contains example entries, including a title and script launcher.
-- `build.mjs` contains the site templates; `build.test.mjs` covers validation and generated behavior.
+- `links.yaml` contains example entries, including a title and script launcher.
+- `build.mjs` forwards to `src/build.mjs`; `src/links.mjs` validates input, `src/pages.mjs` contains the site templates, and `test/build.test.mjs` covers validation and generated behavior.
 - No testimonials, usage metrics, or performance claims are supplied.
 
 ## Product Principles
