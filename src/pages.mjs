@@ -22,7 +22,7 @@ export const redirectPage = ({ url, title }) => `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Redirecting</title>
+<title>Redirecting · shl</title>
 <link rel="canonical" href="${esc(url)}">
 <meta http-equiv="refresh" content="0; url=${esc(url)}">
 <script>location.replace(${scriptString(url)});</script>
@@ -281,15 +281,15 @@ export const navigationScript = `(() => {
 
 const shell = (title, active, depth, content) => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="color-scheme" content="light dark"><title>${esc(title)} · Short links</title>
+<meta name="color-scheme" content="light dark"><title>${esc(title)} · shl</title>
 <link rel="stylesheet" href="${depth}assets/site.css"><script src="${depth}assets/theme.js" defer></script>${active === 'links' ? `<script src="${depth}assets/navigation.js" defer></script>` : ''}</head>
 <body${active === 'links' ? ' class="directory-page"' : ''}><header class="site-head"><div class="wrap head-inner">
- <a class="brand" href="${depth}"${active === 'links' ? ' data-directory-link' : ''}>shortlink</a>
+ <a class="brand" href="${depth}"${active === 'links' ? ' data-directory-link' : ''}>shl</a>
  <nav class="nav" aria-label="Main navigation">
  ${[['Links', '', 'links'], ['Guide', 'guide/', 'guide']].map(([label, path, key]) => `<a href="${depth}${path}"${active === 'links' && key === 'links' ? ' data-directory-link' : ''}${active === key ? ' aria-current="page"' : ''}>${label}</a>`).join('')}
  </nav><button class="theme-toggle" type="button" aria-label="Change color theme">Theme: system</button></div></header>
  <main class="wrap"${active === 'links' ? ' data-directory' : ''}>${content}</main>
- <footer class="footer"><div class="wrap"><p>Shortlink</p><p><a href="${depth}guide/">Guide</a> · <a href="https://github.com/ratrat64/shortlink#readme">Repository</a></p></div></footer>
+ <footer class="footer"><div class="wrap"><p>shl</p><p><a href="${depth}guide/">Guide</a> · <a href="https://github.com/ratrat64/shortlink#readme">Repository</a></p></div></footer>
 </body></html>`;
 
 const visibleCount = (entries, includeHidden = false) => Object.values(entries).reduce((count, value) =>
@@ -346,7 +346,7 @@ export const guidePage = (source) => shell('Guide', 'guide', '../', `<article cl
    <h1>Guide</h1>
    <nav aria-label="On this page"><a href="#about">About</a> · <a href="#how-to-use">How to use</a> · <a href="#how-it-works">How it works</a></nav>
    <section id="about"><h2>About</h2>
-   <p>Shortlink publishes a public directory and browser redirects from a version-controlled JSON or YAML file. GitHub Pages serves the generated files; no application server or database is required.</p>
+   <p>shl publishes a public directory and browser redirects from a version-controlled JSON or YAML file. GitHub Pages serves the generated files; no application server or database is required.</p>
    <p>Links and destinations are public. Redirects are browser-based, not HTTP 301/302 responses. There is no anonymous submission or built-in click tracking.</p></section>
    <section id="how-to-use"><h2>How to use</h2><ol>
      <li>Create a repository with these files and a <code>main</code> branch. Set Settings → Pages → Source to <strong>GitHub Actions</strong>.</li>
@@ -367,7 +367,7 @@ docs:
    <p>See the <a href="https://github.com/ratrat64/shortlink#readme">repository documentation</a> for custom domains, local builds, and full validation rules.</p></section>
    </article>`);
 
-export const oldInfoPage = (section) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Guide · Short links</title><meta http-equiv="refresh" content="0; url=../guide/#${section}"><link rel="canonical" href="../guide/#${section}"></head><body><p><a href="../guide/#${section}">Continue to the guide</a></p></body></html>`;
+export const oldInfoPage = (section) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Guide · shl</title><meta http-equiv="refresh" content="0; url=../guide/#${section}"><link rel="canonical" href="../guide/#${section}"></head><body><p><a href="../guide/#${section}">Continue to the guide</a></p></body></html>`;
 
 // GitHub Pages serves 404.html for anything unmatched. Catches codes that only
 // differ by case, plus typos.
@@ -376,7 +376,7 @@ export const notFoundPage = () => `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Link not found</title>
+<title>Link not found · shl</title>
 <style>${styles}</style>
 </head>
 <body>
