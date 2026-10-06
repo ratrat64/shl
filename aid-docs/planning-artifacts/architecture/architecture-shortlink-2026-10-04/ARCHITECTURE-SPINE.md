@@ -12,7 +12,7 @@ binds: [link-map, builder, directory, browser-routing, launchers, publication]
 sources:
   - README.md
   - PRODUCT.md
-  - DESIGN.md
+  - aid-docs/planning-artifacts/ux-designs/ux-shortlink-2026-10-06/DESIGN.md
   - build.mjs
   - build.test.mjs
   - .github/workflows/check.yml

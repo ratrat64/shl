@@ -3,7 +3,7 @@ stepsCompleted: [step-01-validate-prerequisites, step-02-design-epics, step-03-c
 inputDocuments:
   - aid-docs/planning-artifacts/prds/prd-shortlink-2026-10-02/prd.md
   - aid-docs/planning-artifacts/architecture/architecture-shortlink-2026-10-04/ARCHITECTURE-SPINE.md
-  - DESIGN.md
+  - aid-docs/planning-artifacts/ux-designs/ux-shortlink-2026-10-06/DESIGN.md
 ---
 
 # Shortlink - Epic Breakdown
