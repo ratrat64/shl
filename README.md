@@ -167,10 +167,10 @@ Open the URL printed by `serve` (usually `http://localhost:3000/`). The
 `serve.json` config keeps dotted directory names such as `/dev.tools/` working.
 To run the regression checks: `npx --yes node@24 --test test/build.test.mjs`.
 
-A successful build replaces `dist/` completely;
-edit the templates in `src/pages.mjs`, not the generated files. Validation fails
-before the old output is removed. URL syntax is checked, but destination
-reachability is not.
+A successful build replaces `dist/` completely; edit the templates in
+`src/pages.mjs`, input validation in `src/links.mjs`, and output generation in
+`src/build.mjs`, not the generated files. Validation fails before the old
+output is removed. URL syntax is checked, but destination reachability is not.
 
 For a focused check: `node --test --test-name-pattern="404" test/build.test.mjs`.
 The checks execute generated JavaScript in Node with simulated browser APIs,
