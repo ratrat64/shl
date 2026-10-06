@@ -25,14 +25,8 @@ export const redirectPage = ({ url, title }) => `<!doctype html>
 <title>Redirecting · shl</title>
 <link rel="canonical" href="${esc(url)}">
 <meta http-equiv="refresh" content="0; url=${esc(url)}">
+<link rel="stylesheet" href="./assets/site.css">
 <script>location.replace(${scriptString(url)});</script>
-<style>
-  body{font:16px/1.6 ui-sans-serif,system-ui,sans-serif;margin:0;min-height:100svh;
-       display:grid;place-content:center;gap:.5rem;padding:2rem;text-align:center;
-        background:#fafafa;color:#171717}
-   a{color:#1755a0}
-   @media(prefers-color-scheme:dark){body{background:#000;color:#f2f2f2}a{color:#9ac6ff}}
-</style>
 </head>
 <body>
   <p>Taking you to ${esc(title || url)}</p>
@@ -41,11 +35,14 @@ export const redirectPage = ({ url, title }) => `<!doctype html>
 </html>
 `;
 
-export const styles = `
-  :root{color-scheme:light;--bg:#fafafa;--panel:#fff;--ink:#171717;--muted:#555;--line:#dedede;--accent:#1755a0;--script:#875000;--wash:#f0f2f4}
-  @media(prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#000;--panel:#0d0d0d;--ink:#f2f2f2;--muted:#aaa;--line:#303030;--accent:#9ac6ff;--script:#ffcb86;--wash:#191919}}
-  :root[data-theme=light]{color-scheme:light;--bg:#fafafa;--panel:#fff;--ink:#171717;--muted:#555;--line:#dedede;--accent:#1755a0;--script:#875000;--wash:#f0f2f4}
-  :root[data-theme=dark]{color-scheme:dark;--bg:#000;--panel:#0d0d0d;--ink:#f2f2f2;--muted:#aaa;--line:#303030;--accent:#9ac6ff;--script:#ffcb86;--wash:#191919}
+export const cssVariables = `
+  :root{color-scheme:light;--bg:#f6f6f6;--panel:#fff;--ink:#2a2a2a;--muted:#666;--line:#e0e0e0;--accent:#1a5fb0;--script:#9b6000;--wash:#eeefef}
+  @media(prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#121212;--panel:#1a1a1a;--ink:#e8e8e8;--muted:#999;--line:#2a2a2a;--accent:#8ab8ff;--script:#e8b460;--wash:#1e1e1e}}
+  :root[data-theme=light]{color-scheme:light;--bg:#f6f6f6;--panel:#fff;--ink:#2a2a2a;--muted:#666;--line:#e0e0e0;--accent:#1a5fb0;--script:#9b6000;--wash:#eeefef}
+  :root[data-theme=dark]{color-scheme:dark;--bg:#121212;--panel:#1a1a1a;--ink:#e8e8e8;--muted:#999;--line:#2a2a2a;--accent:#8ab8ff;--script:#e8b460;--wash:#1e1e1e}
+`;
+
+export const styles = cssVariables + `
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
   body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 ui-sans-serif,system-ui,-apple-system,sans-serif}
@@ -377,7 +374,7 @@ export const notFoundPage = () => `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Link not found · shl</title>
-<style>${styles}</style>
+<link rel="stylesheet" href="./assets/site.css">
 </head>
 <body>
 <main class="wrap prose">

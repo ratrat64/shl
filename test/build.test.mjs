@@ -734,7 +734,7 @@ test('information pages use relative navigation and shared theme assets', async 
     }
   }
   assert.match(await f.read('assets/site.css'), /data-theme=dark/);
-  assert.match(await f.read('assets/site.css'), /--bg:#000/);
+  assert.match(await f.read('assets/site.css'), /--bg:#121212/);
   const theme = await f.read('assets/theme.js');
   assert.match(theme, /shortlink-theme/);
   const button = { addEventListener() {} };
@@ -781,7 +781,7 @@ test('script launchers are opt-in, quote URLs, forward arguments and statuses, a
   assert.doesNotMatch(home, /class="download" href="\.\/disabled\.sh"/);
   assert.match(home, /3 links/);
   assert.match(home, /class="code" href="\.\/disabled\/">disabled<\/a>/);
-  assert.match(await f.read('assets/site.css'), /--script:#ffcb86/);
+  assert.match(await f.read('assets/site.css'), /--script:#e8b460/);
   assert.match(await f.read('assets/site.css'), /\.download\{/);
   assert.match(await f.read('assets/site.css'), /\.link-row\.script-row\{grid-template-columns:max-content minmax\(0,1fr\) max-content max-content\}/);
   assert.match(await f.read('tools/Nested/index.html'), /http-equiv="refresh"/);

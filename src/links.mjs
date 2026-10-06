@@ -1,8 +1,29 @@
 import { readFile } from 'node:fs/promises';
 import { parseDocument } from 'yaml';
 
-const CODE_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
-const RESERVED = new Set(['index', '404', 'assets', 'links', 'about', 'guide', 'how-it-works', 'index.html', '404.html', 'links.json', 'cname']);
+export const CODE_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+export const RESERVED_NAMES = new Set(['index', '404', 'assets', 'links', 'about', 'guide', 'how-it-works', 'index.html', '404.html', 'links.json', 'cname']);
+
+export function validateCode(code, path, seen) {
+  const problems = [];
+  if (!CODE_RE.test(code)) problems.push(`"${path.join('/')}" — codes must start with a letter or number and contain only letters, numbers, . _ -`);
+  if (RESERVED_NAMES.has(code.toLowerCase())) problems.push(`"${path.join('/')}" — reserved name`);
+  const key = code.toLowerCase();
+  if (seen.has(key)) problems.push(`"${path.join('/')}" — collides with "${seen.get(key)}" (codes are matched case-insensitively)`);
+  seen.set(key, path.join('/'));
+  return problems;
+}
+
+export function validateUrl(url, name) {
+  try {
+    if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) throw new Error();
+    const parsed = new URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol) || !parsed.hostname) throw new Error();
+    return null;
+  } catch {
+    return `"${name}" — destination must be a valid absolute HTTP or HTTPS URL`;
+  }
+}
 
 export async function loadLinks() {
   let raw;
@@ -53,11 +74,7 @@ export async function loadLinks() {
     for (const [code, value] of Object.entries(entries)) {
       const full = [...path, code];
       const name = full.join('/');
-      if (!CODE_RE.test(code)) problems.push(`"${name}" — codes must start with a letter or number and contain only letters, numbers, . _ -`);
-      if (RESERVED.has(code.toLowerCase())) problems.push(`"${name}" — reserved name`);
-      const key = code.toLowerCase();
-      if (seen.has(key)) problems.push(`"${name}" — collides with "${seen.get(key)}" (codes are matched case-insensitively)`);
-      seen.set(key, name);
+      problems.push(...validateCode(code, full, seen));
 
       if (value && typeof value === 'object' && !Array.isArray(value) && !('url' in value)) {
         collect(value, full);
@@ -81,13 +98,8 @@ export async function loadLinks() {
           (!Array.isArray(value.tags) || value.tags.some((tag) => typeof tag !== 'string' || !tag.trim()))) {
         problems.push(`"${name}" — tags must be an array of nonblank strings`);
       }
-      try {
-        if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) throw new Error();
-        const parsed = new URL(url);
-        if (!['http:', 'https:'].includes(parsed.protocol) || !parsed.hostname) throw new Error();
-      } catch {
-        problems.push(`"${name}" — destination must be a valid absolute HTTP or HTTPS URL`);
-      }
+      const urlError = validateUrl(url, name);
+      if (urlError) problems.push(urlError);
       links.push({ code: name, url, title, script: value?.script === true, hidden: value?.hidden === true });
       if (value?.script === true) launchers.push(code);
     }
