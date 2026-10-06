@@ -58,7 +58,7 @@ The site uses the system sans for reading and modest headings. Codes and code sa
 
 ## Layout & Spacing
 
-A centered 1160px container carries the directory across its full width. On the homepage, a prominent live count ("N links", including "0 links") replaces the visible Links heading on the left. A single-line search sits on the right, followed by a compact grouped area for Show hidden links and any future toggles. In nested folders, keep the directory name prominent for orientation and show the same subtree count nearby; breadcrumbs follow the heading row. Entries put code and destination side by side. On narrow layouts, search and controls wrap beneath the count or folder heading; below 740px the layout stacks. The guide uses a narrower 740px column.
+A centered 1160px container carries the directory across its full width. On the homepage and in nested folders, a prominent live count ("N links", including "0 links") is the sole heading on the left, at the same size. A single-line search sits on the right, followed by a compact grouped area for Show hidden links and any future toggles. Nested pages use breadcrumbs below the count for folder orientation, without a separate folder-name heading. Home reserves the same one-line breadcrumb space, keeping the list in place across navigation; long paths scroll horizontally rather than wrapping. Entries put code and destination side by side. On narrow layouts, search and controls wrap beneath the count; below 740px the layout stacks. The guide uses a narrower 740px column.
 
 The [homepage composition](mockups/directory.html) illustrates the alignment at desktop and narrow widths.
 
@@ -78,11 +78,13 @@ The header has only Links and Guide navigation. Current links are underlined. Th
 
 ### Directory tools
 
-The count is the homepage's visual label, not a small aside or a second search-result number. Keep the search label accessible but visually hidden; the visible placeholder is "Search link, title or tag". Keep the hidden-links toggle compact and adjacent to search within the grouped controls. The same count responds to searching and to the hidden-links toggle; see EXPERIENCE.md for states and announcements.
+The count is every directory page's visual heading, not a small aside or a second search-result number. Keep the search label accessible but visually hidden; the visible placeholder is "Search link, title or tag". Reserve the same search and toggle columns on every directory page so the search size and position do not shift. The toggle stays visible but muted and disabled when there are no hidden links; otherwise it sits beside search on desktop and below it, right-aligned, on mobile. The same count responds to searching and to the hidden-links toggle; see EXPERIENCE.md for states and announcements.
 
 ### Directory rows
 
 A code copies its full short URL on click; script-enabled codes use amber and a visible script label. Destinations copy their full URL on click, and an Open control at the row end follows it. Folder names link to their browseable pages while the disclosure marker expands the nested list. Optional titles appear on hover over codes and remain searchable. Destinations display their ends without wrapping; the full URL is available for copying and to assistive technology.
+
+Copy feedback appears as a small, flat floating panel near the viewport edge and never displaces directory content.
 
 ## Do's and Don'ts
 
