@@ -72,7 +72,9 @@ export const styles = cssVariables + `
   .directory-page .site-head,.directory-page .footer{border:0}
   .directory-tools{display:flex;align-items:flex-start;justify-content:space-between;gap:1.5rem;margin-bottom:1.4rem}
   .directory-tools h1{margin:0}
-  .count{font-variant-numeric:tabular-nums;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;min-width:10ch;display:inline-block;text-align:right}
+  .count{font-variant-numeric:tabular-nums;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;display:inline-flex;align-items:center;gap:.35rem}
+.count-number{min-width:4ch;text-align:right;display:inline-block}
+.count-label{white-space:nowrap}
   .directory-actions{display:grid;grid-template-columns:minmax(0,1fr) 9rem;align-items:center;gap:.65rem;width:min(100%,30rem);min-width:0}
   .directory-toggles{grid-column:2;display:flex;align-items:center;justify-content:flex-end;gap:.5rem}
   .search{grid-column:1;min-width:0}
@@ -181,7 +183,10 @@ export const searchScript = `globalThis.initSearch = () => {
       list.parentElement.hidden = !showHidden;
       input.parentElement.hidden = !showHidden;
     }
-    countLabel.textContent = count + ' link' + (count === 1 ? '' : 's');
+    const numberEl = countLabel.querySelector('.count-number');
+    const labelEl = countLabel.querySelector('.count-label');
+    if (numberEl) numberEl.textContent = count;
+    if (labelEl) labelEl.textContent = count === 1 ? ' link' : ' links';
   }
 
   input.addEventListener('input', update);
@@ -325,8 +330,8 @@ const directoryContents = (entries, depth, breadcrumbs = '', emptyMessage = 'No 
     <div class="directory-actions">${total ? searchableListing() : ''}<div class="directory-toggles"><button id="hidden-toggle" class="theme-toggle" type="button" aria-pressed="false" ${total > visible ? 'hidden' : 'disabled'}>Show hidden links</button></div></div></div>
     ${breadcrumbs || '<div class="breadcrumbs" aria-hidden="true"></div>'}
    ${total ? `<p id="search-status" class="search-status" role="status" hidden></p><p id="copy-status" class="search-status" role="status" aria-live="polite"></p>
-    ${visible ? '' : '<p id="empty-directory">No links listed here.</p>'}
-     <div${visible ? '' : ' hidden'}>${listing(entries)}</div><script src="${depth}assets/search.js" defer></script><script src="${depth}assets/copy.js" defer></script>` : `<p>${emptyMessage}</p>`}</section>`;
+     ${visible ? '' : '<p id="empty-directory">No links listed here.</p>'}
+      <div${visible ? '' : ' hidden'}>${listing(entries)}</div><script src="${depth}assets/search.js" defer></script><script src="${depth}assets/copy.js" defer></script>` : `<p>${emptyMessage}</p>`}</section>`;
 };
 
 export const indexPage = ({ raw, links, source }) => shell('Links', 'links', './', `
