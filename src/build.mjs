@@ -4,7 +4,7 @@
 import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { loadLinks } from './links.mjs';
-import { styles, themeScript, searchScript, copyScript, redirectPage, scriptLauncher, indexPage, directoryPage, guidePage, oldInfoPage, notFoundPage } from './pages.mjs';
+import { styles, themeScript, searchScript, copyScript, navigationScript, redirectPage, scriptLauncher, indexPage, directoryPage, guidePage, oldInfoPage, notFoundPage } from './pages.mjs';
 
 const OUT = 'dist';
 let raw, source, links, directories;
@@ -29,6 +29,7 @@ await writeFile(join(OUT, 'assets', 'site.css'), styles);
 await writeFile(join(OUT, 'assets', 'theme.js'), themeScript);
 await writeFile(join(OUT, 'assets', 'search.js'), searchScript);
 await writeFile(join(OUT, 'assets', 'copy.js'), copyScript);
+await writeFile(join(OUT, 'assets', 'navigation.js'), navigationScript);
 
 for (const link of links) {
   await mkdir(join(OUT, link.code), { recursive: true });

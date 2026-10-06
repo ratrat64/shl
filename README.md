@@ -71,9 +71,12 @@ tools:
 
 This creates browseable `/tools/` and `/tools/editors/` pages and redirect URLs
 `/tools/git/` and `/tools/editors/code/`. The homepage has expandable directories;
-each directory page also lists links and subdirectories. Existing top-level links
-keep their URLs. Directory names are their display labels, and a directory must
-contain at least one entry. A path cannot be both a directory and a redirect.
+each directory page also lists links and subdirectories. With JavaScript, folder
+links, breadcrumbs, and Home navigate without reloading; Back and Forward work too.
+Direct URLs, refreshes, and browsing without JavaScript still use the generated
+pages. Existing top-level links keep their URLs. Directory names are their display
+labels, and a directory must contain at least one entry. A path cannot be both a
+directory and a redirect.
 The checked-in `links.yaml` includes flat and nested examples, optional titles,
 `script: true` and `script: false`, and codes using dots, underscores and hyphens.
 Directories without visible descendants are hidden in parent listings by default,
