@@ -166,12 +166,12 @@ From the repository root, run (requires npm; tests also require Bash):
 
 ```bash
 npm ci
-npx --yes node@24 build.mjs
-npx serve dist -c ../config/serve.json
+npm run dev
 ```
 
-Open the URL printed by `serve` (usually `http://localhost:3000/`). The
-`serve.json` config keeps dotted directory names such as `/dev.tools/` working.
+Open the URL printed by `http-server` (usually `http://localhost:8080/`). The
+preview server supports dotted directory names such as `/dev.tools/`. Restart
+`npm run dev` after editing the link map to rebuild the site.
 To run the regression checks: `npx --yes node@24 --test test/build.test.mjs`.
 
 A successful build replaces `dist/` completely; edit the templates in
