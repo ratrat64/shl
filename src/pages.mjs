@@ -134,7 +134,7 @@ export const themeScript = `(() => {
   });
 })();`;
 
-export const searchScript = `(() => {
+export const searchScript = `globalThis.initSearch = () => {
   const input = document.querySelector('#link-search');
   if (!input) return;
   const list = document.querySelector('.links');
@@ -195,9 +195,10 @@ export const searchScript = `(() => {
     toggle.textContent = showHidden ? 'Hide hidden links' : 'Show hidden links';
     update();
   });
-})();`;
+};
+globalThis.initSearch();`;
 
-export const copyScript = `(() => {
+export const copyScript = `globalThis.initCopy = () => {
   const list = document.querySelector('.links');
   const status = document.querySelector('#copy-status');
   list.addEventListener('click', async (event) => {
@@ -213,18 +214,79 @@ export const copyScript = `(() => {
       status.textContent = 'Could not copy the link. Try your browser\u2019s copy-link action.';
     }
   });
+};
+globalThis.initCopy();`;
+
+export const navigationScript = `(() => {
+  const rebase = (main, url) => {
+    for (const link of main.querySelectorAll('a[href^="."]')) {
+      link.href = new URL(link.getAttribute('href'), url).href;
+    }
+  };
+  // The header and footer survive page swaps, so their relative links must not drift.
+  for (const link of document.querySelectorAll('.site-head a, .footer a')) link.href = link.href;
+  rebase(document.querySelector('main'), location.href);
+
+  let request = 0;
+  let displayed = location.pathname;
+  // ponytail: one scroll position per directory; use history-entry state if per-visit restoration matters.
+  const scroll = new Map();
+  async function navigate(url, push) {
+    const current = ++request;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Directory unavailable');
+      const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+      const main = page.querySelector('main[data-directory]');
+      const title = page.querySelector('title');
+      if (!main || !title) throw new Error('Not a directory');
+      if (current !== request) return;
+      rebase(main, url);
+      for (const script of main.querySelectorAll('script')) script.remove();
+      document.querySelector('main').replaceWith(main);
+      document.title = title.textContent;
+      if (push) history.pushState(null, '', url);
+      displayed = location.pathname;
+      if (main.querySelector('.links')) {
+        globalThis.initSearch();
+        globalThis.initCopy();
+      }
+      window.scrollTo(0, push ? 0 : scroll.get(displayed) || 0);
+      const heading = main.querySelector('h1');
+      heading.tabIndex = -1;
+      heading.focus({ preventScroll: true });
+    } catch {
+      if (current === request) location.assign(url);
+    }
+  }
+
+  history.scrollRestoration = 'manual';
+  document.addEventListener('click', (event) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const link = event.target.closest('a[data-directory-link]');
+    if (!link || link.target && link.target !== '_self' || link.origin !== location.origin) return;
+    if (link.pathname === displayed) { ++request; return; }
+    event.preventDefault();
+    scroll.set(displayed, window.scrollY);
+    navigate(link.href, true);
+  });
+  window.addEventListener('popstate', () => {
+    scroll.set(displayed, window.scrollY);
+    if (location.pathname !== displayed) navigate(location.href, false);
+    else ++request;
+  });
 })();`;
 
 const shell = (title, active, depth, content) => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark"><title>${esc(title)} · Short links</title>
-<link rel="stylesheet" href="${depth}assets/site.css"><script src="${depth}assets/theme.js" defer></script></head>
+<link rel="stylesheet" href="${depth}assets/site.css"><script src="${depth}assets/theme.js" defer></script>${active === 'links' ? `<script src="${depth}assets/navigation.js" defer></script>` : ''}</head>
 <body><header class="site-head"><div class="wrap head-inner">
- <a class="brand" href="${depth}">shortlink</a>
+ <a class="brand" href="${depth}"${active === 'links' ? ' data-directory-link' : ''}>shortlink</a>
  <nav class="nav" aria-label="Main navigation">
- ${[['Links', '', 'links'], ['Guide', 'guide/', 'guide']].map(([label, path, key]) => `<a href="${depth}${path}"${active === key ? ' aria-current="page"' : ''}>${label}</a>`).join('')}
+ ${[['Links', '', 'links'], ['Guide', 'guide/', 'guide']].map(([label, path, key]) => `<a href="${depth}${path}"${active === 'links' && key === 'links' ? ' data-directory-link' : ''}${active === key ? ' aria-current="page"' : ''}>${label}</a>`).join('')}
  </nav><button class="theme-toggle" type="button" aria-label="Change color theme">Theme: system</button></div></header>
- <main class="wrap">${content}</main>
+ <main class="wrap"${active === 'links' ? ' data-directory' : ''}>${content}</main>
  <footer class="footer"><div class="wrap"><p>Shortlink</p><p><a href="${depth}guide/">Guide</a> · <a href="https://github.com/ratrat64/shortlink#readme">Repository</a></p></div></footer>
 </body></html>`;
 
@@ -236,7 +298,7 @@ const listing = (entries, prefix = '') => `<ul class="links">${Object.entries(en
   .map(([code, value]) => {
     const href = `./${prefix}${code}/`;
     if (typeof value === 'object' && !('url' in value)) return `
-      <li${visibleCount(value) ? '' : ' data-hidden="true" hidden'}><details><summary><a href="${esc(href)}">${esc(code)}</a></summary>
+      <li${visibleCount(value) ? '' : ' data-hidden="true" hidden'}><details><summary><a href="${esc(href)}" data-directory-link>${esc(code)}</a></summary>
         ${listing(value, `${prefix}${code}/`)}
       </details></li>`;
     const url = typeof value === 'string' ? value : value.url;
@@ -275,7 +337,7 @@ export const indexPage = ({ raw, links, source }) => {
 
 export const directoryPage = ({ path, entries }) => {
   const depth = '../'.repeat(path.length);
-  const breadcrumbs = `<nav class="breadcrumbs" aria-label="Breadcrumb"><a href="${depth}">Home</a>${path.map((code, i) => ` / ${i < path.length - 1 ? `<a href="${'../'.repeat(path.length - i - 1)}">${esc(code)}</a>` : esc(code)}`).join('')}</nav>`;
+  const breadcrumbs = `<nav class="breadcrumbs" aria-label="Breadcrumb"><a href="${depth}" data-directory-link>Home</a>${path.map((code, i) => ` / ${i < path.length - 1 ? `<a href="${'../'.repeat(path.length - i - 1)}" data-directory-link>${esc(code)}</a>` : esc(code)}`).join('')}</nav>`;
   return shell(path.at(-1), 'links', depth, `
    ${directoryContents(entries, depth, esc(path.at(-1)), null, breadcrumbs)}`);
 };

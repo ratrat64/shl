@@ -124,7 +124,7 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
   const f = await fixture(t, links);
   assert.equal(f.build().status, 0);
   const home = await f.read('index.html');
-  assert.match(home, /<details><summary><a href="\.\/tools\/">tools<\/a><\/summary>/);
+  assert.match(home, /<details><summary><a href="\.\/tools\/" data-directory-link>tools<\/a><\/summary>/);
   assert.match(home, /href="\.\/tools\/editors\/Code\/" title="&lt;Editor&gt;">Code<\/a>/);
   assert.match(home, /data-title="&lt;Editor&gt;"/);
   assert.match(home, /class="link-row" title="&lt;Editor&gt;"/);
@@ -132,12 +132,12 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
   const tools = await f.read('tools/index.html');
   assert.match(tools, /href="\.\.\/assets\/site\.css"/);
   assert.match(tools, /href="\.\/git\/">git<\/a>/);
-  assert.match(tools, /<summary><a href="\.\/editors\/">editors<\/a><\/summary>/);
+  assert.match(tools, /<summary><a href="\.\/editors\/" data-directory-link>editors<\/a><\/summary>/);
   assert.ok(tools.indexOf('class="directory-tools"') < tools.indexOf('class="breadcrumbs"'));
   const editors = await f.read('tools/editors/index.html');
   assert.match(editors, /href="\.\.\/\.\.\/assets\/site\.css"/);
-  assert.match(editors, /href="\.\.\/\.\.\/">Home<\/a>/);
-  assert.match(editors, /href="\.\.\/">tools<\/a>/);
+  assert.match(editors, /href="\.\.\/\.\.\/" data-directory-link>Home<\/a>/);
+  assert.match(editors, /href="\.\.\/" data-directory-link>tools<\/a>/);
   assert.match(editors, /href="\.\/Code\/" title="&lt;Editor&gt;">Code<\/a>/);
   assert.match(editors, /class="link-row" title="&lt;Editor&gt;"/);
   for (const prefix of ['/', '/project/']) {
@@ -156,6 +156,125 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
     assert.equal(await yaml.read(path), await f.read(path), path);
   }
   assert.match(await yaml.read('tools/editors/index.html'), /href="\.\/Code\/" title="&lt;Editor&gt;">Code<\/a>/);
+});
+
+test('folder navigation swaps generated pages, restores history, and falls back on failed fetches', async (t) => {
+  const f = await fixture(t, { tools: { git: 'https://git-scm.com/', editors: { Code: 'https://example.org/' } }, hidden: { secret: { url: 'https://example.org/private', hidden: true } } });
+  assert.equal(f.build().status, 0);
+  const pages = new Map(await Promise.all(['', 'tools/', 'tools/editors/', 'hidden/', 'tools/git/'].map(async (path) =>
+    [`https://short.example/project/${path}`, await f.read(`${path}index.html`)])));
+  const script = await f.read('assets/navigation.js');
+  assert.match(pages.get('https://short.example/project/'), /src="\.\/assets\/navigation\.js"/);
+  assert.match(pages.get('https://short.example/project/tools/'), /src="\.\.\/assets\/navigation\.js"/);
+  assert.doesNotMatch(await f.read('guide/index.html'), /navigation\.js/);
+
+  const location = {
+    href: 'https://short.example/project/',
+    get pathname() { return new URL(this.href).pathname; },
+    get origin() { return new URL(this.href).origin; },
+    assign(url) { this.assigned = url; },
+  };
+  const makeLink = (href, base) => ({
+    raw: href,
+    get href() { return new URL(this.raw, base || location.href).href; },
+    set href(value) { this.raw = value; },
+    get pathname() { return new URL(this.href).pathname; },
+    get origin() { return new URL(this.href).origin; },
+    getAttribute() { return this.raw; },
+  });
+  const main = (html, url) => {
+    const links = [...html.matchAll(/<a [^>]*href="(\.{1,2}\/[^\"]*)"/g)].map((match) => makeLink(match[1], url));
+    const heading = { focus(options) { this.focused = options.preventScroll; } };
+    return {
+      links, heading,
+      querySelectorAll(selector) {
+        if (selector === 'script') return [{ remove() {} }, { remove() {} }];
+        return links.filter((link) => link.raw.startsWith('.'));
+      },
+      querySelector(selector) { return selector === 'h1' ? heading : selector === '.links' && html.includes('class="links"') ? {} : null; },
+      replaceWith(next) { document.currentMain = next; },
+    };
+  };
+  const brand = makeLink('./');
+  const guide = makeLink('./guide/');
+  const initialized = [];
+  const listeners = {};
+  const document = {
+    title: 'Links · Short links',
+    currentMain: main(pages.get(location.href), location.href),
+    querySelector(selector) { return selector === '.brand' ? brand : selector === 'main' ? this.currentMain : null; },
+    querySelectorAll() { return [brand, guide]; },
+    addEventListener(name, callback) { listeners[name] = callback; },
+  };
+  const history = {
+    pushState(_state, _unused, url) { location.href = url; this.pushed = (this.pushed || 0) + 1; },
+  };
+  const window = { scrollY: 0, addEventListener(name, callback) { listeners[name] = callback; }, scrollTo(_x, y) { this.scrollY = y; } };
+  let heldUrl, release;
+  const fetch = async (url) => {
+    if (url === heldUrl) await new Promise((resolve) => { release = resolve; });
+    return { ok: pages.has(url), text: async () => pages.get(url) };
+  };
+  class DOMParser {
+    parseFromString(html) {
+      const title = html.match(/<title>([^<]+)<\/title>/)?.[1];
+      const url = [...pages].find(([, page]) => page === html)?.[0];
+      return { querySelector: (selector) => selector === 'title' ? title && { textContent: title } : selector === 'main[data-directory]' && html.includes('<main class="wrap" data-directory>') ? main(html, url) : null };
+    }
+  }
+  runInNewContext(script, { document, location, history, window, fetch, DOMParser, URL,
+    initSearch: () => initialized.push('search'), initCopy: () => initialized.push('copy') });
+  assert.equal(brand.href, 'https://short.example/project/');
+  assert.equal(guide.href, 'https://short.example/project/guide/');
+  assert.equal(history.scrollRestoration, 'manual');
+
+  const click = async (link, options = {}) => {
+    let prevented = false;
+    listeners.click({ button: 0, defaultPrevented: false, target: { closest: () => link }, preventDefault() { prevented = true; }, ...options });
+    await new Promise((resolve) => setImmediate(resolve));
+    return prevented;
+  };
+  const folder = (suffix) => document.currentMain.links.find((link) => link.href.endsWith(suffix));
+  assert.equal(await click(null), false); // Redirect and destination links remain native.
+  assert.equal(await click(folder('/tools/'), { ctrlKey: true }), false);
+  assert.equal(await click(folder('/tools/')), true);
+  assert.equal(location.pathname, '/project/tools/');
+  assert.equal(document.title, 'tools · Short links');
+  assert.equal(document.currentMain.heading.focused, true);
+  assert.equal(folder('/tools/git/').href, 'https://short.example/project/tools/git/');
+  assert.equal(guide.href, 'https://short.example/project/guide/');
+  assert.deepEqual(initialized, ['search', 'copy']);
+  window.scrollY = 250;
+  assert.equal(await click(folder('/tools/editors/')), true);
+  assert.equal(history.pushed, 2);
+  assert.equal(location.pathname, '/project/tools/editors/');
+  assert.equal(window.scrollY, 0);
+  heldUrl = 'https://short.example/project/tools/';
+  location.href = heldUrl;
+  listeners.popstate();
+  location.href = 'https://short.example/project/tools/editors/';
+  listeners.popstate();
+  release();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(document.title, 'editors · Short links'); // A late Back response cannot replace the Forward page.
+  heldUrl = null;
+  location.href = 'https://short.example/project/tools/';
+  listeners.popstate();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(document.title, 'tools · Short links');
+  assert.equal(window.scrollY, 250);
+  location.href = 'https://short.example/project/';
+  listeners.popstate();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(document.title, 'Links · Short links');
+  assert.equal(await click(folder('/hidden/')), true);
+  assert.equal(initialized.length, 10); // Search and copy also initialize on hidden-only pages.
+  assert.equal(await click(makeLink('https://short.example/project/tools/git/')), true);
+  assert.equal(location.assigned, 'https://short.example/project/tools/git/'); // A redirect page is never injected.
+  pages.delete('https://short.example/project/tools/');
+  assert.equal(await click(makeLink('https://short.example/project/tools/')), true);
+  assert.equal(location.assigned, 'https://short.example/project/tools/');
+  assert.equal(await click(makeLink('https://other.example/tools/')), false);
 });
 
 test('hidden links and hidden-only folders are hidden by default but keep their resources', async (t) => {
@@ -179,21 +298,21 @@ test('hidden links and hidden-only folders are hidden by default but keep their 
     const html = await f.read(page);
     assert.match(html, /id="hidden-toggle"[^>]*hidden>Show hidden links/);
     assert.doesNotMatch(html, /aria-pressed=/);
-    assert.match(html, /<li data-hidden="true" hidden><details><summary><a href="\.\/.*(?:private|hiddenOnly|onlyHidden)\/">/);
+    assert.match(html, /<li data-hidden="true" hidden><details><summary><a href="\.\/.*(?:private|hiddenOnly|onlyHidden)\/" data-directory-link>/);
     assert.match(html, /<li data-hidden="true" hidden data-search="[^"]+"><div class="link-row"[^>]*><a class="code[^>]* href="\.\/.*(?:secret|SecretCode|HiddenDeep)\/"/);
   }
   const home = await f.read('index.html');
   assert.match(home, /data-visible="4" data-total="8">4 links/);
-  assert.match(home, /href="\.\/tools\/nested\/">nested<\/a>/);
+  assert.match(home, /href="\.\/tools\/nested\/" data-directory-link>nested<\/a>/);
   assert.match(home, /href="\.\/tools\/nested\/branch\/further\/VisibleDeep\/">VisibleDeep<\/a>/);
   assert.match(home, /href="\.\/shown\/">shown<\/a>/);
   assert.match(home, /href="\.\/visible\/">visible<\/a>/);
   assert.match(home, /href="\.\/tools\/public\/">public<\/a>/);
   assert.match(await f.read('tools/index.html'), /href="\.\/public\/">public<\/a>/);
-  assert.match(await f.read('tools/index.html'), /href="\.\/nested\/">nested<\/a>/);
-  assert.match(await f.read('tools/nested/index.html'), /href="\.\/branch\/">branch<\/a>/);
-  assert.match(await f.read('tools/nested/index.html'), /<li data-hidden="true" hidden><details><summary><a href="\.\/hiddenOnly\/">hiddenOnly/);
-  assert.match(await f.read('tools/nested/branch/index.html'), /href="\.\/further\/">further<\/a>/);
+  assert.match(await f.read('tools/index.html'), /href="\.\/nested\/" data-directory-link>nested<\/a>/);
+  assert.match(await f.read('tools/nested/index.html'), /href="\.\/branch\/" data-directory-link>branch<\/a>/);
+  assert.match(await f.read('tools/nested/index.html'), /<li data-hidden="true" hidden><details><summary><a href="\.\/hiddenOnly\/" data-directory-link>hiddenOnly/);
+  assert.match(await f.read('tools/nested/branch/index.html'), /href="\.\/further\/" data-directory-link>further<\/a>/);
   assert.match(await f.read('tools/nested/branch/further/index.html'), /href="\.\/VisibleDeep\/">VisibleDeep<\/a>/);
   for (const page of ['onlyHidden/index.html', 'onlyHidden/nested/index.html', 'tools/private/index.html', 'tools/private/deep/index.html']) {
     const html = await f.read(page);
@@ -211,7 +330,7 @@ test('hidden links and hidden-only folders are hidden by default but keep their 
   assert.equal(allHidden.build().status, 0);
   assert.match(await allHidden.read('index.html'), /No links listed here\./);
   assert.match(await allHidden.read('index.html'), /data-visible="0" data-total="1" hidden/);
-  assert.match(await allHidden.read('index.html'), /<li data-hidden="true" hidden><details><summary><a href="\.\/private\/">/);
+  assert.match(await allHidden.read('index.html'), /<li data-hidden="true" hidden><details><summary><a href="\.\/private\/" data-directory-link>/);
   assert.match(await allHidden.read('private/nested/index.html'), /No links listed here\./);
   assert.match(await allHidden.read('private/nested/code/index.html'), /https:\/\/example\.com/);
 });
@@ -453,7 +572,7 @@ test('toggle updates hidden rows, nested search, counts, and hidden-only empty s
   const nestedCode = leaf('code https://example.com/code', true);
   const hiddenGroup = group('onlyHidden', [group('nested', [nestedCode], true)], true);
   const home = await exercise('index.html', [folder, hiddenGroup, leaf('public https://example.com/public'), secret], 2, 5);
-  assert.match(home.html, /<li data-hidden="true" hidden><details><summary><a href="\.\/onlyHidden\/">/);
+  assert.match(home.html, /<li data-hidden="true" hidden><details><summary><a href="\.\/onlyHidden\/" data-directory-link>/);
   const deepHref = home.html.match(/href="(\.\/folder\/private\/deep\/)"/)?.[1];
   assert.ok(deepHref, 'nested short link was generated');
   for (const prefix of ['/', '/project/']) {
