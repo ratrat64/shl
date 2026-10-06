@@ -19,11 +19,11 @@
 - The user authorizes agents to write commit messages, commit task changes, push commits, and publish new branches without asking again for each operation.
 
 ## Build and verification
-- Use Node.js 24 (the CI version) and `npm ci` to install the YAML parser. Launcher tests also require Bash.
-- CI installs dependencies, runs `node --test test/build.test.mjs`, then `node build.mjs`. Run from the repository root: build input and output paths are relative to the working directory. No lint or typecheck suite is configured.
-- Focused routing checks: `node --test --test-name-pattern="404" test/build.test.mjs`. Tests build in temporary directories and execute generated scripts with simulated browser APIs; actual Pages 404 behavior needs a deployed browser smoke test.
+- Use Bun 1.4.2 (the CI version) and `bun ci` to install the YAML parser. Launcher tests also require Bash.
+- CI installs dependencies, runs `bun test --timeout 30000 ./test/build.test.mjs`, then `bun build.mjs`. Run from the repository root: build input and output paths are relative to the working directory. No lint or typecheck suite is configured.
+- Focused routing checks: `bun test --test-name-pattern="404" ./test/build.test.mjs`. Tests build in temporary directories and execute generated scripts with simulated browser APIs; actual Pages 404 behavior needs a deployed browser smoke test.
 - A successful build deletes and recreates `dist/`. Edit the templates in `src/pages.mjs`, not generated files; input validation lives in `src/links.mjs`, and `src/build.mjs` writes the site.
-- Optional local preview: `npx serve dist -c ../config/serve.json` (`cleanUrls: false` keeps dotted directory names working). Redirects use HTML meta refresh and JavaScript, not HTTP redirects; `curl -L` does not follow them.
+- Optional local preview: `bun run dev` builds and serves `dist/` with pinned `http-server`; restart it after editing links. Redirects use HTML meta refresh and JavaScript, not HTTP redirects; `curl -L` does not follow them.
 
 ## Link and routing constraints
 - Exactly one of `links.json`, `links.yaml`, or `links.yml` must exist. Each accepts a URL string, a link object with `url`, optional `title`, boolean `script` and `hidden`, and an optional `tags` array of nonblank strings, or a nonempty nested object for a directory. All formats produce public `dist/links.json` for the browser-side 404 handler.

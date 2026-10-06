@@ -1,8 +1,11 @@
 {
   "name": "shortlink",
   "private": true,
+  "packageManager": "bun@1.4.2",
   "scripts": {
-    "dev": "npx --yes node@24 build.mjs && npx --yes http-server@14.1.1 dist -c-1"
+    "build": "bun build.mjs",
+    "test": "bun test --timeout 30000 ./test/build.test.mjs",
+    "dev": "bun build.mjs && bunx --bun http-server@14.1.1 dist -c-1"
   },
   "dependencies": {
     "yaml": "^2.8.1"

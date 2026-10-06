@@ -713,7 +713,7 @@ test('script launchers are opt-in, quote URLs, forward arguments and statuses, a
 
   const log = join(f.cwd, 'curl.json');
   const payload = 'printf \'%s\\n\' "$@"\nexit "$SCRIPT_STATUS"\n';
-  await writeFile(join(f.cwd, 'curl'), `#!/usr/bin/env node
+  await writeFile(join(f.cwd, 'curl'), `#!/usr/bin/env bun
 const { writeFileSync } = require('node:fs');
 const args = process.argv.slice(2);
 writeFileSync(process.env.CURL_LOG, JSON.stringify(args));
