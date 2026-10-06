@@ -72,11 +72,9 @@ export const styles = `
   p{max-width:68ch}
   .lead{color:var(--muted);max-width:65ch;margin-bottom:2rem}
   .directory-page .site-head,.directory-page .footer{border:0}
-  .directory-tools{display:flex;align-items:flex-end;justify-content:space-between;gap:1.5rem;margin-bottom:1.4rem}
-  .directory-summary{display:flex;flex-direction:column;align-items:flex-start;gap:.25rem}
-  .directory-summary h1{margin:0}
-  .count{color:var(--ink);font-size:clamp(1.5rem,2.5vw,1.8rem);font-weight:600;font-variant-numeric:tabular-nums}
-  h1.count{font-size:clamp(1.8rem,3vw,2.4rem)}
+  .directory-tools{display:flex;align-items:flex-start;justify-content:space-between;gap:1.5rem;margin-bottom:1.4rem}
+  .directory-tools h1{margin:0}
+  .count{font-variant-numeric:tabular-nums}
   .directory-actions{display:flex;align-items:center;justify-content:flex-end;gap:.65rem;flex-wrap:wrap;min-width:0}
   .directory-toggles{display:flex;align-items:center;gap:.5rem}
   .search{width:min(100%,330px)}
@@ -321,12 +319,11 @@ const searchableListing = () => `<div class="search" hidden>
       <input id="link-search" type="search" placeholder="Search link, title or tag" autocomplete="off">
     </div>`;
 
-const directoryContents = (entries, depth, heading = '', breadcrumbs = '') => {
+const directoryContents = (entries, depth, breadcrumbs = '') => {
   const visible = visibleCount(entries);
   const total = visibleCount(entries, true);
-  const countTag = heading ? 'span' : 'h1';
   return `<section aria-label="Links">
-    <div class="directory-tools"><div class="directory-summary">${heading ? `<h1>${heading}</h1>` : ''}<${countTag} id="link-count" class="count" aria-live="polite" aria-atomic="true">${visible} link${visible === 1 ? '' : 's'}</${countTag}></div>
+    <div class="directory-tools"><h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">${visible} link${visible === 1 ? '' : 's'}</h1>
     ${total ? `<div class="directory-actions">${searchableListing()}${total > visible ? '<div class="directory-toggles"><button id="hidden-toggle" class="theme-toggle" type="button" aria-pressed="false" hidden>Show hidden links</button></div>' : ''}</div>` : ''}</div>
    ${breadcrumbs}
    ${total ? `<p id="search-status" class="search-status" role="status" hidden></p><p id="copy-status" class="search-status" role="status" aria-live="polite"></p>
@@ -341,7 +338,7 @@ export const directoryPage = ({ path, entries }) => {
   const depth = '../'.repeat(path.length);
   const breadcrumbs = `<nav class="breadcrumbs" aria-label="Breadcrumb"><a href="${depth}" data-directory-link>Home</a>${path.map((code, i) => ` / ${i < path.length - 1 ? `<a href="${'../'.repeat(path.length - i - 1)}" data-directory-link>${esc(code)}</a>` : esc(code)}`).join('')}</nav>`;
   return shell(path.at(-1), 'links', depth, `
-    ${directoryContents(entries, depth, esc(path.at(-1)), breadcrumbs)}`);
+    ${directoryContents(entries, depth, breadcrumbs)}`);
 };
 
 export const guidePage = (source) => shell('Guide', 'guide', '../', `<article class="prose">

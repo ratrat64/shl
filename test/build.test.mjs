@@ -138,14 +138,17 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
   assert.doesNotMatch(home, /<img>/);
   const tools = await f.read('tools/index.html');
   assert.match(tools, /href="\.\.\/assets\/site\.css"/);
-  assert.match(tools, /<h1>tools<\/h1><span id="link-count" class="count" aria-live="polite" aria-atomic="true">2 links<\/span>/);
+  assert.match(tools, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">2 links<\/h1>/);
   assert.equal([...tools.matchAll(/<h1\b/g)].length, 1);
+  assert.doesNotMatch(tools, /<h1>tools<\/h1>/);
+  assert.match(tools, /<nav class="breadcrumbs" aria-label="Breadcrumb">.*Home<\/a> \/ tools<\/nav>/);
   assert.match(tools, /href="\.\/git\/">git<\/a>/);
   assert.match(tools, /<summary><a href="\.\/editors\/" data-directory-link>editors<\/a><\/summary>/);
   assert.ok(tools.indexOf('class="directory-tools"') < tools.indexOf('class="breadcrumbs"'));
   const editors = await f.read('tools/editors/index.html');
   assert.match(editors, /href="\.\.\/\.\.\/assets\/site\.css"/);
-  assert.match(editors, /<h1>editors<\/h1><span id="link-count" class="count" aria-live="polite" aria-atomic="true">1 link<\/span>/);
+  assert.match(editors, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">1 link<\/h1>/);
+  assert.equal([...editors.matchAll(/<h1\b/g)].length, 1);
   assert.match(editors, /href="\.\.\/\.\.\/" data-directory-link>Home<\/a>/);
   assert.match(editors, /href="\.\.\/" data-directory-link>tools<\/a>/);
   assert.match(editors, /href="\.\/Code\/" title="&lt;Editor&gt;">Code<\/a>/);
@@ -330,7 +333,7 @@ test('hidden links and hidden-only folders are hidden by default but keep their 
   assert.match(await f.read('tools/nested/branch/further/index.html'), /href="\.\/VisibleDeep\/">VisibleDeep<\/a>/);
   for (const page of ['onlyHidden/index.html', 'onlyHidden/nested/index.html', 'tools/private/index.html', 'tools/private/deep/index.html']) {
     const html = await f.read(page);
-    assert.match(html, /<span id="link-count" class="count" aria-live="polite" aria-atomic="true">0 links<\/span>/);
+    assert.match(html, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">0 links<\/h1>/);
     assert.match(html, /<p id="empty-directory">No links listed here\.<\/p>/);
     assert.match(html, /<div hidden><ul class="links">/);
     assert.match(html, /id="hidden-toggle"[^>]*hidden>Show hidden links/);

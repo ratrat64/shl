@@ -18,7 +18,7 @@ The Working Index is a compact, static directory for finding and using public sh
 
 ## Information Architecture
 
-The homepage is the root subtree; each folder has a browseable directory page and nested folders remain expandable. The homepage replaces its visible Links heading with the prominent "N links" count. Nested pages keep their directory name and breadcrumbs for orientation, with their own subtree count. Header navigation stays Links and Guide; the guide remains the informational page. Codes, destinations, optional titles and tags remain available in the directory as before.
+The homepage is the root subtree; each folder has a browseable directory page and nested folders remain expandable. Every directory page has the prominent "N links" count as its sole heading at the same size. Nested pages use breadcrumbs to show the folder path instead of repeating its name as a heading. Header navigation stays Links and Guide; the guide remains the informational page. Codes, destinations, optional titles and tags remain available in the directory as before.
 
 Visual reference: [homepage directory](mockups/directory.html). The DESIGN.md and EXPERIENCE.md spines take precedence over the mock on any conflict; nested directory, guide, redirect and 404 surfaces follow these spines without separate mocks.
 
@@ -28,9 +28,10 @@ Use short, functional labels. The visible search placeholder is exactly "Search 
 
 ## Component Patterns
 
-- **Directory tools:** On the homepage the count is the primary visual label on the left; a single-line search and a compact grouped area for the hidden-links toggle sit on the right. On nested pages retain the folder title and put the current subtree count with the heading. Style the count with the display hierarchy in {typography.display}, not the muted row metadata style; use the existing {colors.ink-light}/{colors.ink-dark} roles. Search uses {rounded.control} and existing surface/rule roles; no new palette.
+- **Directory tools:** On every directory page the count is the sole heading on the left; a single-line search and a compact grouped area for the hidden-links toggle sit on the right. Use the same {typography.display} size for home and nested counts, not the muted row metadata style; use the existing {colors.ink-light}/{colors.ink-dark} roles. Search uses {rounded.control} and existing surface/rule roles; no new palette.
 - **Directory rows:** Code and destination remain side by side; code copies the full short URL, destination copies its full URL, and Open visits the destination. Script links retain their visible script label and existing amber role. Folder names open their pages and disclosure expands the nested list. Optional titles remain available on hover and searchable; tags remain visible below entries. Keep the existing middle-truncation behavior for long destinations while preserving full values for copying and assistive technology.
 - **Navigation:** Keep Links and Guide, active-link underline, theme control and keyboard focus treatment. Remove directory-page framing rules below the header and above the footer; separate sections by space, as specified in DESIGN.md. Keep guide section rules.
+- **Copy feedback:** A polite status message appears after copying a code or destination (or a clipboard failure) in a fixed toast that never changes the listing's position; clear it after five seconds. A second copy resets the timer.
 
 ## State Patterns
 
@@ -45,11 +46,11 @@ Typing filters the current directory's descendants. Folder disclosure expands or
 
 ## Accessibility Floor
 
-Keep the search input programmatically labelled even with its visual label hidden; the placeholder is not its label. Preserve visible keyboard focus and text cues for script links. Expose the hidden-links toggle state programmatically (for example, `aria-pressed`) as well as through its label. Announce changes to the single count through a polite live region without another visible number; do not announce duplicate result counts. Retain meaningful folder headings, breadcrumbs, full destination text for assistive technology and functional links when JavaScript is off.
+Keep the search input programmatically labelled even with its visual label hidden; the placeholder is not its label. Preserve visible keyboard focus and text cues for script links. Expose the hidden-links toggle state programmatically (for example, `aria-pressed`) as well as through its label. Announce changes to the single count through a polite live region without another visible number; do not announce duplicate result counts. Retain the count heading, folder breadcrumbs, full destination text for assistive technology and functional links when JavaScript is off.
 
 ## Responsive & Platform
 
-Use the centered directory width in DESIGN.md on desktop; at narrow widths wrap search and grouped controls beneath the count or folder heading, with search able to fill the available width. Preserve the two-column code/destination relationship where possible and the existing small-screen row behavior. Static GitHub Pages HTML remains the baseline; JavaScript enhances filtering, toggling, copying and in-page directory navigation.
+Use the centered directory width in DESIGN.md on desktop; at narrow widths wrap search and grouped controls beneath the count, with search able to fill the available width. Preserve the two-column code/destination relationship where possible and the existing small-screen row behavior. Static GitHub Pages HTML remains the baseline; JavaScript enhances filtering, toggling, copying and in-page directory navigation.
 
 ## Key Flows
 
