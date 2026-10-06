@@ -114,9 +114,17 @@ test('homepage lists sorted links safely with project-relative URLs and handles 
   assert.match(html, /&lt;script&gt;title&lt;\/script&gt;/);
   assert.match(html, /https:\/\/example\.com\/\?q=&lt;img&gt;&amp;x=&quot;quoted&quot;/);
   assert.doesNotMatch(html, /<script>title|<img|undefined/);
+  assert.match(html, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">3 links<\/h1>/);
+  assert.equal([...html.matchAll(/<h1\b/g)].length, 1);
+  assert.doesNotMatch(html, /<h[1-6]>Links<\/h[1-6]>|data-visible=|data-total=/);
+  assert.match(html, /<ul class="links">[\s\S]*href="\.\/Alpha\/"/); // Browsable before scripts run.
   const empty = await fixture(t, {});
   assert.equal(empty.build().status, 0);
-  assert.match(await empty.read('index.html'), /No links available yet\./);
+  const emptyHtml = await empty.read('index.html');
+  assert.match(emptyHtml, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">0 links<\/h1>/);
+  assert.equal([...emptyHtml.matchAll(/<h1\b/g)].length, 1);
+  assert.match(emptyHtml, /id="hidden-toggle"[^>]*disabled>Show hidden links/);
+  assert.match(emptyHtml, /No links available yet\./);
 });
 
 test('nested JSON and YAML build themed directory pages and redirects', async (t) => {
@@ -124,20 +132,28 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
   const f = await fixture(t, links);
   assert.equal(f.build().status, 0);
   const home = await f.read('index.html');
-  assert.match(home, /<details><summary><a href="\.\/tools\/">tools<\/a><\/summary>/);
+  assert.match(home, /<details><summary><a href="\.\/tools\/" data-directory-link>tools<\/a><\/summary>/);
   assert.match(home, /href="\.\/tools\/editors\/Code\/" title="&lt;Editor&gt;">Code<\/a>/);
   assert.match(home, /data-title="&lt;Editor&gt;"/);
   assert.match(home, /class="link-row" title="&lt;Editor&gt;"/);
   assert.doesNotMatch(home, /<img>/);
   const tools = await f.read('tools/index.html');
   assert.match(tools, /href="\.\.\/assets\/site\.css"/);
+  for (const page of [home, tools]) assert.match(page, /<div class="directory-toggles"><button id="hidden-toggle"[^>]*disabled>Show hidden links<\/button><\/div>/);
+  assert.match(home, /<div class="breadcrumbs" aria-hidden="true"><\/div>/);
+  assert.match(tools, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">2 links<\/h1>/);
+  assert.equal([...tools.matchAll(/<h1\b/g)].length, 1);
+  assert.doesNotMatch(tools, /<h1>tools<\/h1>/);
+  assert.match(tools, /<nav class="breadcrumbs" aria-label="Breadcrumb">.*Home<\/a> \/ tools<\/nav>/);
   assert.match(tools, /href="\.\/git\/">git<\/a>/);
-  assert.match(tools, /<summary><a href="\.\/editors\/">editors<\/a><\/summary>/);
+  assert.match(tools, /<summary><a href="\.\/editors\/" data-directory-link>editors<\/a><\/summary>/);
   assert.ok(tools.indexOf('class="directory-tools"') < tools.indexOf('class="breadcrumbs"'));
   const editors = await f.read('tools/editors/index.html');
   assert.match(editors, /href="\.\.\/\.\.\/assets\/site\.css"/);
-  assert.match(editors, /href="\.\.\/\.\.\/">Home<\/a>/);
-  assert.match(editors, /href="\.\.\/">tools<\/a>/);
+  assert.match(editors, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">1 link<\/h1>/);
+  assert.equal([...editors.matchAll(/<h1\b/g)].length, 1);
+  assert.match(editors, /href="\.\.\/\.\.\/" data-directory-link>Home<\/a>/);
+  assert.match(editors, /href="\.\.\/" data-directory-link>tools<\/a>/);
   assert.match(editors, /href="\.\/Code\/" title="&lt;Editor&gt;">Code<\/a>/);
   assert.match(editors, /class="link-row" title="&lt;Editor&gt;"/);
   for (const prefix of ['/', '/project/']) {
@@ -147,6 +163,9 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
   assert.match(await f.read('tools/editors/Code/index.html'), /&lt;img&gt;/);
   const css = await f.read('assets/site.css');
   assert.doesNotMatch(css, /\.links li\{[^}]*border-bottom|\.links \.links\{[^}]*border-left/);
+  assert.match(css, /\.directory-page \.site-head,\.directory-page \.footer\{border:0\}/);
+  assert.match(css, /\.footer\{border-top:1px solid var\(--line\)/);
+  assert.match(css, /\.prose section\{border-top:1px solid var\(--line\)/);
   assert.match(css, /\.code\{[^}]*white-space:nowrap/);
   assert.match(css, /\.destination-start\{[^}]*text-overflow:ellipsis/);
   assert.deepEqual(JSON.parse(await f.read('links.json')), links);
@@ -156,6 +175,125 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
     assert.equal(await yaml.read(path), await f.read(path), path);
   }
   assert.match(await yaml.read('tools/editors/index.html'), /href="\.\/Code\/" title="&lt;Editor&gt;">Code<\/a>/);
+});
+
+test('folder navigation swaps generated pages, restores history, and falls back on failed fetches', async (t) => {
+  const f = await fixture(t, { tools: { git: 'https://git-scm.com/', editors: { Code: 'https://example.org/' } }, hidden: { secret: { url: 'https://example.org/private', hidden: true } } });
+  assert.equal(f.build().status, 0);
+  const pages = new Map(await Promise.all(['', 'tools/', 'tools/editors/', 'hidden/', 'tools/git/'].map(async (path) =>
+    [`https://short.example/project/${path}`, await f.read(`${path}index.html`)])));
+  const script = await f.read('assets/navigation.js');
+  assert.match(pages.get('https://short.example/project/'), /src="\.\/assets\/navigation\.js"/);
+  assert.match(pages.get('https://short.example/project/tools/'), /src="\.\.\/assets\/navigation\.js"/);
+  assert.doesNotMatch(await f.read('guide/index.html'), /navigation\.js/);
+
+  const location = {
+    href: 'https://short.example/project/',
+    get pathname() { return new URL(this.href).pathname; },
+    get origin() { return new URL(this.href).origin; },
+    assign(url) { this.assigned = url; },
+  };
+  const makeLink = (href, base) => ({
+    raw: href,
+    get href() { return new URL(this.raw, base || location.href).href; },
+    set href(value) { this.raw = value; },
+    get pathname() { return new URL(this.href).pathname; },
+    get origin() { return new URL(this.href).origin; },
+    getAttribute() { return this.raw; },
+  });
+  const main = (html, url) => {
+    const links = [...html.matchAll(/<a [^>]*href="(\.{1,2}\/[^\"]*)"/g)].map((match) => makeLink(match[1], url));
+    const heading = { focus(options) { this.focused = options.preventScroll; } };
+    return {
+      links, heading,
+      querySelectorAll(selector) {
+        if (selector === 'script') return [{ remove() {} }, { remove() {} }];
+        return links.filter((link) => link.raw.startsWith('.'));
+      },
+      querySelector(selector) { return selector === 'h1' ? heading : selector === '.links' && html.includes('class="links"') ? {} : null; },
+      replaceWith(next) { document.currentMain = next; },
+    };
+  };
+  const brand = makeLink('./');
+  const guide = makeLink('./guide/');
+  const initialized = [];
+  const listeners = {};
+  const document = {
+    title: 'Links · Short links',
+    currentMain: main(pages.get(location.href), location.href),
+    querySelector(selector) { return selector === '.brand' ? brand : selector === 'main' ? this.currentMain : null; },
+    querySelectorAll() { return [brand, guide]; },
+    addEventListener(name, callback) { listeners[name] = callback; },
+  };
+  const history = {
+    pushState(_state, _unused, url) { location.href = url; this.pushed = (this.pushed || 0) + 1; },
+  };
+  const window = { scrollY: 0, addEventListener(name, callback) { listeners[name] = callback; }, scrollTo(_x, y) { this.scrollY = y; } };
+  let heldUrl, release;
+  const fetch = async (url) => {
+    if (url === heldUrl) await new Promise((resolve) => { release = resolve; });
+    return { ok: pages.has(url), text: async () => pages.get(url) };
+  };
+  class DOMParser {
+    parseFromString(html) {
+      const title = html.match(/<title>([^<]+)<\/title>/)?.[1];
+      const url = [...pages].find(([, page]) => page === html)?.[0];
+      return { querySelector: (selector) => selector === 'title' ? title && { textContent: title } : selector === 'main[data-directory]' && html.includes('<main class="wrap" data-directory>') ? main(html, url) : null };
+    }
+  }
+  runInNewContext(script, { document, location, history, window, fetch, DOMParser, URL,
+    initSearch: () => initialized.push('search'), initCopy: () => initialized.push('copy') });
+  assert.equal(brand.href, 'https://short.example/project/');
+  assert.equal(guide.href, 'https://short.example/project/guide/');
+  assert.equal(history.scrollRestoration, 'manual');
+
+  const click = async (link, options = {}) => {
+    let prevented = false;
+    listeners.click({ button: 0, defaultPrevented: false, target: { closest: () => link }, preventDefault() { prevented = true; }, ...options });
+    await new Promise((resolve) => setImmediate(resolve));
+    return prevented;
+  };
+  const folder = (suffix) => document.currentMain.links.find((link) => link.href.endsWith(suffix));
+  assert.equal(await click(null), false); // Redirect and destination links remain native.
+  assert.equal(await click(folder('/tools/'), { ctrlKey: true }), false);
+  assert.equal(await click(folder('/tools/')), true);
+  assert.equal(location.pathname, '/project/tools/');
+  assert.equal(document.title, 'tools · Short links');
+  assert.equal(document.currentMain.heading.focused, true);
+  assert.equal(folder('/tools/git/').href, 'https://short.example/project/tools/git/');
+  assert.equal(guide.href, 'https://short.example/project/guide/');
+  assert.deepEqual(initialized, ['search', 'copy']);
+  window.scrollY = 250;
+  assert.equal(await click(folder('/tools/editors/')), true);
+  assert.equal(history.pushed, 2);
+  assert.equal(location.pathname, '/project/tools/editors/');
+  assert.equal(window.scrollY, 0);
+  heldUrl = 'https://short.example/project/tools/';
+  location.href = heldUrl;
+  listeners.popstate();
+  location.href = 'https://short.example/project/tools/editors/';
+  listeners.popstate();
+  release();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(document.title, 'editors · Short links'); // A late Back response cannot replace the Forward page.
+  heldUrl = null;
+  location.href = 'https://short.example/project/tools/';
+  listeners.popstate();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(document.title, 'tools · Short links');
+  assert.equal(window.scrollY, 250);
+  location.href = 'https://short.example/project/';
+  listeners.popstate();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(document.title, 'Links · Short links');
+  assert.equal(await click(folder('/hidden/')), true);
+  assert.equal(initialized.length, 10); // Search and copy also initialize on hidden-only pages.
+  assert.equal(await click(makeLink('https://short.example/project/tools/git/')), true);
+  assert.equal(location.assigned, 'https://short.example/project/tools/git/'); // A redirect page is never injected.
+  pages.delete('https://short.example/project/tools/');
+  assert.equal(await click(makeLink('https://short.example/project/tools/')), true);
+  assert.equal(location.assigned, 'https://short.example/project/tools/');
+  assert.equal(await click(makeLink('https://other.example/tools/')), false);
 });
 
 test('hidden links and hidden-only folders are hidden by default but keep their resources', async (t) => {
@@ -177,26 +315,28 @@ test('hidden links and hidden-only folders are hidden by default but keep their 
   assert.equal(f.build().status, 0);
   for (const page of ['index.html', 'tools/index.html']) {
     const html = await f.read(page);
-    assert.match(html, /id="hidden-toggle"[^>]*hidden>Show hidden links/);
-    assert.doesNotMatch(html, /aria-pressed=/);
-    assert.match(html, /<li data-hidden="true" hidden><details><summary><a href="\.\/.*(?:private|hiddenOnly|onlyHidden)\/">/);
+    assert.match(html, /<div class="directory-toggles"><button id="hidden-toggle"/);
+    assert.match(html, /id="hidden-toggle"[^>]*aria-pressed="false" hidden>Show hidden links/);
+    assert.doesNotMatch(html, /data-visible=|data-total=/);
+    assert.match(html, /<li data-hidden="true" hidden><details><summary><a href="\.\/.*(?:private|hiddenOnly|onlyHidden)\/" data-directory-link>/);
     assert.match(html, /<li data-hidden="true" hidden data-search="[^"]+"><div class="link-row"[^>]*><a class="code[^>]* href="\.\/.*(?:secret|SecretCode|HiddenDeep)\/"/);
   }
   const home = await f.read('index.html');
-  assert.match(home, /data-visible="4" data-total="8">4 links/);
-  assert.match(home, /href="\.\/tools\/nested\/">nested<\/a>/);
+  assert.match(home, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">4 links<\/h1>/);
+  assert.match(home, /href="\.\/tools\/nested\/" data-directory-link>nested<\/a>/);
   assert.match(home, /href="\.\/tools\/nested\/branch\/further\/VisibleDeep\/">VisibleDeep<\/a>/);
   assert.match(home, /href="\.\/shown\/">shown<\/a>/);
   assert.match(home, /href="\.\/visible\/">visible<\/a>/);
   assert.match(home, /href="\.\/tools\/public\/">public<\/a>/);
   assert.match(await f.read('tools/index.html'), /href="\.\/public\/">public<\/a>/);
-  assert.match(await f.read('tools/index.html'), /href="\.\/nested\/">nested<\/a>/);
-  assert.match(await f.read('tools/nested/index.html'), /href="\.\/branch\/">branch<\/a>/);
-  assert.match(await f.read('tools/nested/index.html'), /<li data-hidden="true" hidden><details><summary><a href="\.\/hiddenOnly\/">hiddenOnly/);
-  assert.match(await f.read('tools/nested/branch/index.html'), /href="\.\/further\/">further<\/a>/);
+  assert.match(await f.read('tools/index.html'), /href="\.\/nested\/" data-directory-link>nested<\/a>/);
+  assert.match(await f.read('tools/nested/index.html'), /href="\.\/branch\/" data-directory-link>branch<\/a>/);
+  assert.match(await f.read('tools/nested/index.html'), /<li data-hidden="true" hidden><details><summary><a href="\.\/hiddenOnly\/" data-directory-link>hiddenOnly/);
+  assert.match(await f.read('tools/nested/branch/index.html'), /href="\.\/further\/" data-directory-link>further<\/a>/);
   assert.match(await f.read('tools/nested/branch/further/index.html'), /href="\.\/VisibleDeep\/">VisibleDeep<\/a>/);
   for (const page of ['onlyHidden/index.html', 'onlyHidden/nested/index.html', 'tools/private/index.html', 'tools/private/deep/index.html']) {
     const html = await f.read(page);
+    assert.match(html, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">0 links<\/h1>/);
     assert.match(html, /<p id="empty-directory">No links listed here\.<\/p>/);
     assert.match(html, /<div hidden><ul class="links">/);
     assert.match(html, /id="hidden-toggle"[^>]*hidden>Show hidden links/);
@@ -210,8 +350,8 @@ test('hidden links and hidden-only folders are hidden by default but keep their 
   const allHidden = await fixture(t, { private: { nested: { code: { url: 'https://example.com/', hidden: true } } } });
   assert.equal(allHidden.build().status, 0);
   assert.match(await allHidden.read('index.html'), /No links listed here\./);
-  assert.match(await allHidden.read('index.html'), /data-visible="0" data-total="1" hidden/);
-  assert.match(await allHidden.read('index.html'), /<li data-hidden="true" hidden><details><summary><a href="\.\/private\/">/);
+  assert.match(await allHidden.read('index.html'), /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">0 links<\/h1>/);
+  assert.match(await allHidden.read('index.html'), /<li data-hidden="true" hidden><details><summary><a href="\.\/private\/" data-directory-link>/);
   assert.match(await allHidden.read('private/nested/index.html'), /No links listed here\./);
   assert.match(await allHidden.read('private/nested/code/index.html'), /https:\/\/example\.com/);
 });
@@ -249,9 +389,13 @@ test('directory clicks copy full short or long URLs while Open follows the desti
     const copied = [];
     const status = { textContent: '' };
     const list = { addEventListener: (_, listener) => { list.click = listener; } };
+    const timers = new Map();
+    let nextTimer = 0;
     runInNewContext(script, {
       document: { querySelector: (selector) => ({ '.links': list, '#copy-status': status })[selector] },
       navigator: { clipboard: { writeText: async (text) => { copied.push(text); } } },
+      setTimeout: (callback, delay) => { assert.equal(delay, 5000); timers.set(++nextTimer, callback); return nextTimer; },
+      clearTimeout: (id) => timers.delete(id),
     });
     const anchor = (kind, href) => ({
       href: new URL(href, `https://short.example${prefix}`).href,
@@ -269,6 +413,9 @@ test('directory clicks copy full short or long URLs while Open follows the desti
     assert.equal(await click(anchor('destination', url)), true);
     assert.equal(copied.at(-1), url);
     assert.equal(status.textContent, 'Destination copied.');
+    assert.equal(timers.size, 1);
+    timers.values().next().value();
+    assert.equal(status.textContent, '');
     assert.equal(await click(anchor('visit', url)), false);
     assert.equal(await click(anchor('code', shortHref), { ctrlKey: true }), false);
     assert.equal(copied.length, 2);
@@ -276,14 +423,18 @@ test('directory clicks copy full short or long URLs while Open follows the desti
 
   const status = { textContent: '' };
   const list = { addEventListener: (_, listener) => { list.click = listener; } };
+  let dismiss;
   runInNewContext(script, {
     document: { querySelector: (selector) => ({ '.links': list, '#copy-status': status })[selector] },
     navigator: { clipboard: { writeText: async () => { throw new Error('permission denied'); } } },
+    setTimeout: (callback) => { dismiss = callback; }, clearTimeout: () => {},
   });
   let prevented = false;
   await list.click({ button: 0, target: { closest: () => ({ href: 'https://short.example/project/tools/Setup/', classList: { contains: () => true } }) }, preventDefault: () => { prevented = true; } });
   assert.equal(prevented, true);
   assert.match(status.textContent, /Could not copy/);
+  dismiss();
+  assert.equal(status.textContent, '');
 });
 
 test('search filters nested links on the homepage and directory pages', async (t) => {
@@ -291,10 +442,11 @@ test('search filters nested links on the homepage and directory pages', async (t
   assert.equal(f.build().status, 0);
   for (const [page, depth] of [['index.html', './'], ['tools/index.html', '../'], ['tools/editors/index.html', '../../']]) {
     const html = await f.read(page);
-    assert.match(html, /<div class="search" hidden>\s*<label for="link-search">Search links<\/label>/);
+    assert.match(html, /<div class="search" hidden>\s*<label class="sr-only" for="link-search">Search links<\/label>\s*<input id="link-search" type="search" placeholder="Search link, title or tag"/);
+    assert.match(html, /id="link-count" class="count" aria-live="polite" aria-atomic="true"/);
     assert.match(html, new RegExp(`src="${depth.replaceAll('.', '\\.')}assets/search\\.js"`));
     assert.match(html, /id="search-status"[^>]*role="status" hidden/);
-    assert.doesNotMatch(html, /id="hidden-toggle"/);
+    assert.match(html, /id="hidden-toggle"[^>]*disabled>Show hidden links/);
   }
 
   const leaf = (text, title = '') => ({ firstElementChild: { tagName: 'DIV' }, textContent: text, dataset: { title }, hidden: false });
@@ -312,14 +464,19 @@ test('search filters nested links on the homepage and directory pages', async (t
   const search = { hidden: true };
   const input = { value: '', parentElement: search, addEventListener: (_, listener) => { input.update = listener; } };
   const status = { hidden: true, textContent: '' };
-  const elements = { '#link-search': input, '.links': list, '#search-status': status };
+  const count = { textContent: '3 links' };
+  const disabledToggle = { disabled: true, hidden: false, addEventListener() { throw new Error('disabled toggle should not activate'); } };
+  const elements = { '#link-search': input, '.links': list, '#search-status': status, '#link-count': count, '#hidden-toggle': disabledToggle };
   runInNewContext(await f.read('assets/search.js'), { document: { querySelector: (selector) => elements[selector] } });
   assert.equal(search.hidden, false);
+  assert.equal(disabledToggle.hidden, false);
 
   tools.firstElementChild.open = true; // Preserve directories opened by the visitor.
   input.value = 'vs code';
   input.update();
-  assert.equal(status.textContent, '1 matching link.');
+  assert.equal(status.textContent, '');
+  assert.equal(status.hidden, true);
+  assert.equal(count.textContent, '1 link');
   assert.equal(code.hidden, false);
   assert.equal(git.hidden, true);
   assert.equal(gh.hidden, true);
@@ -327,28 +484,35 @@ test('search filters nested links on the homepage and directory pages', async (t
 
   input.value = 'TOOLS/GIT';
   input.update();
+  assert.equal(count.textContent, '1 link');
   assert.equal(git.hidden, false);
   assert.equal(code.hidden, true);
   assert.equal(editors.hidden, true);
 
   input.value = 'tools';
   input.update();
-  assert.equal(status.textContent, '2 matching links.');
+  assert.equal(status.textContent, '');
+  assert.equal(count.textContent, '2 links');
   assert.equal(git.hidden, false);
   assert.equal(code.hidden, false);
 
   input.value = 'missing';
   input.update();
   assert.equal(status.textContent, 'No links match your search.');
+  assert.equal(status.hidden, false);
+  assert.equal(count.textContent, '0 links');
   assert.equal(tools.hidden, true);
 
   input.value = 'open';
   input.update();
   assert.equal(gh.hidden, true);
+  assert.equal(count.textContent, '0 links');
 
   input.value = '';
   input.update();
   assert.equal(status.hidden, true);
+  assert.equal(status.textContent, '');
+  assert.equal(count.textContent, '3 links');
   assert.equal(gh.hidden, false);
   assert.equal(editors.firstElementChild.open, false);
   assert.equal(tools.firstElementChild.open, true);
@@ -388,24 +552,30 @@ test('tags are displayed safely and searchable on home and nested pages without 
     const search = { hidden: true };
     const input = { value: '', parentElement: search, addEventListener: (_, callback) => { input.update = callback; } };
     const status = { hidden: true, textContent: '' };
-    const toggle = { hidden: true, textContent: 'Show hidden links', addEventListener: (_, callback) => { toggle.click = callback; } };
-    runInNewContext(await f.read('assets/search.js'), { document: { querySelector: (selector) => ({ '#link-search': input, '.links': list, '#search-status': status, '#hidden-toggle': toggle })[selector] ?? null } });
+    const count = { textContent: page === 'index.html' ? '3 links' : '2 links' };
+    const toggle = { hidden: true, textContent: 'Show hidden links', setAttribute(name, value) { this[name] = value; }, addEventListener: (_, callback) => { toggle.click = callback; } };
+    runInNewContext(await f.read('assets/search.js'), { document: { querySelector: (selector) => ({ '#link-search': input, '.links': list, '#search-status': status, '#hidden-toggle': toggle, '#link-count': count })[selector] ?? null } });
     input.value = '#HOW TO';
     input.update();
-    assert.equal(status.textContent, '1 matching link.');
+    assert.equal(status.textContent, '');
+    assert.equal(count.textContent, '1 link');
     assert.equal(guide.hidden, false);
     assert.equal(editor.hidden, true);
     assert.equal(privateLink.hidden, true);
     if (page === 'index.html') assert.equal(group.firstElementChild.open, true);
     toggle.click();
-    assert.equal(status.textContent, '2 matching links.');
+    assert.equal(toggle['aria-pressed'], 'true');
+    assert.equal(count.textContent, '2 links');
+    assert.equal(status.textContent, '');
     assert.equal(privateLink.hidden, false);
     input.value = '<img src=x onerror=alert(1)>';
     input.update();
-    assert.equal(status.textContent, '1 matching link.');
+    assert.equal(count.textContent, '1 link');
+    assert.equal(status.textContent, '');
     input.value = '#editor';
     input.update();
-    assert.equal(status.textContent, '1 matching link.');
+    assert.equal(count.textContent, '1 link');
+    assert.equal(status.textContent, '');
     assert.equal(editor.hidden, false);
   }
 });
@@ -419,17 +589,18 @@ test('toggle updates hidden rows, nested search, counts, and hidden-only empty s
     firstElementChild: { tagName: 'DETAILS', open: false, querySelector: (selector) => selector === 'summary' ? { textContent: name } : { children } },
     dataset: hidden ? { hidden: 'true' } : {}, hidden,
   });
-  const exercise = async (page, children, visible, total, site = f) => {
+  const exercise = async (page, children, visible, site = f) => {
     const html = await site.read(page);
-    assert.match(html, /id="hidden-toggle"[^>]*hidden>Show hidden links/);
-    assert.doesNotMatch(html, /aria-pressed=/);
+    assert.match(html, /id="hidden-toggle"[^>]*aria-pressed="false" hidden>Show hidden links/);
+    assert.doesNotMatch(html, /data-visible=|data-total=/);
+    assert.match(html, new RegExp(`id="link-count" class="count" aria-live="polite" aria-atomic="true">${visible} link${visible === 1 ? '' : 's'}</`));
     const wrapper = { hidden: !visible };
     const list = { children, parentElement: wrapper };
     const search = { hidden: true };
     const input = { value: '', parentElement: search, addEventListener: (_, callback) => { input.update = callback; } };
     const status = { hidden: true, textContent: '' };
-    const toggle = { hidden: true, textContent: 'Show hidden links', addEventListener: (_, callback) => { toggle.click = callback; } };
-    const count = page === 'index.html' ? { dataset: { visible: String(visible), total: String(total) }, hidden: !visible, textContent: visible ? `${visible} links` : '' } : null;
+    const toggle = { hidden: true, textContent: 'Show hidden links', setAttribute(name, value) { this[name] = value; }, addEventListener: (_, callback) => { toggle.click = callback; } };
+    const count = { textContent: `${visible} link${visible === 1 ? '' : 's'}` };
     const empty = visible ? null : { hidden: false };
     const elements = { '#link-search': input, '.links': list, '#search-status': status, '#hidden-toggle': toggle, '#link-count': count, '#empty-directory': empty };
     runInNewContext(script, { document: { querySelector: (selector) => elements[selector] } });
@@ -452,8 +623,8 @@ test('toggle updates hidden rows, nested search, counts, and hidden-only empty s
   const folder = group('folder', [visibleLeaf, privateGroup]);
   const nestedCode = leaf('code https://example.com/code', true);
   const hiddenGroup = group('onlyHidden', [group('nested', [nestedCode], true)], true);
-  const home = await exercise('index.html', [folder, hiddenGroup, leaf('public https://example.com/public'), secret], 2, 5);
-  assert.match(home.html, /<li data-hidden="true" hidden><details><summary><a href="\.\/onlyHidden\/">/);
+  const home = await exercise('index.html', [folder, hiddenGroup, leaf('public https://example.com/public'), secret], 2);
+  assert.match(home.html, /<li data-hidden="true" hidden><details><summary><a href="\.\/onlyHidden\/" data-directory-link>/);
   const deepHref = home.html.match(/href="(\.\/folder\/private\/deep\/)"/)?.[1];
   assert.ok(deepHref, 'nested short link was generated');
   for (const prefix of ['/', '/project/']) {
@@ -463,54 +634,64 @@ test('toggle updates hidden rows, nested search, counts, and hidden-only empty s
   home.input.value = 'private notes';
   home.input.update();
   assert.equal(home.status.textContent, 'No links match your search.');
+  assert.equal(home.count.textContent, '0 links');
   assert.equal(privateGroup.hidden, true);
   assert.equal(secret.hidden, true);
   home.toggle.click();
   assert.equal(home.toggle.textContent, 'Hide hidden links');
-  assert.equal(home.count.textContent, '5 links');
-  assert.equal(home.status.textContent, '1 matching link.');
+  assert.equal(home.toggle['aria-pressed'], 'true');
+  assert.equal(home.count.textContent, '1 link');
+  assert.equal(home.status.textContent, '');
   assert.equal(secret.hidden, false);
   home.input.value = 'private';
   home.input.update();
-  assert.equal(home.status.textContent, '2 matching links.');
+  assert.equal(home.count.textContent, '2 links');
+  assert.equal(home.status.textContent, '');
   assert.equal(secret.hidden, false);
   assert.equal(privateGroup.hidden, false);
   assert.equal(deep.hidden, false);
   home.input.value = '';
   home.input.update();
+  assert.equal(home.count.textContent, '5 links');
   assert.equal(hiddenGroup.hidden, false);
   assert.equal(nestedCode.hidden, false);
   home.input.value = 'private notes';
   home.input.update();
   home.toggle.click();
   assert.equal(home.toggle.textContent, 'Show hidden links');
-  assert.equal(home.count.textContent, '2 links');
+  assert.equal(home.toggle['aria-pressed'], 'false');
+  assert.equal(home.count.textContent, '0 links');
   assert.equal(home.status.textContent, 'No links match your search.');
   assert.equal(secret.hidden, true);
   assert.equal(hiddenGroup.hidden, true);
   assert.equal(privateGroup.hidden, true);
 
   const nested = group('private', [leaf('deep https://example.com/deep', true)], true);
-  const directory = await exercise('folder/index.html', [nested, leaf('visible https://example.com/visible')], 1, 2);
+  const directory = await exercise('folder/index.html', [nested, leaf('visible https://example.com/visible')], 1);
   assert.match(directory.html, /href="\.\/private\/"/);
   directory.toggle.click();
+  assert.equal(directory.count.textContent, '2 links');
   assert.equal(nested.hidden, false);
   directory.toggle.click();
+  assert.equal(directory.count.textContent, '1 link');
   assert.equal(nested.hidden, true);
 
   const only = group('nested', [leaf('code https://example.com/code', true)], true);
-  const hiddenPage = await exercise('onlyHidden/index.html', [only], 0, 1);
+  const hiddenPage = await exercise('onlyHidden/index.html', [only], 0);
   assert.match(hiddenPage.html, /<div hidden><ul class="links">/);
   assert.equal(hiddenPage.empty.hidden, false);
   hiddenPage.toggle.click();
+  assert.equal(hiddenPage.count.textContent, '1 link');
   assert.equal(hiddenPage.empty.hidden, true);
   assert.equal(hiddenPage.wrapper.hidden, false);
   assert.equal(hiddenPage.input.parentElement.hidden, false);
   assert.equal(only.hidden, false);
   hiddenPage.input.value = 'code';
   hiddenPage.input.update();
-  assert.equal(hiddenPage.status.textContent, '1 matching link.');
+  assert.equal(hiddenPage.count.textContent, '1 link');
+  assert.equal(hiddenPage.status.textContent, '');
   hiddenPage.toggle.click();
+  assert.equal(hiddenPage.count.textContent, '0 links');
   assert.equal(hiddenPage.empty.hidden, false);
   assert.equal(hiddenPage.wrapper.hidden, true);
   assert.equal(hiddenPage.input.parentElement.hidden, true);
@@ -519,13 +700,12 @@ test('toggle updates hidden rows, nested search, counts, and hidden-only empty s
 
   const allHidden = await fixture(t, { secret: { url: 'https://example.com/', hidden: true } });
   assert.equal(allHidden.build().status, 0);
-  const root = await exercise('index.html', [leaf('secret https://example.com/', true)], 0, 1, allHidden);
-  assert.equal(root.count.hidden, true);
+  const root = await exercise('index.html', [leaf('secret https://example.com/', true)], 0, allHidden);
+  assert.equal(root.count.textContent, '0 links');
   root.toggle.click();
   assert.equal(root.count.textContent, '1 link');
-  assert.equal(root.count.hidden, false);
   root.toggle.click();
-  assert.equal(root.count.hidden, true);
+  assert.equal(root.count.textContent, '0 links');
   assert.equal(root.empty.hidden, false);
 });
 

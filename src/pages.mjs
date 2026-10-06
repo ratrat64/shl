@@ -64,6 +64,7 @@ export const styles = `
   .nav a:hover{color:var(--accent)}
   .theme-toggle{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:4px;padding:.35rem .7rem;font-size:.85rem;white-space:nowrap}
   .theme-toggle:hover{background:var(--wash)}
+  .theme-toggle:disabled{background:var(--wash);color:var(--muted);cursor:default}
   main{padding-top:clamp(1.5rem,3vw,2.5rem);padding-bottom:4rem;min-height:70vh}
   h1,h2,h3,p{margin-top:0}
   h1{font-size:clamp(1.8rem,3vw,2.4rem);letter-spacing:-.035em;line-height:1.2;margin-bottom:1rem}
@@ -71,13 +72,13 @@ export const styles = `
   h3{font-size:1.06rem;letter-spacing:-.02em}
   p{max-width:68ch}
   .lead{color:var(--muted);max-width:65ch;margin-bottom:2rem}
-  .section-head{display:flex;justify-content:space-between;gap:1rem;align-items:baseline;border-bottom:1px solid var(--line);padding-bottom:.6rem}
-  .section-head h2{margin:0}.count{color:var(--muted);font-size:.85rem;font-variant-numeric:tabular-nums}
-  .directory-tools{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1rem}
-  .directory-tools h1{margin:0}.directory-tools .count{margin-left:.5rem}
-  #hidden-toggle{margin-left:.75rem}
-  .search{width:min(100%,360px)}
-  .search label{display:block;font-size:.82rem;color:var(--muted);margin-bottom:.2rem}
+  .directory-page .site-head,.directory-page .footer{border:0}
+  .directory-tools{display:flex;align-items:flex-start;justify-content:space-between;gap:1.5rem;margin-bottom:1.4rem}
+  .directory-tools h1{margin:0}
+  .count{font-variant-numeric:tabular-nums}
+  .directory-actions{display:grid;grid-template-columns:minmax(0,1fr) 9rem;align-items:center;gap:.65rem;width:min(100%,30rem);min-width:0}
+  .directory-toggles{grid-column:2;display:flex;align-items:center;justify-content:flex-end;gap:.5rem}
+  .search{grid-column:1;min-width:0}
   .search input{width:100%;font:inherit;padding:.45rem .7rem;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--ink);caret-color:var(--accent)}
   .search input::placeholder{color:var(--muted)}
   .search input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -89,7 +90,7 @@ export const styles = `
   summary:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
   summary a{color:inherit;text-decoration:none}
   summary a:hover{text-decoration:underline}
-  .breadcrumbs{margin:0 0 1rem;color:var(--muted);font-size:.9rem}
+  .breadcrumbs{height:2rem;line-height:1.5rem;white-space:nowrap;overflow-x:auto;overflow-y:hidden;margin:0 0 .5rem;color:var(--muted);font-size:.9rem}
   .link-row{display:grid;grid-template-columns:max-content minmax(0,1fr) max-content;gap:1rem;align-items:center;overflow-x:auto}
   .link-row.script-row{grid-template-columns:max-content minmax(0,1fr) max-content max-content}
   .code{font:600 .94rem/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;text-decoration:none;color:var(--accent);white-space:nowrap}
@@ -106,6 +107,7 @@ export const styles = `
   .download:hover{background:var(--wash)}
   .tags{display:block;color:var(--muted);font-size:.78rem;margin-top:.2rem}
   #copy-status:empty{display:none}
+  #copy-status:not(:empty){position:fixed;bottom:1rem;right:1rem;z-index:1;max-width:min(24rem,calc(100vw - 2rem));margin:0;padding:.55rem .8rem;background:var(--panel);border:1px solid var(--line);border-radius:4px;color:var(--ink)}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   .prose{max-width:740px}.prose section{border-top:1px solid var(--line);padding-top:1rem;margin-top:2.5rem;scroll-margin-top:1rem}.prose p,.prose li{color:var(--muted)}
   .prose ol,.prose ul{padding-left:1.4rem}.prose li{padding-left:.35rem;margin-bottom:.8rem}
@@ -115,7 +117,7 @@ export const styles = `
   .prose pre code{overflow-wrap:normal}
   .footer{border-top:1px solid var(--line);padding-block:1.5rem;color:var(--muted);font-size:.87rem}
   .footer .wrap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}.footer p{margin:0}
-  @media(max-width:740px){.head-inner{flex-wrap:wrap;gap:.75rem}.nav{gap:1rem}.directory-tools{align-items:stretch;flex-direction:column}.search{width:100%}.link-row{gap:.5rem}.footer .wrap{display:block}}
+  @media(max-width:740px){.head-inner{flex-wrap:wrap;gap:.75rem}.nav{gap:1rem}.directory-tools{align-items:stretch;flex-direction:column}.directory-actions{width:100%;grid-template-columns:minmax(0,1fr)}.directory-toggles{grid-column:1}.link-row{gap:.5rem}.footer .wrap{display:block}}
   @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 `;
 
@@ -134,7 +136,7 @@ export const themeScript = `(() => {
   });
 })();`;
 
-export const searchScript = `(() => {
+export const searchScript = `globalThis.initSearch = () => {
   const input = document.querySelector('#link-search');
   if (!input) return;
   const list = document.querySelector('.links');
@@ -145,7 +147,7 @@ export const searchScript = `(() => {
   const opened = new Map();
   let showHidden = false;
   input.parentElement.hidden = !!empty;
-  if (toggle) toggle.hidden = false;
+  if (toggle && !toggle.disabled) toggle.hidden = false;
 
   function filter(list, query, path = '', all = false) {
     let count = 0;
@@ -175,36 +177,36 @@ export const searchScript = `(() => {
     opened.clear();
     const query = input.value.trim().toLowerCase();
     const count = filter(list, query);
-    status.hidden = !query || (!!empty && !showHidden);
-    status.textContent = !query ? '' : count ? count + ' matching link' + (count === 1 ? '.' : 's.') : 'No links match your search.';
+    status.hidden = !query || !!count || (!!empty && !showHidden);
+    status.textContent = query && !count ? 'No links match your search.' : '';
     if (empty) {
       empty.hidden = showHidden;
       list.parentElement.hidden = !showHidden;
       input.parentElement.hidden = !showHidden;
     }
-    if (countLabel) {
-      const total = Number(countLabel.dataset[showHidden ? 'total' : 'visible']);
-      countLabel.hidden = !total;
-      countLabel.textContent = total + ' link' + (total === 1 ? '' : 's');
-    }
+    countLabel.textContent = count + ' link' + (count === 1 ? '' : 's');
   }
 
   input.addEventListener('input', update);
-  if (toggle) toggle.addEventListener('click', () => {
+  if (toggle && !toggle.disabled) toggle.addEventListener('click', () => {
     showHidden = !showHidden;
     toggle.textContent = showHidden ? 'Hide hidden links' : 'Show hidden links';
+    toggle.setAttribute('aria-pressed', String(showHidden));
     update();
   });
-})();`;
+};
+globalThis.initSearch();`;
 
-export const copyScript = `(() => {
+export const copyScript = `globalThis.initCopy = () => {
   const list = document.querySelector('.links');
   const status = document.querySelector('#copy-status');
+  let timeout;
   list.addEventListener('click', async (event) => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const link = event.target.closest('a.code, a.destination');
     if (!link) return;
     event.preventDefault();
+    clearTimeout(timeout);
     status.textContent = '';
     try {
       await navigator.clipboard.writeText(link.classList.contains('code') ? link.href : link.getAttribute('href'));
@@ -212,19 +214,81 @@ export const copyScript = `(() => {
     } catch {
       status.textContent = 'Could not copy the link. Try your browser\u2019s copy-link action.';
     }
+    timeout = setTimeout(() => { status.textContent = ''; }, 5000);
+  });
+};
+globalThis.initCopy();`;
+
+export const navigationScript = `(() => {
+  const rebase = (main, url) => {
+    for (const link of main.querySelectorAll('a[href^="."]')) {
+      link.href = new URL(link.getAttribute('href'), url).href;
+    }
+  };
+  // The header and footer survive page swaps, so their relative links must not drift.
+  for (const link of document.querySelectorAll('.site-head a, .footer a')) link.href = link.href;
+  rebase(document.querySelector('main'), location.href);
+
+  let request = 0;
+  let displayed = location.pathname;
+  // ponytail: one scroll position per directory; use history-entry state if per-visit restoration matters.
+  const scroll = new Map();
+  async function navigate(url, push) {
+    const current = ++request;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Directory unavailable');
+      const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+      const main = page.querySelector('main[data-directory]');
+      const title = page.querySelector('title');
+      if (!main || !title) throw new Error('Not a directory');
+      if (current !== request) return;
+      rebase(main, url);
+      for (const script of main.querySelectorAll('script')) script.remove();
+      document.querySelector('main').replaceWith(main);
+      document.title = title.textContent;
+      if (push) history.pushState(null, '', url);
+      displayed = location.pathname;
+      if (main.querySelector('.links')) {
+        globalThis.initSearch();
+        globalThis.initCopy();
+      }
+      window.scrollTo(0, push ? 0 : scroll.get(displayed) || 0);
+      const heading = main.querySelector('h1');
+      heading.tabIndex = -1;
+      heading.focus({ preventScroll: true });
+    } catch {
+      if (current === request) location.assign(url);
+    }
+  }
+
+  history.scrollRestoration = 'manual';
+  document.addEventListener('click', (event) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const link = event.target.closest('a[data-directory-link]');
+    if (!link || link.target && link.target !== '_self' || link.origin !== location.origin) return;
+    if (link.pathname === displayed) { ++request; return; }
+    event.preventDefault();
+    scroll.set(displayed, window.scrollY);
+    navigate(link.href, true);
+  });
+  window.addEventListener('popstate', () => {
+    scroll.set(displayed, window.scrollY);
+    if (location.pathname !== displayed) navigate(location.href, false);
+    else ++request;
   });
 })();`;
 
 const shell = (title, active, depth, content) => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark"><title>${esc(title)} · Short links</title>
-<link rel="stylesheet" href="${depth}assets/site.css"><script src="${depth}assets/theme.js" defer></script></head>
-<body><header class="site-head"><div class="wrap head-inner">
- <a class="brand" href="${depth}">shortlink</a>
+<link rel="stylesheet" href="${depth}assets/site.css"><script src="${depth}assets/theme.js" defer></script>${active === 'links' ? `<script src="${depth}assets/navigation.js" defer></script>` : ''}</head>
+<body${active === 'links' ? ' class="directory-page"' : ''}><header class="site-head"><div class="wrap head-inner">
+ <a class="brand" href="${depth}"${active === 'links' ? ' data-directory-link' : ''}>shortlink</a>
  <nav class="nav" aria-label="Main navigation">
- ${[['Links', '', 'links'], ['Guide', 'guide/', 'guide']].map(([label, path, key]) => `<a href="${depth}${path}"${active === key ? ' aria-current="page"' : ''}>${label}</a>`).join('')}
+ ${[['Links', '', 'links'], ['Guide', 'guide/', 'guide']].map(([label, path, key]) => `<a href="${depth}${path}"${active === 'links' && key === 'links' ? ' data-directory-link' : ''}${active === key ? ' aria-current="page"' : ''}>${label}</a>`).join('')}
  </nav><button class="theme-toggle" type="button" aria-label="Change color theme">Theme: system</button></div></header>
- <main class="wrap">${content}</main>
+ <main class="wrap"${active === 'links' ? ' data-directory' : ''}>${content}</main>
  <footer class="footer"><div class="wrap"><p>Shortlink</p><p><a href="${depth}guide/">Guide</a> · <a href="https://github.com/ratrat64/shortlink#readme">Repository</a></p></div></footer>
 </body></html>`;
 
@@ -236,7 +300,7 @@ const listing = (entries, prefix = '') => `<ul class="links">${Object.entries(en
   .map(([code, value]) => {
     const href = `./${prefix}${code}/`;
     if (typeof value === 'object' && !('url' in value)) return `
-      <li${visibleCount(value) ? '' : ' data-hidden="true" hidden'}><details><summary><a href="${esc(href)}">${esc(code)}</a></summary>
+      <li${visibleCount(value) ? '' : ' data-hidden="true" hidden'}><details><summary><a href="${esc(href)}" data-directory-link>${esc(code)}</a></summary>
         ${listing(value, `${prefix}${code}/`)}
       </details></li>`;
     const url = typeof value === 'string' ? value : value.url;
@@ -251,33 +315,31 @@ const listing = (entries, prefix = '') => `<ul class="links">${Object.entries(en
            <a class="destination" href="${esc(url)}" aria-label="Copy destination: ${esc(url)}"${title ? '' : ` title="${esc(url)}"`}><span class="sr-only">${esc(url)}</span><span class="destination-start" aria-hidden="true">${esc(url.slice(0, cut))}</span><span class="destination-end" aria-hidden="true">${esc(url.slice(cut))}</span></a>${value?.script === true ? `<a class="download" href="${esc(`./${prefix}${code}.sh`)}" aria-label="Download script for ${esc(code)}" download>Download</a>` : ''}<a class="visit" href="${esc(url)}" aria-label="Open destination for ${esc(code)}">Open</a></div>${tags.length ? `<span class="tags">${tags.map((tag) => `#${esc(tag)}`).join(' · ')}</span>` : ''}</li>`;
   }).join('')}</ul>`;
 
-const searchableListing = (entries, depth) => `<div class="search" hidden>
-     <label for="link-search">Search links</label>
-     <input id="link-search" type="search" placeholder="Code, title, destination or tag" autocomplete="off">
-   </div>`;
+const searchableListing = () => `<div class="search" hidden>
+      <label class="sr-only" for="link-search">Search links</label>
+      <input id="link-search" type="search" placeholder="Search link, title or tag" autocomplete="off">
+    </div>`;
 
-const directoryContents = (entries, depth, heading, count = null, breadcrumbs = '') => {
+const directoryContents = (entries, depth, breadcrumbs = '', emptyMessage = 'No links listed here.') => {
   const visible = visibleCount(entries);
   const total = visibleCount(entries, true);
   return `<section aria-label="Links">
-    <div class="directory-tools"><div><h1>${heading}</h1>${count !== null ? `<span id="link-count" class="count" data-visible="${visible}" data-total="${total}"${visible ? '' : ' hidden'}>${count}</span>` : ''}${total > visible ? '<button id="hidden-toggle" class="theme-toggle" type="button" hidden>Show hidden links</button>' : ''}</div>${total ? searchableListing(entries, depth) : ''}</div>
-   ${breadcrumbs}
+    <div class="directory-tools"><h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">${visible} link${visible === 1 ? '' : 's'}</h1>
+    <div class="directory-actions">${total ? searchableListing() : ''}<div class="directory-toggles"><button id="hidden-toggle" class="theme-toggle" type="button" aria-pressed="false" ${total > visible ? 'hidden' : 'disabled'}>Show hidden links</button></div></div></div>
+    ${breadcrumbs || '<div class="breadcrumbs" aria-hidden="true"></div>'}
    ${total ? `<p id="search-status" class="search-status" role="status" hidden></p><p id="copy-status" class="search-status" role="status" aria-live="polite"></p>
     ${visible ? '' : '<p id="empty-directory">No links listed here.</p>'}
-    <div${visible ? '' : ' hidden'}>${listing(entries)}</div><script src="${depth}assets/search.js" defer></script><script src="${depth}assets/copy.js" defer></script>` : '<p>No links listed here.</p>'}</section>`;
+     <div${visible ? '' : ' hidden'}>${listing(entries)}</div><script src="${depth}assets/search.js" defer></script><script src="${depth}assets/copy.js" defer></script>` : `<p>${emptyMessage}</p>`}</section>`;
 };
 
-export const indexPage = ({ raw, links, source }) => {
-  const visible = links.filter((link) => !link.hidden).length;
-  return shell('Links', 'links', './', `
-    ${links.length ? directoryContents(raw, './', 'Links', visible ? `${visible} ${visible === 1 ? 'link' : 'links'}` : '') : `<h1>Links</h1><p>No links available yet. Add your first entry to <code>${source}</code> and rebuild the site.</p>`}`);
-};
+export const indexPage = ({ raw, links, source }) => shell('Links', 'links', './', `
+    ${directoryContents(raw, './', '', links.length ? 'No links listed here.' : `No links available yet. Add your first entry to <code>${esc(source)}</code> and rebuild the site.`)}`);
 
 export const directoryPage = ({ path, entries }) => {
   const depth = '../'.repeat(path.length);
-  const breadcrumbs = `<nav class="breadcrumbs" aria-label="Breadcrumb"><a href="${depth}">Home</a>${path.map((code, i) => ` / ${i < path.length - 1 ? `<a href="${'../'.repeat(path.length - i - 1)}">${esc(code)}</a>` : esc(code)}`).join('')}</nav>`;
+  const breadcrumbs = `<nav class="breadcrumbs" aria-label="Breadcrumb"><a href="${depth}" data-directory-link>Home</a>${path.map((code, i) => ` / ${i < path.length - 1 ? `<a href="${'../'.repeat(path.length - i - 1)}" data-directory-link>${esc(code)}</a>` : esc(code)}`).join('')}</nav>`;
   return shell(path.at(-1), 'links', depth, `
-   ${directoryContents(entries, depth, esc(path.at(-1)), null, breadcrumbs)}`);
+    ${directoryContents(entries, depth, breadcrumbs)}`);
 };
 
 export const guidePage = (source) => shell('Guide', 'guide', '../', `<article class="prose">

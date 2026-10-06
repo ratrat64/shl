@@ -1,0 +1,8 @@
+{
+  "claims": [
+    { "claim": "GitHub Pages publishes static assets at user-site roots and project-site prefixes (undated documentation; checked date used)", "class": "platform", "pub_date": "2026-10-06" },
+    { "claim": "Actions can deploy generated entry files (undated documentation; checked date used)", "class": "platform", "pub_date": "2026-10-06" },
+    { "claim": "pushState changes same-origin history without immediately fetching the destination", "class": "pattern", "pub_date": "2025-06-23" },
+    { "claim": "Fetch and popstate support same-document navigation with history restoration", "class": "pattern", "pub_date": "2025-08-01" }
+  ]
+}

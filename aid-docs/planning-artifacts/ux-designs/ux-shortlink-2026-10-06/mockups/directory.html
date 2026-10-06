@@ -1,0 +1,156 @@
+<!doctype html>
+<!-- Illustrative offline mock; DESIGN.md (Brand & Style, Colors, Typography, Layout & Spacing, Components) and EXPERIENCE.md (Information Architecture, Component Patterns, State Patterns, Accessibility Floor, Responsive & Platform, Key Flows) govern. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Links · Short links</title>
+  <style>
+    :root{color-scheme:light;--bg:#fafafa;--panel:#fff;--ink:#171717;--muted:#555555;--line:#dedede;--accent:#1755a0;--script:#875000;--wash:#f0f2f4}
+    @media(prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#000000;--panel:#0d0d0d;--ink:#f2f2f2;--muted:#aaaaaa;--line:#303030;--accent:#9ac6ff;--script:#ffcb86;--wash:#191919}}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100svh;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);font:16px/1.55 ui-sans-serif,system-ui,-apple-system,sans-serif}
+    ::selection{background:var(--accent);color:var(--bg)}
+    a{color:var(--accent);text-underline-offset:.22em}
+    a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+    button,input{font:inherit}
+    button{cursor:pointer}
+    .wrap{width:100%;max-width:1160px;margin-inline:auto;padding-inline:clamp(1rem,3vw,2.5rem)}
+    .head-inner{min-height:64px;display:flex;align-items:center;gap:1.5rem;padding-block:.65rem}
+    .brand{color:var(--ink);font-size:1.2rem;font-weight:700;letter-spacing:-.035em;text-decoration:none;line-height:1}
+    .nav{display:flex;gap:1.5rem;align-items:center;margin-left:auto}
+    .nav a{color:var(--muted);font-size:.9rem;text-decoration:none}
+    .nav a[aria-current=page]{color:var(--ink);text-decoration:underline;text-decoration-color:var(--accent);text-underline-offset:.45em}
+    .nav a:hover{color:var(--accent)}
+    .control{border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink);padding:.35rem .7rem;font-size:.85rem;white-space:nowrap}
+    .control:hover{background:var(--wash)}
+    main{flex:1;padding-top:clamp(1.5rem,3vw,2.5rem);padding-bottom:4rem}
+    .directory-tools{display:flex;justify-content:space-between;align-items:center;gap:1.5rem;margin-bottom:1.4rem}
+    h1{font-size:clamp(1.8rem,3vw,2.4rem);line-height:1.2;letter-spacing:-.035em;margin:0;font-variant-numeric:tabular-nums}
+    .tools-right{display:flex;align-items:center;justify-content:flex-end;gap:.65rem;min-width:0}
+    .search{width: min(330px, 34vw);min-width:0}
+    .search input{display:block;width:100%;padding:.45rem .7rem;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--ink);caret-color:var(--accent)}
+    .search input::placeholder{color:var(--muted)}
+    .toggles{display:flex;align-items:center;gap:.5rem}
+    .links{list-style:none;margin:0;padding:0}
+    .links li{padding:.65rem 0;min-width:0}
+    .links .links{margin:.35rem 0 0 .75rem;padding-left:1rem}
+    summary{cursor:pointer;color:var(--ink);font-weight:600}
+    summary a{color:inherit;text-decoration:none}
+    summary a:hover{text-decoration:underline}
+    .link-row{display:grid;grid-template-columns:max-content minmax(0,1fr) max-content;gap:1rem;align-items:center}
+    .link-row.script-row{grid-template-columns:max-content minmax(0,1fr) max-content max-content}
+    .code{font:600 .94rem/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;text-decoration:none;white-space:nowrap}
+    .code:hover,.destination:hover{text-decoration:underline}
+    .script-link,.download{color:var(--script)}
+    .script-label{font:600 .7rem/1.5 ui-sans-serif,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.04em;margin-left:.5rem}
+    .destination{min-width:0;display:flex;color:var(--muted);font-size:.85rem;white-space:nowrap;text-decoration:none}
+    .destination:hover{color:var(--accent)}
+    .destination-start{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .destination-end{flex-shrink:0;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .visit,.download{border:1px solid var(--line);border-radius:4px;padding:.2rem .55rem;text-decoration:none;font-size:.85rem;white-space:nowrap}
+    .visit:hover,.download:hover{background:var(--wash)}
+    .tags{display:block;color:var(--muted);font-size:.78rem;margin-top:.2rem}
+    .footer{padding-block:1.5rem;color:var(--muted);font-size:.87rem}
+    .footer .wrap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+    .footer p{margin:0}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    @media(max-width:740px){
+      .head-inner{flex-wrap:wrap;gap:.75rem}.nav{gap:1rem}
+      .directory-tools{align-items:stretch;flex-direction:column;gap:1rem}
+      .tools-right{width:100%;justify-content:flex-start;flex-wrap:wrap}
+      .search{width:100%}
+      .link-row,.link-row.script-row{grid-template-columns:minmax(0,1fr) auto auto;gap:.4rem .5rem}
+      .code{grid-column:1/-1}.destination{grid-column:1}.visit{grid-column:3}.download{grid-column:2}
+      .footer .wrap{display:block}.footer p+p{margin-top:.5rem}
+    }
+  </style>
+</head>
+<body>
+  <header class="site-head"><div class="wrap head-inner">
+    <a class="brand" href="./">shortlink</a>
+    <nav class="nav" aria-label="Main navigation"><a href="./" aria-current="page">Links</a><a href="guide/">Guide</a></nav>
+    <button class="control" type="button" aria-label="Change color theme">Theme: system</button>
+  </div></header>
+  <main class="wrap">
+    <section aria-label="Links">
+      <div class="directory-tools">
+        <h1 aria-live="polite" aria-atomic="true">25 links</h1>
+        <div class="tools-right">
+          <div class="search"><label class="sr-only" for="link-search">Search links</label><input id="link-search" type="search" placeholder="Search link, title or tag" autocomplete="off"></div>
+          <div class="toggles"><button class="control" type="button" aria-pressed="false">Show hidden links</button></div>
+        </div>
+      </div>
+      <ul class="links">
+        <li><details><summary><a href="./dev.tools/">dev.tools</a></summary>
+          <ul class="links">
+            <li><details><summary><a href="./dev.tools/editors/">editors</a></summary>
+              <ul class="links">
+                <li><div class="link-row" title="Visual Studio Code"><a class="code" href="./dev.tools/editors/VS_Code/" title="Visual Studio Code">VS_Code</a><a class="destination" href="https://code.visualstudio.com/" aria-label="Copy destination: https://code.visualstudio.com/" title="https://code.visualstudio.com/"><span class="destination-start" aria-hidden="true">https://code.visualstudio.com/</span></a><a class="visit" href="https://code.visualstudio.com/" aria-label="Open destination for VS_Code">Open</a></div><span class="tags">#editor · #development</span></li>
+                <li><div class="link-row"><a class="code" href="./dev.tools/editors/Neovim/">Neovim</a><a class="destination" href="https://neovim.io/" aria-label="Copy destination: https://neovim.io/" title="https://neovim.io/"><span class="destination-start" aria-hidden="true">https://neovim.io/</span></a><a class="visit" href="https://neovim.io/" aria-label="Open destination for Neovim">Open</a></div></li>
+                <li><div class="link-row"><a class="code" href="./dev.tools/editors/emacs/">emacs</a><a class="destination" href="https://www.gnu.org/software/emacs/" aria-label="Copy destination: https://www.gnu.org/software/emacs/" title="https://www.gnu.org/software/emacs/"><span class="destination-start" aria-hidden="true">https://www.gnu.org/software/</span><span class="destination-end" aria-hidden="true">emacs/</span></a><a class="visit" href="https://www.gnu.org/software/emacs/" aria-label="Open destination for emacs">Open</a></div></li>
+              </ul>
+            </details></li>
+            <li><div class="link-row" title="Pro Git book"><a class="code" href="./dev.tools/git-guide/" title="Pro Git book">git-guide</a><a class="destination" href="https://git-scm.com/book/en/v2" aria-label="Copy destination: https://git-scm.com/book/en/v2" title="https://git-scm.com/book/en/v2"><span class="destination-start" aria-hidden="true">https://git-scm.com/book/en/</span><span class="destination-end" aria-hidden="true">v2</span></a><a class="visit" href="https://git-scm.com/book/en/v2" aria-label="Open destination for git-guide">Open</a></div><span class="tags">#documentation · #git</span></li>
+            <li><div class="link-row"><a class="code" href="./dev.tools/git-cli/">git-cli</a><a class="destination" href="https://git-scm.com/" aria-label="Copy destination: https://git-scm.com/" title="https://git-scm.com/"><span class="destination-start" aria-hidden="true">https://git-scm.com/</span></a><a class="visit" href="https://git-scm.com/" aria-label="Open destination for git-cli">Open</a></div></li>
+            <li><details><summary><a href="./dev.tools/languages/">languages</a></summary>
+              <ul class="links">
+                <li><div class="link-row"><a class="code" href="./dev.tools/languages/Go/">Go</a><a class="destination" href="https://go.dev/" aria-label="Copy destination: https://go.dev/" title="https://go.dev/"><span class="destination-start" aria-hidden="true">https://go.dev/</span></a><a class="visit" href="https://go.dev/" aria-label="Open destination for Go">Open</a></div></li>
+                <li><div class="link-row"><a class="code" href="./dev.tools/languages/Node_JS/">Node_JS</a><a class="destination" href="https://nodejs.org/en" aria-label="Copy destination: https://nodejs.org/en" title="https://nodejs.org/en"><span class="destination-start" aria-hidden="true">https://nodejs.org/en</span></a><a class="visit" href="https://nodejs.org/en" aria-label="Open destination for Node_JS">Open</a></div></li>
+                <li><div class="link-row"><a class="code" href="./dev.tools/languages/Python/">Python</a><a class="destination" href="https://www.python.org/" aria-label="Copy destination: https://www.python.org/" title="https://www.python.org/"><span class="destination-start" aria-hidden="true">https://www.python.org/</span></a><a class="visit" href="https://www.python.org/" aria-label="Open destination for Python">Open</a></div></li>
+                <li><div class="link-row"><a class="code" href="./dev.tools/languages/Rust/">Rust</a><a class="destination" href="https://www.rust-lang.org/" aria-label="Copy destination: https://www.rust-lang.org/" title="https://www.rust-lang.org/"><span class="destination-start" aria-hidden="true">https://www.rust-lang.org/</span></a><a class="visit" href="https://www.rust-lang.org/" aria-label="Open destination for Rust">Open</a></div></li>
+              </ul>
+            </details></li>
+            <li><details><summary><a href="./dev.tools/source/">source</a></summary>
+              <ul class="links">
+                <li><div class="link-row"><a class="code" href="./dev.tools/source/gh-cli/">gh-cli</a><a class="destination" href="https://cli.github.com/" aria-label="Copy destination: https://cli.github.com/" title="https://cli.github.com/"><span class="destination-start" aria-hidden="true">https://cli.github.com/</span></a><a class="visit" href="https://cli.github.com/" aria-label="Open destination for gh-cli">Open</a></div></li>
+                <li><div class="link-row"><a class="code" href="./dev.tools/source/git-hosting/">git-hosting</a><a class="destination" href="https://github.com/features" aria-label="Copy destination: https://github.com/features" title="https://github.com/features"><span class="destination-start" aria-hidden="true">https://github.com/</span><span class="destination-end" aria-hidden="true">features</span></a><a class="visit" href="https://github.com/features" aria-label="Open destination for git-hosting">Open</a></div></li>
+              </ul>
+            </details></li>
+          </ul>
+        </details></li>
+        <li><div class="link-row" title="GitHub Pages docs"><a class="code" href="./docs/" title="GitHub Pages docs">docs</a><a class="destination" href="https://docs.github.com/en/pages" aria-label="Copy destination: https://docs.github.com/en/pages" title="https://docs.github.com/en/pages"><span class="destination-start" aria-hidden="true">https://docs.github.com/en/</span><span class="destination-end" aria-hidden="true">pages</span></a><a class="visit" href="https://docs.github.com/en/pages" aria-label="Open destination for docs">Open</a></div><span class="tags">#documentation · #github</span></li>
+        <li><div class="link-row"><a class="code" href="./gh/">gh</a><a class="destination" href="https://github.com/" aria-label="Copy destination: https://github.com/" title="https://github.com/"><span class="destination-start" aria-hidden="true">https://github.com/</span></a><a class="visit" href="https://github.com/" aria-label="Open destination for gh">Open</a></div></li>
+        <li><div class="link-row" title="PowerShell Gallery"><a class="code" href="./psgallery/" title="PowerShell Gallery">psgallery</a><a class="destination" href="https://www.powershellgallery.com/" aria-label="Copy destination: https://www.powershellgallery.com/" title="https://www.powershellgallery.com/"><span class="destination-start" aria-hidden="true">https://www.powershellgallery.com/</span></a><a class="visit" href="https://www.powershellgallery.com/" aria-label="Open destination for psgallery">Open</a></div></li>
+        <li><details><summary><a href="./references/">references</a></summary>
+          <ul class="links">
+            <li><details><summary><a href="./references/platforms/">platforms</a></summary>
+              <ul class="links">
+                <li><div class="link-row"><a class="code" href="./references/platforms/github-actions/">github-actions</a><a class="destination" href="https://docs.github.com/en/actions" aria-label="Copy destination: https://docs.github.com/en/actions" title="https://docs.github.com/en/actions"><span class="destination-start" aria-hidden="true">https://docs.github.com/en/</span><span class="destination-end" aria-hidden="true">actions</span></a><a class="visit" href="https://docs.github.com/en/actions" aria-label="Open destination for github-actions">Open</a></div></li>
+                <li><div class="link-row"><a class="code" href="./references/platforms/github-pages/">github-pages</a><a class="destination" href="https://docs.github.com/en/pages/getting-started-with-github-pages" aria-label="Copy destination: https://docs.github.com/en/pages/getting-started-with-github-pages" title="https://docs.github.com/en/pages/getting-started-with-github-pages"><span class="destination-start" aria-hidden="true">https://docs.github.com/en/pages/</span><span class="destination-end" aria-hidden="true">getting-started-with-github-pages</span></a><a class="visit" href="https://docs.github.com/en/pages/getting-started-with-github-pages" aria-label="Open destination for github-pages">Open</a></div></li>
+                <li><div class="link-row"><a class="code" href="./references/platforms/node-docs/">node-docs</a><a class="destination" href="https://nodejs.org/en/docs" aria-label="Copy destination: https://nodejs.org/en/docs" title="https://nodejs.org/en/docs"><span class="destination-start" aria-hidden="true">https://nodejs.org/en/</span><span class="destination-end" aria-hidden="true">docs</span></a><a class="visit" href="https://nodejs.org/en/docs" aria-label="Open destination for node-docs">Open</a></div></li>
+              </ul>
+            </details></li>
+            <li><details><summary><a href="./references/standards/">standards</a></summary>
+              <ul class="links">
+                <li><div class="link-row"><a class="code" href="./references/standards/accessibility/">accessibility</a><a class="destination" href="https://www.w3.org/WAI/fundamentals/accessibility-intro/" aria-label="Copy destination: https://www.w3.org/WAI/fundamentals/accessibility-intro/" title="https://www.w3.org/WAI/fundamentals/accessibility-intro/"><span class="destination-start" aria-hidden="true">https://www.w3.org/WAI/fundamentals/</span><span class="destination-end" aria-hidden="true">accessibility-intro/</span></a><a class="visit" href="https://www.w3.org/WAI/fundamentals/accessibility-intro/" aria-label="Open destination for accessibility">Open</a></div></li>
+                <li><div class="link-row"><a class="code" href="./references/standards/yaml-1.2/">yaml-1.2</a><a class="destination" href="https://yaml.org/spec/1.2.2/" aria-label="Copy destination: https://yaml.org/spec/1.2.2/" title="https://yaml.org/spec/1.2.2/"><span class="destination-start" aria-hidden="true">https://yaml.org/spec/</span><span class="destination-end" aria-hidden="true">1.2.2/</span></a><a class="visit" href="https://yaml.org/spec/1.2.2/" aria-label="Open destination for yaml-1.2">Open</a></div></li>
+              </ul>
+            </details></li>
+            <li><details><summary><a href="./references/web/">web</a></summary>
+              <ul class="links">
+                <li><div class="link-row"><a class="code" href="./references/web/css/">css</a><a class="destination" href="https://developer.mozilla.org/en-US/docs/Web/CSS" aria-label="Copy destination: https://developer.mozilla.org/en-US/docs/Web/CSS" title="https://developer.mozilla.org/en-US/docs/Web/CSS"><span class="destination-start" aria-hidden="true">https://developer.mozilla.org/en-US/docs/Web/</span><span class="destination-end" aria-hidden="true">CSS</span></a><a class="visit" href="https://developer.mozilla.org/en-US/docs/Web/CSS" aria-label="Open destination for css">Open</a></div></li>
+                <li><div class="link-row"><a class="code" href="./references/web/html/">html</a><a class="destination" href="https://developer.mozilla.org/en-US/docs/Web/HTML" aria-label="Copy destination: https://developer.mozilla.org/en-US/docs/Web/HTML" title="https://developer.mozilla.org/en-US/docs/Web/HTML"><span class="destination-start" aria-hidden="true">https://developer.mozilla.org/en-US/docs/Web/</span><span class="destination-end" aria-hidden="true">HTML</span></a><a class="visit" href="https://developer.mozilla.org/en-US/docs/Web/HTML" aria-label="Open destination for html">Open</a></div></li>
+                <li><div class="link-row"><a class="code" href="./references/web/http/">http</a><a class="destination" href="https://developer.mozilla.org/en-US/docs/Web/HTTP" aria-label="Copy destination: https://developer.mozilla.org/en-US/docs/Web/HTTP" title="https://developer.mozilla.org/en-US/docs/Web/HTTP"><span class="destination-start" aria-hidden="true">https://developer.mozilla.org/en-US/docs/Web/</span><span class="destination-end" aria-hidden="true">HTTP</span></a><a class="visit" href="https://developer.mozilla.org/en-US/docs/Web/HTTP" aria-label="Open destination for http">Open</a></div></li>
+                <li><div class="link-row"><a class="code" href="./references/web/javascript/">javascript</a><a class="destination" href="https://developer.mozilla.org/en-US/docs/Web/JavaScript" aria-label="Copy destination: https://developer.mozilla.org/en-US/docs/Web/JavaScript" title="https://developer.mozilla.org/en-US/docs/Web/JavaScript"><span class="destination-start" aria-hidden="true">https://developer.mozilla.org/en-US/docs/Web/</span><span class="destination-end" aria-hidden="true">JavaScript</span></a><a class="visit" href="https://developer.mozilla.org/en-US/docs/Web/JavaScript" aria-label="Open destination for javascript">Open</a></div></li>
+                <li><div class="link-row"><a class="code" href="./references/web/mdn/">mdn</a><a class="destination" href="https://developer.mozilla.org/" aria-label="Copy destination: https://developer.mozilla.org/" title="https://developer.mozilla.org/"><span class="destination-start" aria-hidden="true">https://developer.mozilla.org/</span></a><a class="visit" href="https://developer.mozilla.org/" aria-label="Open destination for mdn">Open</a></div><span class="tags">#documentation · #web</span></li>
+              </ul>
+            </details></li>
+          </ul>
+        </details></li>
+        <li><details open><summary><a href="./setup/">setup</a></summary>
+          <ul class="links">
+            <li><details open><summary><a href="./setup/ohmyposh/">ohmyposh</a></summary>
+              <ul class="links">
+                <li><div class="link-row script-row"><a class="code script-link" href="./setup/ohmyposh/stable/">stable<span class="script-label">script</span></a><a class="destination" href="https://raw.githubusercontent.com/ratrat64/homelab-public/9a32b5a83044bbbb0f7b01a7b76bb5e929950b80/scripts/ubuntu/oh-my-posh/setup.sh" aria-label="Copy destination: https://raw.githubusercontent.com/ratrat64/homelab-public/9a32b5a83044bbbb0f7b01a7b76bb5e929950b80/scripts/ubuntu/oh-my-posh/setup.sh" title="https://raw.githubusercontent.com/ratrat64/homelab-public/9a32b5a83044bbbb0f7b01a7b76bb5e929950b80/scripts/ubuntu/oh-my-posh/setup.sh"><span class="destination-start" aria-hidden="true">https://raw.githubusercontent.com/ratrat64/homelab-public/9a32b5a83044bbbb0f7b01a7b76bb5e929950b80/scripts/ubuntu/</span><span class="destination-end" aria-hidden="true">oh-my-posh/setup.sh</span></a><a class="download" href="./setup/ohmyposh/stable.sh" aria-label="Download script for stable" download>Download</a><a class="visit" href="https://raw.githubusercontent.com/ratrat64/homelab-public/9a32b5a83044bbbb0f7b01a7b76bb5e929950b80/scripts/ubuntu/oh-my-posh/setup.sh" aria-label="Open destination for stable">Open</a></div><span class="tags">#shell · #setup</span></li>
+              </ul>
+            </details></li>
+          </ul>
+        </details></li>
+      </ul>
+    </section>
+  </main>
+  <footer class="footer"><div class="wrap"><p>Shortlink</p><p><a href="guide/">Guide</a> · <a href="https://github.com/ratrat64/shortlink#readme">Repository</a></p></div></footer>
+</body>
+</html>

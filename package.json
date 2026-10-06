@@ -1,6 +1,9 @@
 {
   "name": "shortlink",
   "private": true,
+  "scripts": {
+    "dev": "npx --yes node@24 build.mjs && npx --yes http-server@14.1.1 dist -c-1"
+  },
   "dependencies": {
     "yaml": "^2.8.1"
   }

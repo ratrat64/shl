@@ -9,9 +9,9 @@ and How it works sections. The former `/about/` and `/how-it-works/` URLs forwar
 to those sections. It follows the system light/dark preference; visitors
 can override it with the Theme button, saved in their browser.
 Search on the homepage and each directory page filters the listed links by code,
-title, destination, or tag (including nested links). Pages with hidden links have a
-Show hidden links button to include them in listings and search; the homepage
-link count updates too.
+title, destination, or tag (including nested links). Show hidden links includes
+hidden entries in listings and search; the button is disabled where none exist.
+The single link count on each page updates with search and the hidden-links toggle.
 Click a short code to copy its full short URL, or a destination to copy its full URL;
 use **Open** beside the destination to visit it. Without JavaScript, the links
 remain navigable and hidden links stay hidden.
@@ -71,9 +71,12 @@ tools:
 
 This creates browseable `/tools/` and `/tools/editors/` pages and redirect URLs
 `/tools/git/` and `/tools/editors/code/`. The homepage has expandable directories;
-each directory page also lists links and subdirectories. Existing top-level links
-keep their URLs. Directory names are their display labels, and a directory must
-contain at least one entry. A path cannot be both a directory and a redirect.
+each directory page also lists links and subdirectories. With JavaScript, folder
+links, breadcrumbs, and Home navigate without reloading; Back and Forward work too.
+Direct URLs, refreshes, and browsing without JavaScript still use the generated
+pages. Existing top-level links keep their URLs. Directory names are their display
+labels, and a directory must contain at least one entry. A path cannot be both a
+directory and a redirect.
 The checked-in `links.yaml` includes flat and nested examples, optional titles,
 `script: true` and `script: false`, and codes using dots, underscores and hyphens.
 Directories without visible descendants are hidden in parent listings by default,
@@ -163,12 +166,12 @@ From the repository root, run (requires npm; tests also require Bash):
 
 ```bash
 npm ci
-npx --yes node@24 build.mjs
-npx serve dist -c ../config/serve.json
+npm run dev
 ```
 
-Open the URL printed by `serve` (usually `http://localhost:3000/`). The
-`serve.json` config keeps dotted directory names such as `/dev.tools/` working.
+Open the URL printed by `http-server` (usually `http://localhost:8080/`). The
+preview server supports dotted directory names such as `/dev.tools/`. Restart
+`npm run dev` after editing the link map to rebuild the site.
 To run the regression checks: `npx --yes node@24 --test test/build.test.mjs`.
 
 A successful build replaces `dist/` completely; edit the templates in

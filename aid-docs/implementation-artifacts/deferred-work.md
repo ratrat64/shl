@@ -7,3 +7,6 @@
 - source_spec: `aid-docs/implementation-artifacts/spec-organize-project-root.md`
   summary: Investigate local serve preview of dotted directory paths.
   evidence: Both before and after the file move, `serve` returns a directory listing for `/dev.tools/` while `/dev.tools/index.html` returns the generated directory page; build/test routing does not exercise the preview server.
+- source_spec: `aid-docs/implementation-artifacts/spec-local-preview-command.md`
+  summary: Update AGENTS.md local preview instructions to use the working npm command.
+  evidence: AGENTS.md still recommends `serve` and claims its `cleanUrls: false` setting preserves dotted directory pages, but that command serves directory listings instead of generated pages.
