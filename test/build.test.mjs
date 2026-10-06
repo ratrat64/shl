@@ -219,7 +219,7 @@ test('folder navigation swaps generated pages, restores history, and falls back 
   const initialized = [];
   const listeners = {};
   const document = {
-    title: 'Links · Short links',
+    title: 'Links · shl',
     currentMain: main(pages.get(location.href), location.href),
     querySelector(selector) { return selector === '.brand' ? brand : selector === 'main' ? this.currentMain : null; },
     querySelectorAll() { return [brand, guide]; },
@@ -258,7 +258,7 @@ test('folder navigation swaps generated pages, restores history, and falls back 
   assert.equal(await click(folder('/tools/'), { ctrlKey: true }), false);
   assert.equal(await click(folder('/tools/')), true);
   assert.equal(location.pathname, '/project/tools/');
-  assert.equal(document.title, 'tools · Short links');
+  assert.equal(document.title, 'tools · shl');
   assert.equal(document.currentMain.heading.focused, true);
   assert.equal(folder('/tools/git/').href, 'https://short.example/project/tools/git/');
   assert.equal(guide.href, 'https://short.example/project/guide/');
@@ -275,17 +275,17 @@ test('folder navigation swaps generated pages, restores history, and falls back 
   listeners.popstate();
   release();
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(document.title, 'editors · Short links'); // A late Back response cannot replace the Forward page.
+  assert.equal(document.title, 'editors · shl'); // A late Back response cannot replace the Forward page.
   heldUrl = null;
   location.href = 'https://short.example/project/tools/';
   listeners.popstate();
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(document.title, 'tools · Short links');
+  assert.equal(document.title, 'tools · shl');
   assert.equal(window.scrollY, 250);
   location.href = 'https://short.example/project/';
   listeners.popstate();
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(document.title, 'Links · Short links');
+  assert.equal(document.title, 'Links · shl');
   assert.equal(await click(folder('/hidden/')), true);
   assert.equal(initialized.length, 10); // Search and copy also initialize on hidden-only pages.
   assert.equal(await click(makeLink('https://short.example/project/tools/git/')), true);
@@ -713,25 +713,42 @@ test('information pages use relative navigation and shared theme assets', async 
   const f = await fixture(t, { aboutme: 'https://example.org/' });
   assert.equal(f.build().status, 0);
   const home = await f.read('index.html');
+  assert.match(home, /<title>Links · shl<\/title>/);
+  assert.match(home, /class="brand" href="\.\/" data-directory-link>shl<\/a>/);
+  assert.match(home, /<footer class="footer">[\s\S]*?<p>shl<\/p>/);
   assert.match(home, /href="\.\/assets\/site\.css"/);
   assert.match(home, /href="\.\/guide\/"/);
   assert.doesNotMatch(home, /href="\.\/about\/"|Simple by design|Good links/);
   for (const page of ['about', 'guide', 'how-it-works']) {
     const html = await f.read(`${page}/index.html`);
     if (page === 'guide') {
+      assert.match(html, /<title>Guide · shl<\/title>/);
+      assert.match(html, /<p>shl publishes a public directory/);
       assert.match(html, /href="\.\.\/assets\/site\.css"/);
       assert.match(html, /src="\.\.\/assets\/theme\.js"/);
       assert.match(html, /href="\.\.\/"/);
       for (const section of ['about', 'how-to-use', 'how-it-works']) assert.match(html, new RegExp(`id="${section}"`));
     } else {
+      assert.match(html, /<title>Guide · shl<\/title>/);
       assert.match(html, new RegExp(`url=\\.\\.\\/guide\\/#${page}`));
     }
   }
   assert.match(await f.read('assets/site.css'), /data-theme=dark/);
   assert.match(await f.read('assets/site.css'), /--bg:#000/);
-  assert.match(await f.read('assets/theme.js'), /shortlink-theme/);
+  const theme = await f.read('assets/theme.js');
+  assert.match(theme, /shortlink-theme/);
+  const button = { addEventListener() {} };
+  const root = { dataset: {} };
+  runInNewContext(theme, {
+    document: { documentElement: root, querySelector: () => button },
+    localStorage: { getItem: (key) => { assert.equal(key, 'shortlink-theme'); return 'dark'; } },
+  });
+  assert.equal(root.dataset.theme, 'dark');
+  assert.equal(button.textContent, 'Theme: dark');
   assert.match(await f.read('guide/index.html'), /github\.com\/ratrat64\/shortlink#readme/);
   assert.match(await f.read('guide/index.html'), /tags: \[documentation, github\]/);
+  assert.match(await f.read('aboutme/index.html'), /<title>Redirecting · shl<\/title>/);
+  assert.match(await f.read('404.html'), /<title>Link not found · shl<\/title>/);
 });
 
 test('redirect script safely preserves destinations containing HTML and quotes', async (t) => {

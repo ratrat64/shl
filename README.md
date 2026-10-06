@@ -1,4 +1,4 @@
-# Short links
+# shl
 
 A URL shortener that runs entirely on GitHub Pages. A JSON or YAML link map is
 the source of truth; a build step turns each entry into a static folder with an
@@ -23,9 +23,10 @@ remain navigable and hidden links stay hidden.
 2. Settings → Pages → **Source: GitHub Actions**.
 3. Edit your link file with your links on a branch and open a pull request to `main`.
    Once checks pass, merge it. The deployment workflow checks, builds, and deploys.
-   Wait for **Actions → Deploy short links** to finish.
+   Wait for **Actions → Deploy shl** to finish.
 
-Your links live at `https://<user>.github.io/<repo>/<code>`. Want bare
+Your links live at `https://<user>.github.io/<repo>/<code>`; the path follows
+your repository name (for example, `/shl/` if you name it `shl`). Want bare
 `go.example.com/<code>`? Add a root `CNAME` file containing only `go.example.com`
 (no scheme or path); the build copies it into `dist/`. Point that subdomain's DNS
 CNAME record at `<user>.github.io`, set the custom domain in Settings → Pages,
@@ -112,27 +113,28 @@ the 404 handler. Hiding controls discoverability, not secrecy.
 
 Set `script: true` in YAML (or `"script": true` in JSON) to generate an
 additional `<path>.sh` launcher alongside its browser redirect, including in
-nested directories:
+nested directories. The checked-in `links.yaml` includes:
 
 ```yaml
-ohmyposh-setup-stable:
-  url: https://raw.githubusercontent.com/ratrat64/homelab-public/refs/heads/main/scripts/ubuntu/oh-my-posh/setup.sh
-  script: true
+setup:
+  ohmyposh:
+    stable:
+      url: https://raw.githubusercontent.com/ratrat64/homelab-public/9a32b5a83044bbbb0f7b01a7b76bb5e929950b80/scripts/ubuntu/oh-my-posh/setup.sh
+      script: true
 ```
 
 After deployment, use the `.sh` URL for remote execution:
 
 ```bash
-curl -fsSL https://ratrat64.github.io/shortlink/ohmyposh-setup-stable.sh | bash
+curl -fsSL https://your-user.github.io/shl/setup/ohmyposh/stable.sh | bash
 
 # Arguments are forwarded to the destination script:
-curl -fsSL https://ratrat64.github.io/shortlink/ohmyposh-setup-stable.sh | bash -s -- --verbose
+curl -fsSL https://your-user.github.io/shl/setup/ohmyposh/stable.sh | bash -s -- --verbose
 ```
 
 Use the full link path's exact casing, with `.sh` and **no trailing slash**. The browser
 URL ending in `/<path>/` returns HTML, which `curl -L` cannot follow.
-The checked-in `scripts/ohmyposh-setup` entry also demonstrates a nested launcher
-at `/scripts/ohmyposh-setup.sh`.
+This example is the nested launcher at `/setup/ohmyposh/stable.sh`.
 
 Launchers require Bash, curl, mktemp, and rm. Each run downloads the current
 destination into a temporary file, executes it only after a successful download,
