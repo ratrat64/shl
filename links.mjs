@@ -77,6 +77,10 @@ export async function loadLinks() {
       if (typeof value === 'object' && value && 'hidden' in value && typeof value.hidden !== 'boolean') {
         problems.push(`"${name}" — hidden must be a boolean`);
       }
+      if (typeof value === 'object' && value && 'tags' in value &&
+          (!Array.isArray(value.tags) || value.tags.some((tag) => typeof tag !== 'string' || !tag.trim()))) {
+        problems.push(`"${name}" — tags must be an array of nonblank strings`);
+      }
       try {
         if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) throw new Error();
         const parsed = new URL(url);
