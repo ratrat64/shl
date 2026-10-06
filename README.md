@@ -147,13 +147,13 @@ short code or directory in the same folder, regardless of casing.
 
 ## Pull request checks
 
-Every pull request targeting `main` runs **Check pull request**, using Node.js 24
-on Ubuntu. The **PR validation** job runs `node --test test/build.test.mjs` followed by
-`node build.mjs`: tests cover regression cases, and the build validates the proposed
+Every pull request targeting `main` runs **Check pull request**, using Bun 1.4.2
+on Ubuntu. The **PR validation** job runs `bun ci`, `bun test ./test/build.test.mjs`,
+then `bun build.mjs`: tests cover regression cases, and the build validates the proposed
 link file. New commits rerun checks and cancel older runs for the same PR.
 PR checks have read-only repository permissions and do not deploy the site.
 For PRs changing only `AGENTS.md`, the required job succeeds without running
-Node.js tests or a build; mixed changes still run both.
+Bun tests or a build; mixed changes still run both.
 
 For your own repository, configure an active branch ruleset under **Settings →
 Rules → Rulesets**, targeting `main`. Require a pull request and the **PR validation**
@@ -164,25 +164,30 @@ Merging to `main` triggers the existing production deployment.
 
 ## Run locally
 
-From the repository root, run (requires npm; tests also require Bash):
+Install [Bun 1.4.2](https://bun.com/docs/installation) and check with
+`bun --version`. From the repository root, run (tests also require Bash):
 
 ```bash
-npm ci
-npm run dev
+bun ci
+bun run dev
 ```
 
 Open the URL printed by `http-server` (usually `http://localhost:8080/`). The
 preview server supports dotted directory names such as `/dev.tools/`. Restart
-`npm run dev` after editing the link map to rebuild the site.
-To run the regression checks: `npx --yes node@24 --test test/build.test.mjs`.
+`bun run dev` after editing the link map to rebuild the site.
+To run the regression checks: `bun run test`. To build
+without starting the preview server: `bun build.mjs`.
+
+To return to Node.js 24 if the Bun workflow fails, revert the Bun migration
+commit to restore the npm lockfile and Node-based CI commands together.
 
 A successful build replaces `dist/` completely; edit the templates in
 `src/pages.mjs`, input validation in `src/links.mjs`, and output generation in
 `src/build.mjs`, not the generated files. Validation fails before the old
 output is removed. URL syntax is checked, but destination reachability is not.
 
-For a focused check: `node --test --test-name-pattern="404" test/build.test.mjs`.
-The checks execute generated JavaScript in Node with simulated browser APIs,
+For a focused check: `bun test --test-name-pattern="404" ./test/build.test.mjs`.
+The checks execute generated JavaScript in Bun with simulated browser APIs,
 and Bash launchers with a stubbed downloader.
 After deploying, smoke-test a known code, a wrong-case code (with and without a
 trailing slash), and an unknown code in a browser. Repeat under a project prefix

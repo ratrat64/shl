@@ -30,16 +30,16 @@ jobs:
           else
             echo 'run_checks=true' >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/setup-node@v7.0.0
+      - uses: oven-sh/setup-bun@v2
         if: steps.changes.outputs.run_checks == 'true'
         with:
-          node-version: 24
+          bun-version: 1.4.2
       - name: Install dependencies
         if: steps.changes.outputs.run_checks == 'true'
-        run: npm ci
+        run: bun ci
       - name: Test
         if: steps.changes.outputs.run_checks == 'true'
-        run: node --test test/build.test.mjs
+        run: bun test --timeout 30000 ./test/build.test.mjs
       - name: Build
         if: steps.changes.outputs.run_checks == 'true'
-        run: node build.mjs
+        run: bun build.mjs

@@ -19,14 +19,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
-      - uses: actions/setup-node@v7.0.0
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: 24
+          bun-version: 1.4.2
       - uses: actions/configure-pages@v6.0.0
       - name: Install dependencies
-        run: npm ci
+        run: bun ci
       - name: Build
-        run: node build.mjs
+        run: bun build.mjs
       - uses: actions/upload-pages-artifact@v5.0.0
         with:
           path: dist
