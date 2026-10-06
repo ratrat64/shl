@@ -1,0 +1,6 @@
+[
+  {"claim":"Deno published Node API compatibility list (updated July 30)","class":"compatibility","pub_date":"2026-07-30"},
+  {"claim":"Bun and Deno observed local build and test compatibility (not vendor publication)","class":"compatibility","pub_date":"2026-10-06"},
+  {"claim":"Deno CI documentation (updated June 14)","class":"integration","pub_date":"2026-06-14"},
+  {"claim":"Node 24 LTS release schedule (last update Sep 7)","class":"ecosystem","pub_date":"2026-09-07"}
+]
