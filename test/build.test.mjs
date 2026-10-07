@@ -825,13 +825,19 @@ test('search filters nested links on the homepage and directory pages', async (t
   assert.equal(tools.firstElementChild.open, true);
 });
 
-test('inline tags keep row height and usable tag/destination targets on narrow script rows', async (t) => {
+test('directory highlights match, full inline tags stay compact, and destinations reveal without shifting rows', async (t) => {
   const chrome = availableChrome(t);
   if (!chrome) return;
   const f = await fixture(t, {
     example: { url: 'https://example.com/setup.sh', script: true, tags: ['documentation', 'a-very-long-tag-for-disclosure'] },
     'long-script-code': { url: 'https://example.com/setup.sh', script: true, tags: ['shell'] },
     plain: { url: 'https://example.com/plain', tags: ['reference'] },
+    folder: { nested: { url: 'https://example.com/a/very/long/path/to/setup.sh', tags: ['nested'] } },
+    ['long-folder-'.repeat(12)]: { plain: 'https://example.com/folder' },
+    ['long-code-'.repeat(12)]: 'https://example.com/plain',
+    ['long-script-'.repeat(12)]: { url: 'https://example.com/setup.sh', script: true },
+    private: { url: 'https://example.com/private', hidden: true },
+    hiddenFolder: { private: { url: 'https://example.com/private', hidden: true } },
   });
   assert.equal(f.build().status, 0);
   await writeFile(join(f.cwd, 'dist', 'layout-check.html'), `<!doctype html><html><body><iframe src="index.html" style="width:390px;height:700px;border:0"></iframe><script>
@@ -839,15 +845,75 @@ test('inline tags keep row height and usable tag/destination targets on narrow s
       try {
         const frame = event.target;
         const doc = frame.contentDocument;
+        const win = frame.contentWindow;
+        const rules = [...doc.styleSheets].flatMap(sheet => [...sheet.cssRules]);
+        const pointerRule = rules.find(rule => rule.conditionText === '(hover: hover) and (pointer: fine)');
+        const coarseRule = rules.find(rule => rule.conditionText === '(any-pointer: coarse)');
+        if (!pointerRule || !coarseRule) throw new Error('Missing input-mode visibility rules');
+        // Reuse the real selectors while forcing hover and input modes in the dump-DOM harness.
+        const hover = doc.createElement('style');
+        hover.textContent = [...rules, ...pointerRule.cssRules].filter(rule => rule.selectorText?.includes(':hover')).map(rule => rule.selectorText.replaceAll(':hover', '.verify-hover') + '{' + rule.style.cssText + '}').join('');
+        doc.head.append(hover);
+        doc.querySelector('#hidden-toggle').click();
+        for (const details of doc.querySelectorAll('details')) details.open = true;
+        const summary = doc.querySelector('summary');
         for (const width of [320, 390, 1440]) {
           frame.style.width = width + 'px';
           await new Promise(resolve => setTimeout(resolve, 30));
           for (const theme of ['light', 'dark']) {
             doc.documentElement.dataset.theme = theme;
+            const summaryStyle = win.getComputedStyle(summary);
+            for (const folder of doc.querySelectorAll('summary')) {
+              if (folder.getBoundingClientRect().height !== 50 || win.getComputedStyle(folder).whiteSpace !== 'nowrap') throw new Error('Folder label wrapped or changed height');
+              folder.focus();
+              if (win.getComputedStyle(folder).outlineWidth !== '2px' || win.getComputedStyle(folder).opacity !== '1') throw new Error('Folder focus/opacity failed');
+              folder.blur();
+            }
+            for (const row of doc.querySelectorAll('.link-row')) {
+              const style = win.getComputedStyle(row);
+              if (row.getBoundingClientRect().height !== summary.getBoundingClientRect().height || style.minHeight !== '50px') throw new Error('Unequal highlight heights at ' + width + ': row=' + row.getBoundingClientRect().height + ', summary=' + summary.getBoundingClientRect().height);
+              for (const prop of ['padding', 'borderRadius']) {
+                if (style[prop] !== summaryStyle[prop]) throw new Error('Unequal highlight ' + prop);
+              }
+              if (style.paddingTop !== '10px' || style.paddingBottom !== '10px' || style.paddingLeft !== '12px' || style.paddingRight !== '12px' || style.borderRadius !== '4px') throw new Error('Missing padded rounded highlight');
+              const destination = row.querySelector('.destination');
+              const before = [row.getBoundingClientRect().height, destination.getBoundingClientRect().width];
+              pointerRule.media.mediaText = 'not all';
+              if (win.getComputedStyle(destination).opacity !== '1') throw new Error('Touch/non-hover destination unavailable');
+              pointerRule.media.mediaText = 'all';
+              if (win.getComputedStyle(destination).opacity !== '0' || win.getComputedStyle(destination).pointerEvents !== 'none') throw new Error('Idle desktop destination visible');
+              coarseRule.media.mediaText = 'all';
+              if (win.getComputedStyle(destination).opacity !== '1' || win.getComputedStyle(destination).pointerEvents !== 'auto') throw new Error('Hybrid touch destination unavailable');
+              coarseRule.media.mediaText = 'not all';
+              row.classList.add('verify-hover');
+              const wash = win.getComputedStyle(row).backgroundColor;
+              if (win.getComputedStyle(destination).opacity !== '1' || wash === 'rgba(0, 0, 0, 0)') throw new Error('Hover reveal or wash failed');
+              summary.classList.add('verify-hover');
+              if (win.getComputedStyle(summary).backgroundColor !== wash || win.getComputedStyle(summary.parentElement).backgroundColor !== 'rgba(0, 0, 0, 0)') throw new Error('Folder wash differs or covers descendants');
+              summary.classList.remove('verify-hover');
+              row.classList.remove('verify-hover');
+              row.querySelector('.code').focus();
+              if (win.getComputedStyle(destination).opacity !== '1' || win.getComputedStyle(row).opacity !== '1' || win.getComputedStyle(row).backgroundColor !== wash) throw new Error('Keyboard reveal failed');
+              destination.focus();
+              if (win.getComputedStyle(destination).opacity !== '1' || win.getComputedStyle(destination).outlineWidth !== '2px') throw new Error('Destination focus unavailable');
+              destination.blur();
+              if (win.getComputedStyle(destination).opacity !== '0') throw new Error('Destination did not hide after blur');
+              if (win.getComputedStyle(destination).whiteSpace !== 'nowrap' || JSON.stringify(before) !== JSON.stringify([row.getBoundingClientRect().height, destination.getBoundingClientRect().width])) throw new Error('Reveal shifted or wrapped URL');
+              if (destination.getBoundingClientRect().width < 48) throw new Error('Untagged destination collapsed');
+              if (row.scrollWidth > row.clientWidth) {
+                row.scrollLeft = row.scrollWidth;
+                const action = row.querySelector('.visit').getBoundingClientRect();
+                const bounds = row.getBoundingClientRect();
+                if (action.right > bounds.right || action.left < bounds.left) throw new Error('Overflow action unreachable');
+                row.scrollLeft = 0;
+              }
+            }
             for (const button of doc.querySelectorAll('.tags')) {
               const row = button.closest('li');
               const destination = row.querySelector('.destination');
               if (button.getBoundingClientRect().width < 40 || destination.getBoundingClientRect().width < 40) throw new Error('Collapsed target at ' + width + ' for ' + button.textContent + ': ' + button.getBoundingClientRect().width + '/' + destination.getBoundingClientRect().width);
+              const tagStyle = win.getComputedStyle(button);
+              if (tagStyle.maxWidth !== 'none' || tagStyle.whiteSpace !== 'nowrap' || button.scrollWidth > button.clientWidth) throw new Error('Tags are capped or truncated at ' + width);
               const before = row.getBoundingClientRect().height;
               const next = button.nextSibling;
               button.remove();
@@ -1423,7 +1489,7 @@ test('script launchers are opt-in, quote URLs, forward arguments and statuses, a
   assert.match(home, /class="code" href="\.\/disabled\/">disabled<\/a>/);
   assert.match(await f.read('assets/site.css'), /--script:#c6a36a/);
   assert.match(await f.read('assets/site.css'), /\.download\{/);
-  assert.match(await f.read('assets/site.css'), /\.link-row\.script-row\{grid-template-columns:max-content minmax\(0,1fr\) max-content max-content\}/);
+  assert.match(await f.read('assets/site.css'), /\.link-row\.script-row\{grid-template-columns:max-content minmax\(4rem,1fr\) max-content max-content\}/);
   assert.match(await f.read('tools/Nested/index.html'), /http-equiv="refresh"/);
   assert.match(await f.read('Run/index.html'), /http-equiv="refresh"/);
   await assert.rejects(f.read('disabled.sh'), { code: 'ENOENT' });
