@@ -37,10 +37,13 @@ jobs:
       - name: Install dependencies
         if: steps.changes.outputs.run_checks == 'true'
         run: bun ci
+      - name: Format sources
+        if: steps.changes.outputs.run_checks == 'true'
+        run: bun run format
       - name: Test
         if: steps.changes.outputs.run_checks == 'true'
         env:
-          SHL_REQUIRE_BROWSER: '1'
+          SHL_REQUIRE_BROWSER: "1"
         run: bun test --timeout 30000 ./test/build.test.mjs
       - name: Build
         if: steps.changes.outputs.run_checks == 'true'

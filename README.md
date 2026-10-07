@@ -155,7 +155,7 @@ short code or directory in the same folder, regardless of casing.
 ## Pull request checks
 
 Every pull request targeting `main` runs **Check pull request**, using Bun 1.4.2
-on Ubuntu. The **PR validation** job runs `bun ci`, `bun test ./test/build.test.mjs`,
+on Ubuntu. The **PR validation** job runs `bun ci`, `bun run format`, `bun test ./test/build.test.mjs`,
 then `bun build.mjs`: tests cover regression cases, and the build validates the proposed
 link file. New commits rerun checks and cancel older runs for the same PR.
 PR checks have read-only repository permissions and do not deploy the site.
@@ -185,13 +185,21 @@ preview server supports dotted directory names such as `/dev.tools/`. Restart
 To run the regression checks: `bun run test`. To build
 without starting the preview server: `bun build.mjs`.
 
+Run `bun run format` to apply pinned Prettier formatting locally, or
+`bun run format:check` to check it without writing. Both CI workflows apply
+formatting with `--write` before tests/build. Formatting covers application
+build/source/test files, workflows, package metadata, and the root link map;
+generated output, vendor files, and planning documents are excluded. HTML stays
+in `.mjs` templates; `/* HTML */` comments enable Prettier's embedded HTML formatter
+without a runtime tag. Preserve output escaping and whitespace inside code samples.
+
 To return to Node.js 24 if the Bun workflow fails, revert the Bun migration
 commit to restore the npm lockfile and Node-based CI commands together.
 
 A successful build replaces `dist/` completely; edit the templates in
 `src/pages.mjs` (Guide, redirects, legacy forwarding, and 404), shared layout in
 `src/layout.mjs`, directory components in `src/directory.mjs`, styles in
-`src/styles.mjs`, browser behaviors and content mounting in `src/browser.mjs`,
+`src/assets/site.css`, browser behaviors and content mounting in `src/assets/*.js`,
 input validation in `src/links.mjs`, and output generation in
 `src/build.mjs`, not the generated files. Validation fails before the old
 output is removed. URL syntax is checked, but destination reachability is not.
@@ -205,7 +213,9 @@ paths cannot break their foundations. Recovery rebases shell links after the
 first readable ancestor map; unavailable maps retain the relative fallback.
 `src/links.mjs` owns validated leaf interpretation and the directory tree used
 for rendering and counts. Shared tokens and control styles have one owner in
-`src/styles.mjs`; content selectors must not change shell appearance. See
+`src/assets/site.css`; `src/styles.mjs` and `src/browser.mjs` load the same CSS and
+theme script relative to their modules for embedding. The build copies native
+assets to `dist/assets/`; content selectors must not change shell appearance. See
 [architecture AD-7–AD-9](aid-docs/planning-artifacts/architecture/architecture-shortlink-2026-10-04/ARCHITECTURE-SPINE.md).
 
 For a focused check: `bun test --test-name-pattern="404" ./test/build.test.mjs`.

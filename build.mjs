@@ -1,2 +1,2 @@
 #!/usr/bin/env bun
-import './src/build.mjs';
+import "./src/build.mjs";
