@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { runInNewContext } from 'node:vm';
+import { createContext, runInContext, runInNewContext } from 'node:vm';
 
 const buildScript = fileURLToPath(new URL('../build.mjs', import.meta.url));
 
@@ -185,7 +185,6 @@ for (const prefix of ['/', '/project/']) test(`app navigation swaps pages, handl
   const base = `https://short.example${prefix}`;
   const pages = new Map(await Promise.all(['', 'guide/', 'tools/', 'tools/editors/', 'hidden/', 'tools/git/'].map(async (path) =>
     [`${base}${path}`, await f.read(`${path}index.html`)])));
-  const script = await f.read('assets/navigation.js');
   assert.match(pages.get(base), /src="\.\/assets\/navigation\.js"/);
   assert.match(pages.get(base + 'tools/'), /src="\.\.\/assets\/navigation\.js"/);
   assert.match(await f.read('guide/index.html'), /navigation\.js/);
@@ -208,10 +207,18 @@ for (const prefix of ['/', '/project/']) test(`app navigation swaps pages, handl
     setAttribute(name, value) { this[name] = value; },
     removeAttribute(name) { delete this[name]; },
   });
+  const anchors = (html, url) => [...html.matchAll(/<a\b([^>]*)>/g)].map((match) => {
+    const attributes = Object.fromEntries([...match[1].matchAll(/([\w-]+)(?:="([^"]*)")?/g)].map((attribute) => [attribute[1], attribute[2] ?? '']));
+    const link = makeLink(attributes.href, url, 'data-app-link' in attributes);
+    link.dataset = Object.fromEntries(Object.entries(attributes).filter(([name]) => name.startsWith('data-')).map(([name, value]) => [name.slice(5), value]));
+    link.hasAttribute = (name) => name in attributes;
+    for (const name of ['class', 'target', 'aria-current']) if (name in attributes) link[name] = attributes[name];
+    return link;
+  });
   const main = (html, url) => {
     const content = html.match(/<main[^>]*>([\s\S]*?)<\/main>/)?.[1] || '';
-    const links = [...content.matchAll(/<a ([^>]*href="([^\"]*)"[^>]*)>/g)].map((match) => makeLink(match[2], url, match[1].includes('data-app-link')));
-    const heading = { focus(options) { this.focused = options.preventScroll; } };
+    const links = anchors(content, url);
+    const heading = content.includes('<h1') ? { focus(options) { this.focused = options.preventScroll; } } : null;
     const ids = [...content.matchAll(/id="([^"]+)"/g)].map((match) => ({ id: match[1], focus(options) { this.focused = options.preventScroll; }, scrollIntoView() { this.scrolled = true; window.scrollY = 400; } }));
     const control = (extra = {}) => ({
       handlers: new Map(), ...extra,
@@ -244,31 +251,41 @@ for (const prefix of ['/', '/project/']) test(`app navigation swaps pages, handl
       replaceWith(next) { document.currentMain = next; },
     };
   };
-  const brand = makeLink('../');
-  const guide = makeLink('../guide/');
-  const linksNav = makeLink('../');
-  guide.dataset.nav = 'guide';
-  linksNav.dataset.nav = 'links';
-  const footerGuide = makeLink('../guide/');
-  const initialized = [];
+  const entryHtml = pages.get(base + 'guide/');
+  const headerHtml = entryHtml.match(/<header\b[^>]*>[\s\S]*?<\/header>/)[0];
+  const footerHtml = entryHtml.match(/<footer\b[^>]*>[\s\S]*?<\/footer>/)[0];
+  const headerLinks = anchors(headerHtml, location.href);
+  const footerLinks = anchors(footerHtml, location.href);
+  const shellLinks = [...headerLinks, ...footerLinks];
+  const hasClass = (html, name) => html.match(/^<\w+\b[^>]*class="([^"]*)"/)?.[1].split(/\s+/).includes(name);
+  const persistentLinks = [...(hasClass(headerHtml, 'site-head') ? headerLinks : []), ...(hasClass(footerHtml, 'footer') ? footerLinks : [])];
+  const brand = headerLinks.find((link) => link.class === 'brand');
+  const guide = headerLinks.find((link) => link.dataset.nav === 'guide');
+  const linksNav = headerLinks.find((link) => link.dataset.nav === 'links');
+  const footerGuide = footerLinks.find((link) => link.app);
+  assert.ok(brand?.app && guide?.app && linksNav?.app && footerGuide?.app, 'generated shell links carry app markers and navigation keys');
+  const themeButton = { addEventListener(name, callback) { this[name] = callback; } };
   const listeners = {};
   const document = {
-    title: 'Guide · shl', scriptsRemoved: 0,
+    title: entryHtml.match(/<title>([^<]+)<\/title>/)[1], scriptsRemoved: 0,
     body: { classList: { toggle(name, on) { document.directory = on; } } },
-    documentElement: { dataset: { theme: 'dark' } },
+    documentElement: { dataset: {} },
     currentMain: main(pages.get(base + 'guide/'), location.href),
-    querySelector(selector) { return selector === '.brand' ? brand : selector === 'main' ? this.currentMain : this.currentMain.querySelector(selector); },
-    querySelectorAll(selector) { return selector === '[data-nav]' ? [linksNav, guide] : [brand, linksNav, guide, footerGuide]; },
+    querySelector(selector) { return selector === '.theme-toggle' ? themeButton : selector === '.brand' ? brand : selector === 'main' ? this.currentMain : this.currentMain.querySelector(selector); },
+    querySelectorAll(selector) { return selector === '[data-nav]' ? shellLinks.filter((link) => link.hasAttribute('data-nav')) : selector === '.site-head a, .footer a' ? persistentLinks : []; },
     addEventListener(name, callback) { listeners[name] = callback; },
   };
   const history = {
     pushState(_state, _unused, url) { location.href = url; this.pushed = (this.pushed || 0) + 1; },
   };
-  const window = { scrollY: 0, addEventListener(name, callback) { listeners[name] = callback; }, scrollTo(_x, y) { this.scrollY = y; } };
+  const window = { scrollY: 0, addEventListener(name, callback) { listeners[name] = callback; }, scrollTo(options) { this.scrollY = options.top; this.scrollBehavior = options.behavior; } };
   let heldUrl, release;
   const fetched = [];
-  const fetch = async (url) => {
+  const fetchOverrides = new Map();
+  const fetch = async (url, options) => {
     fetched.push(url);
+    assert.ok(options.signal instanceof AbortSignal);
+    if (fetchOverrides.has(url)) return fetchOverrides.get(url)(options.signal);
     if (url === heldUrl) await new Promise((resolve) => { release = resolve; });
     return { ok: pages.has(url), text: async () => pages.get(url) };
   };
@@ -282,13 +299,23 @@ for (const prefix of ['/', '/project/']) test(`app navigation swaps pages, handl
   const copied = [];
   const timers = new Map();
   let timer = 0;
-  runInNewContext(await f.read('assets/search.js') + '\n' + await f.read('assets/copy.js') + `
-    const search = initSearch, copy = initCopy;
-    globalThis.initSearch = () => { initialized.push('search'); search(); };
-    globalThis.initCopy = () => { initialized.push('copy'); copy(); };
-  ` + script, { document, location, history, window, fetch, DOMParser, URL, initialized,
+  let shortTimeout = false;
+  const context = createContext({ document, location, history, window, fetch, DOMParser, URL,
+    AbortSignal: { timeout(ms) { assert.equal(ms, 10000); return AbortSignal.timeout(shortTimeout ? 10 : ms); } },
+    localStorage: { getItem: () => 'dark' },
     navigator: { clipboard: { writeText: async (text) => copied.push(text) } },
     clearTimeout: (id) => timers.delete(id), setTimeout: (callback) => { timers.set(++timer, callback); return timer; } });
+  const assetOrder = [];
+  for (const tag of entryHtml.matchAll(/<script\b([^>]*)><\/script>/g)) {
+    assert.match(tag[1], /\bdefer\b/);
+    const src = tag[1].match(/src="([^"]+)"/)[1];
+    const asset = new URL(src, location.href).href.slice(base.length);
+    assetOrder.push(asset);
+    runInContext(await f.read(asset), context);
+  }
+  assert.deepEqual(assetOrder, ['assets/theme.js', 'assets/search.js', 'assets/copy.js', 'assets/navigation.js']);
+  assert.equal(themeButton.textContent, 'Theme: dark');
+  assert.equal(typeof themeButton.click, 'function');
   assert.equal(brand.href, base);
   assert.equal(guide.href, base + 'guide/');
   assert.equal(history.scrollRestoration, 'manual');
@@ -304,7 +331,6 @@ for (const prefix of ['/', '/project/']) test(`app navigation swaps pages, handl
   const folder = (suffix) => document.currentMain.links.find((link) => link.href.endsWith(suffix));
   assert.equal(await click(brand), true);
   assert.equal(document.title, 'Links · shl');
-  initialized.length = 0;
   history.pushed = 0;
   assert.equal(await click(null), false); // Redirect and destination links remain native.
   assert.equal(await click(folder('/tools/'), { ctrlKey: true }), false);
@@ -314,7 +340,8 @@ for (const prefix of ['/', '/project/']) test(`app navigation swaps pages, handl
   assert.equal(document.currentMain.heading.focused, true);
   assert.equal(folder('/tools/git/').href, base + 'tools/git/');
   assert.equal(guide.href, base + 'guide/');
-  assert.deepEqual(initialized, ['search', 'copy']);
+  assert.equal(document.currentMain.elements['#link-search'].handlers.get('input').length, 1);
+  assert.equal(document.currentMain.elements['.links'].handlers.get('click').length, 1);
   window.scrollY = 250;
   assert.equal(await click(folder('/tools/editors/')), true);
   assert.equal(history.pushed, 2);
@@ -334,12 +361,12 @@ for (const prefix of ['/', '/project/']) test(`app navigation swaps pages, handl
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(document.title, 'tools · shl');
   assert.equal(window.scrollY, 250);
+  assert.equal(window.scrollBehavior, 'instant');
   location.href = base;
   listeners.popstate();
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(document.title, 'Links · shl');
   assert.equal(await click(folder('/hidden/')), true);
-  assert.equal(initialized.length, 10); // Search and copy also initialize on hidden-only pages.
   const controls = document.currentMain.elements;
   assert.equal(controls['#link-search'].handlers.get('input').length, 1);
   assert.equal(controls['#hidden-toggle'].handlers.get('click').length, 1);
@@ -374,6 +401,7 @@ for (const prefix of ['/', '/project/']) test(`app navigation swaps pages, handl
   location.href = base + 'guide/#how-to-use';
   listeners.popstate();
   assert.equal(window.scrollY, 550);
+  assert.equal(window.scrollBehavior, 'instant');
   assert.equal(document.currentMain, guideMain);
   assert.equal(fetched.length, beforeSections);
   assert.equal(await click(makeLink(base + 'guide/#missing')), true);
@@ -417,6 +445,95 @@ for (const prefix of ['/', '/project/']) test(`app navigation swaps pages, handl
   assert.equal(await click(guide), true);
   assert.equal(await click(makeLink(base + 'hidden/')), true);
   assert.equal(document.currentMain.elements['.links'].handlers.get('click').length, 1);
+
+  const tick = () => new Promise((resolve) => setImmediate(resolve));
+  pages.set(base + 'tools/', await f.read('tools/index.html'));
+  const response = (path) => ({ ok: true, text: async () => pages.get(base + path) });
+  const deferFetch = (url) => {
+    let resolve, reject;
+    fetchOverrides.set(url, () => new Promise((yes, no) => { resolve = yes; reject = no; }));
+    return { resolve: (value) => resolve(value), reject: (error) => reject(error) };
+  };
+  // Two distinct clicks complete in reverse order; only the newest may commit.
+  const first = deferFetch(base + 'tools/');
+  const second = deferFetch(base + 'guide/');
+  await click(makeLink(base + 'tools/'));
+  await click(guide);
+  second.resolve(response('guide/'));
+  await tick();
+  const winner = document.currentMain;
+  const pushed = history.pushed;
+  location.assigned = undefined;
+  first.resolve(response('tools/'));
+  await tick();
+  assert.equal(document.currentMain, winner);
+  assert.equal(location.href, base + 'guide/');
+  assert.equal(history.pushed, pushed);
+  assert.equal(location.assigned, undefined);
+  fetchOverrides.delete(base + 'guide/');
+  // A superseded request rejecting must not perform a native fallback either.
+  const stale = deferFetch(base + 'tools/');
+  await click(makeLink(base + 'tools/'));
+  await click(makeLink(base + 'hidden/'));
+  const newer = document.currentMain;
+  const newerPushed = history.pushed;
+  stale.reject(new Error('stale fetch failed'));
+  await tick();
+  assert.equal(document.currentMain, newer);
+  assert.equal(location.href, base + 'hidden/');
+  assert.equal(history.pushed, newerPushed);
+  assert.equal(location.assigned, undefined);
+  fetchOverrides.delete(base + 'tools/');
+
+  // Save scrolling done while the fetch was in flight, just before replacement.
+  await click(guide);
+  const slow = deferFetch(base + 'tools/');
+  window.scrollY = 180;
+  await click(makeLink(base + 'tools/'));
+  window.scrollY = 360;
+  slow.resolve(response('tools/'));
+  await tick();
+  location.href = base + 'guide/';
+  listeners.popstate();
+  await tick();
+  assert.equal(window.scrollY, 360);
+  assert.equal(window.scrollBehavior, 'instant');
+  fetchOverrides.delete(base + 'tools/');
+
+  const valid = pages.get(base + 'hidden/');
+  for (const [name, html] of [
+    ['missing-title', valid.replace(/<title>[\s\S]*?<\/title>/, '')],
+    ['missing-heading', valid.replace(/<h1\b[^>]*>[\s\S]*?<\/h1>/, '')],
+    ['unsupported-marker', valid.replace('data-app-page="links"', 'data-app-page="redirect"')],
+  ]) {
+    const url = base + name + '/';
+    pages.set(url, html);
+    const before = document.currentMain;
+    const beforePushed = history.pushed;
+    await click(makeLink(url));
+    assert.equal(location.assigned, url);
+    assert.equal(document.currentMain, before);
+    assert.equal(history.pushed, beforePushed);
+  }
+  const aborted = (signal) => new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }));
+  for (const [name, handler, timed] of [
+    ['fetch-timeout', (signal) => aborted(signal), true],
+    ['body-timeout', (signal) => ({ ok: true, text: () => aborted(signal) }), true],
+    ['fetch-rejection', () => { throw new Error('network rejected'); }, false],
+    ['body-rejection', () => ({ ok: true, text: async () => { throw new Error('body rejected'); } }), false],
+  ]) {
+    const url = base + name + '/';
+    fetchOverrides.set(url, handler);
+    shortTimeout = timed;
+    location.assigned = undefined;
+    const before = document.currentMain;
+    const beforePushed = history.pushed;
+    await click(makeLink(url));
+    if (timed) await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.equal(location.assigned, url, name + ' uses native navigation');
+    assert.equal(document.currentMain, before);
+    assert.equal(history.pushed, beforePushed);
+  }
 });
 
 test('hidden links and hidden-only folders are hidden by default but keep their resources', async (t) => {

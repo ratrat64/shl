@@ -141,9 +141,9 @@ export const navigationScript = `(() => {
     let fragment;
     try { fragment = decodeURIComponent(new URL(url).hash.slice(1)); } catch {}
     const section = fragment && [...main.querySelectorAll('[id]')].find((element) => element.id === fragment);
-    if (restore && scroll.has(url)) window.scrollTo(0, scroll.get(url));
-    else if (section) section.scrollIntoView();
-    else window.scrollTo(0, 0);
+    if (restore && scroll.has(url)) window.scrollTo({ left: 0, top: scroll.get(url), behavior: 'instant' });
+    else if (section) section.scrollIntoView({ behavior: restore ? 'instant' : 'auto' });
+    else window.scrollTo({ left: 0, top: 0, behavior: restore ? 'instant' : 'auto' });
     const focus = section || main.querySelector('h1');
     if (focus) { focus.tabIndex = -1; focus.focus({ preventScroll: true }); }
   };
@@ -158,7 +158,7 @@ export const navigationScript = `(() => {
     try {
       const fetchUrl = new URL(url);
       fetchUrl.hash = '';
-      const response = await fetch(fetchUrl.href);
+      const response = await fetch(fetchUrl.href, { signal: AbortSignal.timeout(10000) });
       if (!response.ok) throw new Error('Page unavailable');
       const page = new DOMParser().parseFromString(await response.text(), 'text/html');
       const main = page.querySelector('main[data-app-page]');
@@ -167,6 +167,7 @@ export const navigationScript = `(() => {
       if (current !== request) return;
       rebase(main, url);
       for (const script of main.querySelectorAll('script')) script.remove();
+      scroll.set(displayed, window.scrollY);
       globalThis.cleanupCopy?.();
       document.querySelector('main').replaceWith(main);
       document.title = title.textContent;

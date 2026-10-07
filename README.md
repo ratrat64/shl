@@ -76,7 +76,8 @@ each directory page also lists links and subdirectories. With JavaScript, folder
 links, breadcrumbs, brand, and header/footer Links and Guide navigation work
 without reloading, keeping the header, footer, and theme mounted. Guide section
 anchors also navigate without reloading; Back and Forward restore content and
-saved scroll positions. Search, hidden toggles, and expanded folders reset on
+saved scroll positions (the most recently saved position per URL, shared by
+repeated visits to that URL). Search, hidden toggles, and expanded folders reset on
 page transitions.
 Direct URLs, refreshes, and browsing without JavaScript still use the generated
 pages. Existing top-level links keep their URLs. Directory names are their display
@@ -200,6 +201,18 @@ After deploying, smoke-test a known code, a wrong-case code (with and without a
 trailing slash), and an unknown code in a browser. Repeat under a project prefix
 when changing routing; local preview servers may serve 404 pages differently
 from GitHub Pages.
+
+For app navigation, run `bun run dev` and open `/guide/#about` directly. In the
+browser console, save `window.savedHeader = document.querySelector('header')`.
+Change Theme, then use Links, folders, breadcrumbs, and the footer Guide link;
+confirm `savedHeader === document.querySelector('header')`, the theme, page title,
+active navigation, and keyboard focus after each transition. Click the current
+navigation link and Guide section links, then use Back/Forward: content, fragments,
+and saved scroll should match, with history restoration jumping instantly.
+Check search, Show hidden links, and code/destination copy after returning from
+Guide; each interaction should run once, and controls should reset after leaving
+and returning. Repeat with browser JavaScript disabled to check native links.
+Repeat on a deployed project-prefix URL such as `/<repo>/guide/#about`.
 
 ## How it works
 
