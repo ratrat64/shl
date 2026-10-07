@@ -1,19 +1,36 @@
-import { readFile } from 'node:fs/promises';
-import { parseDocument } from 'yaml';
+import { readFile } from "node:fs/promises";
+import { parseDocument } from "yaml";
 
 export const CODE_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
-export const RESERVED_NAMES = new Set(['index', '404', 'assets', 'links', 'about', 'guide', 'how-it-works', 'index.html', '404.html', 'links.json', 'cname']);
+export const RESERVED_NAMES = new Set([
+  "index",
+  "404",
+  "assets",
+  "links",
+  "about",
+  "guide",
+  "how-it-works",
+  "index.html",
+  "404.html",
+  "links.json",
+  "cname",
+]);
 
-export const isDirectory = (value) => value !== null && typeof value === 'object' && !Array.isArray(value) && !('url' in value);
-export const linkUrl = (value) => typeof value === 'string' ? value : value?.url;
+export const isDirectory = (value) =>
+  value !== null &&
+  typeof value === "object" &&
+  !Array.isArray(value) &&
+  !("url" in value);
+export const linkUrl = (value) =>
+  typeof value === "string" ? value : value?.url;
 
 // Consumers call this only after validating the original fields below.
 export const linkFields = (value) => ({
   url: linkUrl(value),
-  title: typeof value === 'string' ? '' : value.title ?? '',
+  title: typeof value === "string" ? "" : (value.title ?? ""),
   script: value?.script === true,
   hidden: value?.hidden === true,
-  tags: (value?.tags ?? []).map(tag => tag.trim()),
+  tags: (value?.tags ?? []).map((tag) => tag.trim()),
 });
 
 export const entryCounts = (nodes) => ({
@@ -21,33 +38,48 @@ export const entryCounts = (nodes) => ({
   visible: nodes.reduce((n, node) => n + node.visible, 0),
 });
 
-export const entryTree = (entries, prefix = '') => Object.entries(entries)
-  .sort(([a], [b]) => a.toLowerCase() < b.toLowerCase() ? -1 : 1)
-  .map(([code, value]) => {
-    const node = { code, prefix, href: `./${prefix}${code}/`, isDirectory: isDirectory(value) };
-    if (!node.isDirectory) {
-      const fields = linkFields(value);
-      return { ...node, ...fields, total: 1, visible: fields.hidden ? 0 : 1 };
-    }
-    const children = entryTree(value, `${prefix}${code}/`);
-    return { ...node, children, ...entryCounts(children) };
-  });
+export const entryTree = (entries, prefix = "") =>
+  Object.entries(entries)
+    .sort(([a], [b]) => (a.toLowerCase() < b.toLowerCase() ? -1 : 1))
+    .map(([code, value]) => {
+      const node = {
+        code,
+        prefix,
+        href: `./${prefix}${code}/`,
+        isDirectory: isDirectory(value),
+      };
+      if (!node.isDirectory) {
+        const fields = linkFields(value);
+        return { ...node, ...fields, total: 1, visible: fields.hidden ? 0 : 1 };
+      }
+      const children = entryTree(value, `${prefix}${code}/`);
+      return { ...node, children, ...entryCounts(children) };
+    });
 
 export function validateCode(code, path, seen) {
   const problems = [];
-  if (!CODE_RE.test(code)) problems.push(`"${path.join('/')}" — codes must start with a letter or number and contain only letters, numbers, . _ -`);
-  if (RESERVED_NAMES.has(code.toLowerCase())) problems.push(`"${path.join('/')}" — reserved name`);
+  if (!CODE_RE.test(code))
+    problems.push(
+      `"${path.join("/")}" — codes must start with a letter or number and contain only letters, numbers, . _ -`,
+    );
+  if (RESERVED_NAMES.has(code.toLowerCase()))
+    problems.push(`"${path.join("/")}" — reserved name`);
   const key = code.toLowerCase();
-  if (seen.has(key)) problems.push(`"${path.join('/')}" — collides with "${seen.get(key)}" (codes are matched case-insensitively)`);
-  seen.set(key, path.join('/'));
+  if (seen.has(key))
+    problems.push(
+      `"${path.join("/")}" — collides with "${seen.get(key)}" (codes are matched case-insensitively)`,
+    );
+  seen.set(key, path.join("/"));
   return problems;
 }
 
 export function validateUrl(url, name) {
   try {
-    if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) throw new Error();
+    if (typeof url !== "string" || !/^https?:\/\//i.test(url))
+      throw new Error();
     const parsed = new URL(url);
-    if (!['http:', 'https:'].includes(parsed.protocol) || !parsed.hostname) throw new Error();
+    if (!["http:", "https:"].includes(parsed.protocol) || !parsed.hostname)
+      throw new Error();
     return null;
   } catch {
     return `"${name}" — destination must be a valid absolute HTTP or HTTPS URL`;
@@ -56,20 +88,23 @@ export function validateUrl(url, name) {
 
 export async function loadLinks() {
   let raw;
-  let source = 'link source';
+  let source = "link source";
   try {
     const files = [];
-    for (const name of ['links.json', 'links.yaml', 'links.yml']) {
+    for (const name of ["links.json", "links.yaml", "links.yml"]) {
       try {
-        files.push([name, await readFile(name, 'utf8')]);
+        files.push([name, await readFile(name, "utf8")]);
       } catch (error) {
-        if (error.code !== 'ENOENT') throw error;
+        if (error.code !== "ENOENT") throw error;
       }
     }
-    if (files.length !== 1) throw new Error(`expected exactly one of links.json, links.yaml, links.yml (found ${files.length ? files.map(([name]) => name).join(', ') : 'none'})`);
+    if (files.length !== 1)
+      throw new Error(
+        `expected exactly one of links.json, links.yaml, links.yml (found ${files.length ? files.map(([name]) => name).join(", ") : "none"})`,
+      );
     const text = files[0][1];
     source = files[0][0];
-    if (source === 'links.json') {
+    if (source === "links.json") {
       raw = JSON.parse(text);
     } else {
       const document = parseDocument(text, { uniqueKeys: true });
@@ -77,7 +112,7 @@ export async function loadLinks() {
       raw = document.toJS();
     }
     if (!raw || Object.getPrototypeOf(raw) !== Object.prototype) {
-      throw new Error('expected an object mapping short codes to destinations');
+      throw new Error("expected an object mapping short codes to destinations");
     }
   } catch (error) {
     throw new Error(`Build stopped. Fix ${source}: ${error.message}`);
@@ -91,11 +126,17 @@ export async function loadLinks() {
     const seen = new Map();
     const launchers = [];
     if (active.has(entries)) {
-      problems.push(`"${path.join('/')}" — directory cannot contain itself`);
+      problems.push(`"${path.join("/")}" — directory cannot contain itself`);
       return;
     }
-    if (!entries || Object.getPrototypeOf(entries) !== Object.prototype || (path.length && !Object.keys(entries).length)) {
-      problems.push(`"${path.join('/') || '/'}" — directory must contain links or subdirectories`);
+    if (
+      !entries ||
+      Object.getPrototypeOf(entries) !== Object.prototype ||
+      (path.length && !Object.keys(entries).length)
+    ) {
+      problems.push(
+        `"${path.join("/") || "/"}" — directory must contain links or subdirectories`,
+      );
       return;
     }
     active.add(entries);
@@ -103,7 +144,7 @@ export async function loadLinks() {
     for (const [code, value] of Object.entries(entries)) {
       const before = problems.length;
       const full = [...path, code];
-      const name = full.join('/');
+      const name = full.join("/");
       problems.push(...validateCode(code, full, seen));
 
       if (isDirectory(value)) {
@@ -111,31 +152,59 @@ export async function loadLinks() {
         continue;
       }
       const url = linkUrl(value);
-      if (typeof value !== 'string' && (!value || typeof value !== 'object' || Array.isArray(value))) {
-        problems.push(`"${name}" — expected a URL string, an object with url, or a directory`);
+      if (
+        typeof value !== "string" &&
+        (!value || typeof value !== "object" || Array.isArray(value))
+      ) {
+        problems.push(
+          `"${name}" — expected a URL string, an object with url, or a directory`,
+        );
       }
-      if (typeof value === 'object' && value && 'title' in value && typeof value.title !== 'string') {
+      if (
+        typeof value === "object" &&
+        value &&
+        "title" in value &&
+        typeof value.title !== "string"
+      ) {
         problems.push(`"${name}" — title must be a string`);
       }
-      if (typeof value === 'object' && value && 'script' in value && typeof value.script !== 'boolean') {
+      if (
+        typeof value === "object" &&
+        value &&
+        "script" in value &&
+        typeof value.script !== "boolean"
+      ) {
         problems.push(`"${name}" — script must be a boolean`);
       }
-      if (typeof value === 'object' && value && 'hidden' in value && typeof value.hidden !== 'boolean') {
+      if (
+        typeof value === "object" &&
+        value &&
+        "hidden" in value &&
+        typeof value.hidden !== "boolean"
+      ) {
         problems.push(`"${name}" — hidden must be a boolean`);
       }
-      if (typeof value === 'object' && value && 'tags' in value &&
-          (!Array.isArray(value.tags) || value.tags.some((tag) => typeof tag !== 'string' || !tag.trim()))) {
+      if (
+        typeof value === "object" &&
+        value &&
+        "tags" in value &&
+        (!Array.isArray(value.tags) ||
+          value.tags.some((tag) => typeof tag !== "string" || !tag.trim()))
+      ) {
         problems.push(`"${name}" — tags must be an array of nonblank strings`);
       }
       const urlError = validateUrl(url, name);
       if (urlError) problems.push(urlError);
       if (value?.script === true) launchers.push(code);
-      if (problems.length === before) links.push({ code: name, ...linkFields(value) });
+      if (problems.length === before)
+        links.push({ code: name, ...linkFields(value) });
     }
     for (const code of launchers) {
       const filename = `${code}.sh`;
       if (seen.has(filename.toLowerCase())) {
-        problems.push(`"${[...path, code].join('/')}" — launcher "${filename}" collides with "${seen.get(filename.toLowerCase())}"`);
+        problems.push(
+          `"${[...path, code].join("/")}" — launcher "${filename}" collides with "${seen.get(filename.toLowerCase())}"`,
+        );
       }
     }
     active.delete(entries);
@@ -143,7 +212,9 @@ export async function loadLinks() {
   collect(raw);
 
   if (problems.length) {
-    throw new Error(`Build stopped. Fix these in ${source}:\n${problems.map((p) => '  - ' + p).join('\n')}`);
+    throw new Error(
+      `Build stopped. Fix these in ${source}:\n${problems.map((p) => "  - " + p).join("\n")}`,
+    );
   }
   return { raw, source, links, directories };
 }

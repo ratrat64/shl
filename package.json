@@ -3,11 +3,16 @@
   "private": true,
   "packageManager": "bun@1.4.2",
   "scripts": {
+    "format": "prettier --write build.mjs src test .github/workflows package.json 'links.{json,yaml,yml}' --no-error-on-unmatched-pattern",
+    "format:check": "prettier --check build.mjs src test .github/workflows package.json 'links.{json,yaml,yml}' --no-error-on-unmatched-pattern",
     "build": "bun build.mjs",
     "test": "bun test --timeout 30000 ./test/build.test.mjs",
     "dev": "bun build.mjs && bunx --bun http-server@14.1.1 dist -c-1"
   },
   "dependencies": {
     "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "prettier": "3.9.9"
   }
 }
