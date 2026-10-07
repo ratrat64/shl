@@ -24,6 +24,8 @@ Refresh the existing directory with a black dark-mode background and a fitting h
 - Verification: all 17 build tests passed; production build generated 26 links; `git diff --check` passed; Impeccable detector returned no findings.
 - Headless Chrome checked 1280px, 375px and 320px in both themes: footer at viewport bottom on short pages, footer after long guide content without overlap, hover/focus row wash, no page overflow, and hidden-row text/action contrast at least 4.5:1. Inspected desktop/mobile screenshots.
 - User refinement: remove hidden text labels and their mobile styling; use muted code colors alone. Add subtle teal button fills and amber Download fills, strengthening on hover while retaining disabled states.
+- User refinement: soften dark palette brightness and button edges, remove SCRIPT labels, and distinguish hidden rows across codes, destinations, tags and actions using a dedicated subdued color and lighter code weight. Download remains the script affordance.
+- Alignment with main: preserve the app-navigation refactor; shared CSS now lives in `src/styles.mjs`, branding in `src/layout.mjs`, and row markup in `src/directory.mjs`. Retain the upstream browser lifecycle and navigation regression checks.
 
 ## Review Triage Log
 

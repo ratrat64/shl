@@ -5,9 +5,9 @@ status: final
 updated: 2026-10-07
 colors:
   action-light: "#006b60"
-  action-dark: "#79d6c3"
+  action-dark: "#64b6a4"
   script-light: "#895400"
-  script-dark: "#e9bf7a"
+  script-dark: "#c6a36a"
   paper-light: "#f6f7f5"
   surface-light: "#fff"
   ink-light: "#252b29"
@@ -16,10 +16,12 @@ colors:
   wash-light: "#e8eeeb"
   paper-dark: "#000"
   surface-dark: "#111715"
-  ink-dark: "#e0e7e3"
-  secondary-dark: "#a0afa7"
+  ink-dark: "#c6d0ca"
+  secondary-dark: "#96a59d"
+  hidden-light: "#5c6a61"
+  hidden-dark: "#788a80"
   rule-dark: "#63736b"
-  wash-dark: "#17221d"
+  wash-dark: "#111b16"
 typography:
   display:
     fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif"
@@ -50,9 +52,9 @@ A compact index puts codes, destinations, and search above everything else. Slee
 
 ## Colors
 
-Teal is reserved for standard links and focus; amber marks executable-script entries with a text label as a second cue. Dark mode uses a pure black page (#000), softly green-tinted panels and softened light ink; light mode uses an off-white page and white panels. Muted text and visible control borders retain theme-specific contrast without harsh white-on-black glare. Respect system light/dark preference and retain the visitor's saved theme override.
+Teal is reserved for standard links and focus; amber marks executable-script entries, with their Download action as a second cue instead of a SCRIPT label. Dark mode uses a pure black page (#000), softly green-tinted panels and softened light ink; light mode uses an off-white page and white panels. The dark palette is deliberately lower in brightness; hidden-row text remains readable with a distinct subdued role. Respect system light/dark preference and retain the visitor's saved theme override.
 
-The frontmatter roles map to the CSS tokens in `src/pages.mjs`: paper → `--bg`, surface → `--panel`, ink → `--ink`, secondary → `--muted`, rule → `--line`, action → `--accent`, script → `--script`, and wash → `--wash`, with light/dark variants above.
+The frontmatter roles map to the CSS tokens in `src/styles.mjs`: paper → `--bg`, surface → `--panel`, ink → `--ink`, secondary → `--muted`, hidden → `--hidden-ink`, rule → `--line`, action → `--accent`, script → `--script`, and wash → `--wash`, with light/dark variants above.
 
 ## Typography
 
@@ -78,7 +80,7 @@ Directory rows are square and unruled. Inputs and code blocks have subtle 4px co
 
 ### Navigation
 
-The header brand reads `/shl/`: `shl` uses ink, the leading slash uses teal action, and the trailing slash uses amber script. The header has only Links and Guide navigation. Current links are underlined. The theme toggle has a fine border and a visible keyboard focus outline. Theme, hidden-toggle and Open controls have a subtle teal background; Download uses amber. Mix 10% of the action color into the page background, increasing to 18% on hover. Disabled controls retain the muted wash.
+The header brand reads `/shl/`: `shl` uses ink, the leading slash uses teal action, and the trailing slash uses amber script. The header has only Links and Guide navigation. Current links are underlined. Buttons have subdued edges mixed from 25% of their action color and the page background; keep the visible keyboard focus outline. Theme, hidden-toggle and Open controls have a subtle teal background; Download uses amber. Mix 10% of the action color into the page background, increasing to 18% on hover. Disabled controls retain the muted wash.
 
 ### Directory tools
 
@@ -86,11 +88,11 @@ The count is every directory page's visual heading, not a small aside or a secon
 
 ### Directory rows
 
-A code copies its full short URL on click; script-enabled codes use amber and a visible script label. Destinations copy their full URL on click, and an Open control at the row end follows it. Folder names link to their browseable pages while the disclosure marker expands the nested list. Optional titles appear on hover over codes and remain searchable. Destinations display their ends without wrapping; the full URL is available for copying and to assistive technology.
+A code copies its full short URL on click; script-enabled codes use amber and have a Download action without a SCRIPT label. Destinations copy their full URL on click, and an Open control at the row end follows it. Folder names link to their browseable pages while the disclosure marker expands the nested list. Optional titles appear on hover over codes and remain searchable. Destinations display their ends without wrapping; the full URL is available for copying and to assistive technology.
 
 Copy feedback appears as a small, flat floating panel near the viewport edge and never displaces directory content.
 
-Link rows and folder summaries use the theme wash on hover and focus-within, preserving visible focus outlines. Revealed hidden links are subtle: their code uses secondary (muted) ink without a hidden text label or reduced opacity on the entire row. Hidden-only folder summaries also use secondary ink. A hidden script code uses muted ink but retains its visible script label; destination, Open and Download actions remain readable and usable.
+Link rows and folder summaries use the theme wash on hover and focus-within, preserving visible focus outlines. Revealed hidden links use the hidden-ink role across codes, destinations, tags and actions, with lighter-weight codes (400 instead of 600). Their buttons have neutral subdued fills and edges. Hidden-only folder summaries also use hidden ink and lighter weight. Do not add hidden or SCRIPT labels or reduce whole-row opacity; keep text readable and focus outlines distinct.
 
 ## Do's and Don'ts
 

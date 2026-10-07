@@ -29,8 +29,8 @@ Use short, functional labels. The visible search placeholder is exactly "Search 
 ## Component Patterns
 
 - **Directory tools:** On every directory page the count is the sole heading on the left; a single-line search and a compact grouped area for the hidden-links toggle sit on the right. Reserve the same control columns without hidden descendants: search retains its size and position, while Show hidden links stays visible, muted and disabled. Use the same {typography.display} size for home and nested counts, not the muted row metadata style; use {colors.ink-light}/{colors.ink-dark}. Search uses {rounded.control}, {colors.surface-light}/{colors.surface-dark} and {colors.rule-light}/{colors.rule-dark}.
-- **Directory rows:** Code and destination remain side by side; code copies the full short URL, destination copies its full URL, and Open visits the destination. Script links retain their visible script label and existing amber role. Folder names open their pages and disclosure expands the nested list. Optional titles remain available on hover and searchable; tags remain visible below entries. Keep the existing middle-truncation behavior for long destinations while preserving full values for copying and assistive technology.
-- **Row emphasis:** Link rows and folder summaries use {colors.wash-light}/{colors.wash-dark} on hover and focus-within. Revealed hidden codes and hidden-only folder summaries use {colors.secondary-light}/{colors.secondary-dark} without a hidden text label. Hidden script codes remain muted while retaining the visible script label. Keep destinations and actions readable rather than dimming entire rows.
+- **Directory rows:** Code and destination remain side by side; code copies the full short URL, destination copies its full URL, and Open visits the destination. Script links use amber and their Download action, without a SCRIPT label. Folder names open their pages and disclosure expands the nested list. Optional titles remain available on hover and searchable; tags remain visible below entries. Keep the existing middle-truncation behavior for long destinations while preserving full values for copying and assistive technology.
+- **Row emphasis:** Link rows and folder summaries use {colors.wash-light}/{colors.wash-dark} on hover and focus-within. Revealed hidden codes, destinations, tags and actions use {colors.hidden-light}/{colors.hidden-dark}, with neutral subdued button fills and lighter-weight codes. Hidden-only summaries also use hidden ink and lighter weight. Do not add hidden text labels or lower entire-row opacity; preserve readability and focus indicators.
 - **Button fills:** Use subtle teal fills for theme, hidden-toggle and Open controls, and amber for Download, as specified in DESIGN.md. Hover strengthens the fill; disabled controls retain their muted wash and existing disabled behavior.
 - **Navigation:** The header brand reads `/shl/`, with `shl` in {colors.ink-light}/{colors.ink-dark}, the leading slash in teal {colors.action-light}/{colors.action-dark}, and the trailing slash in amber {colors.script-light}/{colors.script-dark}. Keep Links and Guide, active-link underline, theme control and keyboard focus treatment. Remove directory-page framing rules below the header and above the footer; separate sections by space, as specified in DESIGN.md. Keep guide section rules.
 - **Footer:** The page shell fills at least the viewport height, with main content growing to put the footer at the bottom on short pages. On long pages it follows content in normal flow without covering it.
@@ -61,7 +61,7 @@ Use the centered directory width in DESIGN.md on desktop; at narrow widths wrap 
 
 1. Rat opens the homepage looking for an automation script, without remembering its short path.
 2. Rat types `#shell` into search; the same prominent count narrows to the matching links, and the relevant nested folders expand.
-3. Rat sees `setup/ohmyposh/stable`, its destination and the visible script label.
+3. Rat sees `setup/ohmyposh/stable`, its destination and the Download action.
 4. **Climax:** Rat uses Download to get the `.sh` launcher for the intended setup resource, confident the directory has surfaced the right entry.
 
 If the search has no match, the count reads "0 links" and the no-match message appears; clearing search restores the visible directory.
@@ -70,5 +70,5 @@ If the search has no match, the count reads "0 links" and the no-match message a
 
 1. Rat searches for `ohmyposh` but needs the hidden `latest` entry rather than `stable`.
 2. Rat turns on Show hidden links in the grouped controls; the current search and the single count update to include the hidden entry.
-3. **Climax:** Rat sees both script-labelled entries and can choose the intended launcher without losing the query.
+3. **Climax:** Rat sees both entries with Download actions, the hidden alternative visibly subdued, and can choose the intended launcher without losing the query.
 4. Rat turns off the toggle to return to the visible-only view. Without JavaScript, Rat can still browse and open the visible `stable` entry through the folder pages.
