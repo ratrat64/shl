@@ -615,7 +615,7 @@ test('toggle updates hidden rows, nested search, counts, and hidden-only empty s
   };
 
   const homeMarkup = await f.read('index.html');
-  const titled = homeMarkup.match(/<li([^>]*)><div class="link-row" title="Private notes"><a class="code" href="([^"]+)" title="Private notes">secret<span class="hidden-label">hidden<\/span><\/a>/);
+  const titled = homeMarkup.match(/<li([^>]*)><div class="link-row" title="Private notes"><a class="code" href="([^"]+)" title="Private notes">secret<\/a>/);
   assert.ok(titled, 'generated hidden titled link is present');
   const [, attributes, secretHref] = titled;
   assert.match(attributes, /data-hidden="true" hidden data-title="Private notes"/);

@@ -78,7 +78,7 @@ Directory rows are square and unruled. Inputs and code blocks have subtle 4px co
 
 ### Navigation
 
-The header brand reads `/shl/`: `shl` uses ink, the leading slash uses teal action, and the trailing slash uses amber script. The header has only Links and Guide navigation. Current links are underlined. The theme toggle has a fine border and a visible keyboard focus outline.
+The header brand reads `/shl/`: `shl` uses ink, the leading slash uses teal action, and the trailing slash uses amber script. The header has only Links and Guide navigation. Current links are underlined. The theme toggle has a fine border and a visible keyboard focus outline. Theme, hidden-toggle and Open controls have a subtle teal background; Download uses amber. Mix 10% of the action color into the page background, increasing to 18% on hover. Disabled controls retain the muted wash.
 
 ### Directory tools
 
@@ -90,7 +90,7 @@ A code copies its full short URL on click; script-enabled codes use amber and a 
 
 Copy feedback appears as a small, flat floating panel near the viewport edge and never displaces directory content.
 
-Link rows and folder summaries use the theme wash on hover and focus-within, preserving visible focus outlines. Revealed hidden links are subtle: their code uses secondary (muted) ink with a visible hidden label, not reduced opacity on the entire row. Hidden-only folder summaries also use secondary ink. A hidden script code uses muted ink but retains its visible script label; destination, Open and Download actions remain readable and usable.
+Link rows and folder summaries use the theme wash on hover and focus-within, preserving visible focus outlines. Revealed hidden links are subtle: their code uses secondary (muted) ink without a hidden text label or reduced opacity on the entire row. Hidden-only folder summaries also use secondary ink. A hidden script code uses muted ink but retains its visible script label; destination, Open and Download actions remain readable and usable.
 
 ## Do's and Don'ts
 

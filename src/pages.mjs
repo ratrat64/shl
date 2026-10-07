@@ -60,8 +60,9 @@ export const styles = cssVariables + `
   .nav a{color:var(--muted);font-size:.9rem;text-decoration:none}
   .nav a[aria-current=page]{color:var(--ink);text-decoration:underline;text-decoration-color:var(--accent);text-underline-offset:.45em}
   .nav a:hover{color:var(--accent)}
-  .theme-toggle{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:4px;padding:.35rem .7rem;font-size:.85rem;white-space:nowrap}
-  .theme-toggle:hover{background:var(--wash)}
+  .theme-toggle{border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:.35rem .7rem;font-size:.85rem;white-space:nowrap}
+  .theme-toggle,.visit,.download{background:color-mix(in srgb,var(--button-tone,var(--accent)) 10%,var(--bg))}
+  .theme-toggle:hover,.visit:hover,.download:hover{background:color-mix(in srgb,var(--button-tone,var(--accent)) 18%,var(--bg))}
   .theme-toggle:disabled{background:var(--wash);color:var(--muted);cursor:default}
   main.wrap{width:100%;flex:1;margin-block:0;padding-top:clamp(1.5rem,3vw,2.5rem);padding-bottom:4rem}
   h1,h2,h3,p{margin-top:0}
@@ -87,7 +88,6 @@ export const styles = cssVariables + `
   .links li{padding:.65rem 0;overflow-wrap:anywhere}
   .links li:has(>.link-row):hover,.links li:has(>.link-row):focus-within,.links summary:hover,.links summary:focus-within{background:var(--wash)}
   .links li[data-hidden=true]>.link-row .code,.links li[data-hidden=true]>details>summary{color:var(--muted)}
-  .hidden-label{color:var(--muted);font:400 .7rem/1.5 ui-sans-serif,system-ui,sans-serif;margin-left:.5rem}
   .links .links{margin:.35rem 0 0 .75rem;padding-left:1rem}
   summary{cursor:pointer;color:var(--ink);font-weight:600}
   summary:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
@@ -105,9 +105,7 @@ export const styles = cssVariables + `
   .destination-start{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .destination-end{flex-shrink:0;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .visit{border:1px solid var(--line);border-radius:4px;padding:.2rem .55rem;text-decoration:none;font-size:.85rem;white-space:nowrap}
-  .visit:hover{background:var(--wash)}
-  .download{border:1px solid var(--line);border-radius:4px;padding:.2rem .55rem;text-decoration:none;font-size:.85rem;white-space:nowrap;color:var(--script)}
-  .download:hover{background:var(--wash)}
+  .download{--button-tone:var(--script);border:1px solid var(--line);border-radius:4px;padding:.2rem .55rem;text-decoration:none;font-size:.85rem;white-space:nowrap;color:var(--script)}
   .tags{display:block;color:var(--muted);font-size:.78rem;margin-top:.2rem}
   #copy-status:empty{display:none}
   #copy-status:not(:empty){position:fixed;bottom:1rem;right:1rem;z-index:1;max-width:min(24rem,calc(100vw - 2rem));margin:0;padding:.55rem .8rem;background:var(--panel);border:1px solid var(--line);border-radius:4px;color:var(--ink)}
@@ -120,7 +118,7 @@ export const styles = cssVariables + `
   .prose pre code{overflow-wrap:normal}
   .footer{border-top:1px solid var(--line);padding-block:1.5rem;color:var(--muted);font-size:.87rem}
   .footer .wrap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}.footer p{margin:0}
-  @media(max-width:740px){.head-inner{flex-wrap:wrap;gap:.75rem}.nav{gap:1rem}.directory-tools{align-items:stretch;flex-direction:column}.directory-actions{width:100%;grid-template-columns:minmax(0,1fr)}.directory-toggles{grid-column:1}.link-row{gap:.5rem}.hidden-label{display:block;margin-left:0}.footer .wrap{display:block}}
+  @media(max-width:740px){.head-inner{flex-wrap:wrap;gap:.75rem}.nav{gap:1rem}.directory-tools{align-items:stretch;flex-direction:column}.directory-actions{width:100%;grid-template-columns:minmax(0,1fr)}.directory-toggles{grid-column:1}.link-row{gap:.5rem}.footer .wrap{display:block}}
   @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 `;
 
@@ -347,7 +345,7 @@ const renderLinkRow = ({ code, url, title, script, tags, hidden, prefix, href })
   const cut = split > 0 ? originLength + split + 1 : url.length;
   const searchText = `${code} ${script ? 'script ' : ''}${url} ${tags.join(' ')} ${tags.map((tag) => `#${tag}`).join(' ')}`.trim();
   return `
-        <li${hidden ? ' data-hidden="true" hidden' : ''}${title ? ` data-title="${esc(title)}"` : ''} data-search="${esc(searchText)}"><div class="link-row${script ? ' script-row' : ''}"${title ? ` title="${esc(title)}"` : ''}><a class="code${script ? ' script-link' : ''}" href="${esc(href)}"${title ? ` title="${esc(title)}"` : ''}>${esc(code)}${script ? '<span class="script-label">script</span>' : ''}${hidden ? '<span class="hidden-label">hidden</span>' : ''}</a>
+        <li${hidden ? ' data-hidden="true" hidden' : ''}${title ? ` data-title="${esc(title)}"` : ''} data-search="${esc(searchText)}"><div class="link-row${script ? ' script-row' : ''}"${title ? ` title="${esc(title)}"` : ''}><a class="code${script ? ' script-link' : ''}" href="${esc(href)}"${title ? ` title="${esc(title)}"` : ''}>${esc(code)}${script ? '<span class="script-label">script</span>' : ''}</a>
             <a class="destination" href="${esc(url)}" aria-label="Copy destination: ${esc(url)}"${title ? '' : ` title="${esc(url)}"`}><span class="sr-only">${esc(url)}</span><span class="destination-start" aria-hidden="true">${esc(url.slice(0, cut))}</span><span class="destination-end" aria-hidden="true">${esc(url.slice(cut))}</span></a>${script ? `<a class="download" href="${esc(`./${prefix}${code}.sh`)}" aria-label="Download script for ${esc(code)}" download>Download</a>` : ''}<a class="visit" href="${esc(url)}" aria-label="Open destination for ${esc(code)}">Open</a></div>${tags.length ? `<span class="tags">${tags.map((tag) => `#${esc(tag)}`).join(' · ')}</span>` : ''}</li>`;
 };
 
