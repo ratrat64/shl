@@ -802,7 +802,7 @@ test('inline tags keep row height and usable tag/destination targets on narrow s
             for (const button of doc.querySelectorAll('.tags')) {
               const row = button.closest('li');
               const destination = row.querySelector('.destination');
-              if (button.getBoundingClientRect().width < 40 || destination.getBoundingClientRect().width < 40) throw new Error('Collapsed target at ' + width);
+              if (button.getBoundingClientRect().width < 40 || destination.getBoundingClientRect().width < 40) throw new Error('Collapsed target at ' + width + ' for ' + button.textContent + ': ' + button.getBoundingClientRect().width + '/' + destination.getBoundingClientRect().width);
               const before = row.getBoundingClientRect().height;
               const next = button.nextSibling;
               button.remove();
