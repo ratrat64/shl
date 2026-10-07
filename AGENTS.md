@@ -4,7 +4,7 @@
 - The agent may write commit messages, push commits, and publish new branches for requested work. Use a task branch for changes intended for a pull request; do not push directly to `main`.
 
 ## Session startup
-- At the start of a new session, before tackling the first task, read `README.md`, `PRODUCT.md`, `aid-docs/planning-artifacts/ux-designs/ux-shortlink-2026-10-06/DESIGN.md`, and `package.json`. For UI tasks, also read the adjacent `EXPERIENCE.md`. Identify the relevant code paths, then briefly summarize how the project works and what you will inspect for the task.
+- At the start of a new session, before tackling the first task, read `README.md`, `aid-docs/planning-artifacts/ux-designs/ux-shortlink-2026-10-06/PRODUCT.md`, `aid-docs/planning-artifacts/ux-designs/ux-shortlink-2026-10-06/DESIGN.md`, and `package.json`. For UI tasks, also read the adjacent `EXPERIENCE.md`. Identify the relevant code paths, then briefly summarize how the project works and what you will inspect for the task.
 
 ## Branch and worktree workflow
 - Before creating a new branch or worktree, update local `main` from `origin/main` with a fast-forward pull.
