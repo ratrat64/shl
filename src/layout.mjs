@@ -10,7 +10,7 @@ export const NAV_ITEMS = [
 ];
 
 const header = (active, depth) => `<header class="site-head"><div class="wrap head-inner">
- <a class="brand" href="${depth}" data-app-link>shl</a>
+ <a class="brand" href="${depth}" data-app-link><span class="brand-slash">/</span>shl<span class="brand-slash">/</span></a>
  <nav class="nav" aria-label="Main navigation">
  ${NAV_ITEMS.map(({ label, path, key }) => `<a href="${depth}${path}" data-app-link data-nav="${key}"${active === key ? ' aria-current="page"' : ''}>${label}</a>`).join('')}
  </nav><button class="theme-toggle" type="button" aria-label="Change color theme">Theme: system</button></div></header>`;

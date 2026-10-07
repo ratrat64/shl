@@ -1053,7 +1053,7 @@ test('information pages use relative navigation and shared theme assets', async 
   assert.equal(f.build().status, 0);
   const home = await f.read('index.html');
   assert.match(home, /<title>Links · shl<\/title>/);
-  assert.match(home, /class="brand" href="\.\/" data-app-link>shl<\/a>/);
+  assert.match(home, /class="brand" href="\.\/" data-app-link><span class="brand-slash">\/<\/span>shl<span class="brand-slash">\/<\/span><\/a>/);
   assert.match(home, /<footer class="footer">[\s\S]*?<p>shl<\/p>/);
   assert.match(home, /href="\.\/assets\/site\.css"/);
   assert.match(home, /href="\.\/guide\/"/);
@@ -1073,7 +1073,7 @@ test('information pages use relative navigation and shared theme assets', async 
     }
   }
   assert.match(await f.read('assets/site.css'), /data-theme=dark/);
-  assert.match(await f.read('assets/site.css'), /--bg:#121212/);
+  assert.match(await f.read('assets/site.css'), /--bg:#000/);
   const theme = await f.read('assets/theme.js');
   assert.match(theme, /shortlink-theme/);
   const button = { addEventListener() {} };
@@ -1111,7 +1111,8 @@ test('script launchers are opt-in, quote URLs, forward arguments and statuses, a
   const launcher = await f.read('Run.sh');
   assert.equal(await f.read('tools/Nested.sh'), launcher);
   const home = await f.read('index.html');
-  assert.match(home, /<li data-hidden="true" hidden data-search="Run script [^"]+"><div class="link-row script-row"><a class="code script-link" href="\.\/Run\/">Run<span class="script-label">/);
+  assert.match(home, /<li data-hidden="true" hidden data-search="Run script [^"]+"><div class="link-row script-row"><a class="code script-link" href="\.\/Run\/">Run<\/a>/);
+  assert.doesNotMatch(home, /class="script-label"/);
   assert.match(home, /class="download" href="\.\/Run\.sh"[^>]* download>Download<\/a><a class="visit" href="https:\/\/example\.com\/setup\.sh/);
   assert.match(home, /#shell"[^>]*><div class="link-row script-row">/);
   assert.match(home, /<button class="tags"[^>]*>#shell<\/button><a class="destination"/);
@@ -1120,7 +1121,7 @@ test('script launchers are opt-in, quote URLs, forward arguments and statuses, a
   assert.doesNotMatch(home, /class="download" href="\.\/disabled\.sh"/);
   assert.match(home, /<span class="count-number" aria-hidden="true">3<\/span><span class="count-label"> links<\/span>/);
   assert.match(home, /class="code" href="\.\/disabled\/">disabled<\/a>/);
-  assert.match(await f.read('assets/site.css'), /--script:#e8b460/);
+  assert.match(await f.read('assets/site.css'), /--script:#c6a36a/);
   assert.match(await f.read('assets/site.css'), /\.download\{/);
   assert.match(await f.read('assets/site.css'), /\.link-row\.script-row\{grid-template-columns:max-content minmax\(0,1fr\) max-content max-content\}/);
   assert.match(await f.read('tools/Nested/index.html'), /http-equiv="refresh"/);
