@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile, mkdir, rm, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { createContext, runInContext, runInNewContext } from 'node:vm';
 
@@ -780,6 +780,77 @@ test('search filters nested links on the homepage and directory pages', async (t
   assert.equal(tools.firstElementChild.open, true);
 });
 
+test('inline tags keep row height and usable tag/destination targets on narrow script rows', async (t) => {
+  const chrome = process.env.CHROME_BIN || 'google-chrome';
+  if (spawnSync(chrome, ['--version']).status !== 0) return t.skip('Chrome is not installed');
+  const f = await fixture(t, {
+    example: { url: 'https://example.com/setup.sh', script: true, tags: ['documentation', 'a-very-long-tag-for-disclosure'] },
+    'long-script-code': { url: 'https://example.com/setup.sh', script: true, tags: ['shell'] },
+    plain: { url: 'https://example.com/plain', tags: ['reference'] },
+  });
+  assert.equal(f.build().status, 0);
+  await writeFile(join(f.cwd, 'dist', 'layout-check.html'), `<!doctype html><html><body><iframe src="index.html" style="width:390px;height:700px;border:0"></iframe><script>
+    document.querySelector('iframe').addEventListener('load', async (event) => {
+      try {
+        const frame = event.target;
+        const doc = frame.contentDocument;
+        for (const width of [320, 390, 1440]) {
+          frame.style.width = width + 'px';
+          await new Promise(resolve => setTimeout(resolve, 30));
+          for (const theme of ['light', 'dark']) {
+            doc.documentElement.dataset.theme = theme;
+            for (const button of doc.querySelectorAll('.tags')) {
+              const row = button.closest('li');
+              const destination = row.querySelector('.destination');
+              if (button.getBoundingClientRect().width < 40 || destination.getBoundingClientRect().width < 40) throw new Error('Collapsed target at ' + width + ' for ' + button.textContent + ': ' + button.getBoundingClientRect().width + '/' + destination.getBoundingClientRect().width);
+              const before = row.getBoundingClientRect().height;
+              const next = button.nextSibling;
+              button.remove();
+              const withoutTags = row.getBoundingClientRect().height;
+              next.parentNode.insertBefore(button, next);
+              if (before !== withoutTags) throw new Error('Tags increased height at ' + width);
+              button.click();
+              const panel = doc.getElementById(button.getAttribute('popovertarget'));
+              if (!panel.matches(':popover-open') || panel.textContent !== button.textContent) throw new Error('Disclosure failed');
+              if (row.getBoundingClientRect().height !== before) throw new Error('Popover increased height');
+              panel.hidePopover();
+            }
+          }
+        }
+        document.body.dataset.layoutCheck = 'passed';
+      } catch (error) { document.body.dataset.layoutCheck = error.message; }
+    });
+  </script></body></html>`);
+  const result = spawnSync(chrome, [
+    '--headless', '--no-sandbox', '--disable-gpu', '--allow-file-access-from-files',
+    `--user-data-dir=${join(f.cwd, 'chrome-profile')}`, '--virtual-time-budget=2000', '--dump-dom',
+    pathToFileURL(join(f.cwd, 'dist', 'layout-check.html')).href,
+  ], { encoding: 'utf8', timeout: 15000 });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /<body data-layout-check="passed">/, result.stdout);
+});
+
+test('inline tag disclosures target the correct link when codes repeat in different folders', async (t) => {
+  const f = await fixture(t, {
+    docs: { url: 'https://example.com/root', tags: ['root'] },
+    tools: { docs: { url: 'https://example.com/tools', tags: ['tools'] } },
+    guides: { docs: { url: 'https://example.com/guides', tags: ['guides'], script: true } },
+    untagged: 'https://example.com/plain',
+  });
+  assert.equal(f.build().status, 0);
+  for (const path of ['index.html', 'tools/index.html', 'guides/index.html']) {
+    const html = await f.read(path);
+    const buttons = [...html.matchAll(/<button class="tags"[^>]*popovertarget="([^"]+)"[^>]*>([^<]+)<\/button>/g)];
+    const panels = [...html.matchAll(/<div class="tag-panel" id="([^"]+)"[^>]*>([^<]+)<\/div>/g)];
+    assert.equal(buttons.length, path === 'index.html' ? 3 : 1);
+    assert.equal(new Set(panels.map(([, id]) => id)).size, panels.length);
+    for (const [, target, label] of buttons) {
+      assert.equal(panels.find(([, id]) => id === target)?.[2], label);
+    }
+    assert.doesNotMatch(html, /Show all tags for untagged/);
+  }
+});
+
 test('tags are displayed safely and searchable on home and nested pages without revealing hidden links', async (t) => {
   const links = {
     tools: {
@@ -796,10 +867,11 @@ test('tags are displayed safely and searchable on home and nested pages without 
   for (const page of ['index.html', 'tools/index.html']) {
     const html = await f.read(page);
     assert.match(html, /data-search="manual https:\/\/example\.com\/guide How To &lt;img src=x onerror=alert\(1\)&gt; #How To #&lt;img src=x onerror=alert\(1\)&gt;"/);
-    assert.match(html, /class="tags">#How To · #&lt;img src=x onerror=alert\(1\)&gt;<\/span>/);
-    assert.match(html, /class="tags">#editor<\/span>/);
+    assert.match(html, /<button class="tags"[^>]*aria-label="#How To · #&lt;img src=x onerror=alert\(1\)&gt;\. Show all tags for manual">#How To · #&lt;img src=x onerror=alert\(1\)&gt;<\/button><a class="destination"/);
+    assert.match(html, /<button class="tags"[^>]*>#editor<\/button>/);
+    assert.match(html, /<div class="tag-panel"[^>]*popover tabindex="0" role="region" aria-label="Tags for manual">#How To · #&lt;img src=x onerror=alert\(1\)&gt;<\/div>/);
     assert.doesNotMatch(html, /<img/);
-    const rows = [...html.matchAll(/<li([^>]*)><div class="link-row"[^>]*>[\s\S]*?<\/div>(?:<span class="tags">[\s\S]*?<\/span>)?<\/li>/g)];
+    const rows = [...html.matchAll(/<li([^>]*)><div class="link-row"[^>]*>[\s\S]*?<\/div>(?:<div class="tag-panel"[^>]*>[\s\S]*?<\/div>)?<\/li>/g)];
     const leaf = (code) => {
       const [, attributes] = rows.find(([, attributes]) => attributes.includes(`data-search="${code} `)) || [];
       assert.ok(attributes, `missing ${code} on ${page}`);
@@ -1043,7 +1115,7 @@ test('script launchers are opt-in, quote URLs, forward arguments and statuses, a
   assert.doesNotMatch(home, /class="script-label"/);
   assert.match(home, /class="download" href="\.\/Run\.sh"[^>]* download>Download<\/a><a class="visit" href="https:\/\/example\.com\/setup\.sh/);
   assert.match(home, /#shell"[^>]*><div class="link-row script-row">/);
-  assert.match(home, /<span class="tags">#shell<\/span><\/li>/);
+  assert.match(home, /<button class="tags"[^>]*>#shell<\/button><a class="destination"/);
   assert.match(home, /class="download" href="\.\/tools\/Nested\.sh"[^>]* download>Download<\/a><a class="visit"/);
   assert.match(await f.read('tools/index.html'), /class="download" href="\.\/Nested\.sh"[^>]* download>Download<\/a><a class="visit"/);
   assert.doesNotMatch(home, /class="download" href="\.\/disabled\.sh"/);

@@ -90,6 +90,8 @@ A code copies its full short URL on click; script-enabled codes use amber and ha
 
 Copy feedback appears as a small, flat floating panel near the viewport edge and never displaces directory content.
 
+Tags sit inline between the code and destination in muted text at the existing metadata size. Cap their width at 9rem (5rem below 500px), keep them on one line, and truncate with an ellipsis rather than increasing row height. Let the tag track fit its actual label width so the gap to destinations stays consistent. Reserve at least 3rem for the labels and 4rem for the destination (3rem below 500px); let long-code or script rows scroll horizontally instead of reducing either target to zero. Horizontal scrollbar chrome must not add row height. Selecting the labels reveals the full tags in a flat floating panel using existing surface, rule, ink, and control-radius roles. Place it near the labels where CSS anchor positioning is supported; otherwise use the browser's centered popover. See EXPERIENCE.md for keyboard and dismissal behavior.
+
 Link rows and folder summaries use the theme wash on hover and focus-within, preserving visible focus outlines. Revealed hidden links use exactly the regular colors and font weights, with reduced opacity across the row and tags: 80% in dark mode and 94% in light mode. Hidden-only folder summaries use the same opacity without dimming their nested lists again. Keyboard focus restores full row or summary opacity so focus outlines stay clear. Do not add hidden or SCRIPT labels.
 
 ## Do's and Don'ts
