@@ -379,10 +379,10 @@ const directoryContents = (entries, depth, breadcrumbs = '', emptyMessage = 'No 
   const visible = visibleCount(entries);
   const total = visibleCount(entries, true);
   return `<section aria-label="Links">
-    <div class="directory-tools"><h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">${visible} link${visible === 1 ? '' : 's'}</h1>
+    <div class="directory-tools"><h1 id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number" aria-hidden="true">${visible}</span><span class="count-label">${visible === 1 ? ' link' : ' links'}</span></h1>
     <div class="directory-actions">${total ? searchableListing() : ''}<div class="directory-toggles"><button id="hidden-toggle" class="theme-toggle" type="button" aria-pressed="false" ${total > visible ? 'hidden' : 'disabled'}>Show hidden links</button></div></div></div>
     ${breadcrumbs || '<div class="breadcrumbs" aria-hidden="true"></div>'}
-   ${total ? `<p id="search-status" class="search-status" role="status" hidden></p><p id="copy-status" class="search-status" role="status" aria-live="polite"></p>
+    ${total ? `<p id="search-status" class="search-status" role="status" hidden></p><p id="copy-status" class="search-status" role="status" aria-live="polite"></p>
      ${visible ? '' : '<p id="empty-directory">No links listed here.</p>'}
       <div${visible ? '' : ' hidden'}>${listing(entries)}</div><script src="${depth}assets/search.js" defer></script><script src="${depth}assets/copy.js" defer></script>` : `<p>${emptyMessage}</p>`}</section>`;
 };

@@ -114,14 +114,14 @@ test('homepage lists sorted links safely with project-relative URLs and handles 
   assert.match(html, /&lt;script&gt;title&lt;\/script&gt;/);
   assert.match(html, /https:\/\/example\.com\/\?q=&lt;img&gt;&amp;x=&quot;quoted&quot;/);
   assert.doesNotMatch(html, /<script>title|<img|undefined/);
-  assert.match(html, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">3 links<\/h1>/);
+  assert.match(html, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number" aria-hidden="true">3<\/span><span class="count-label"> links<\/span><\/h1>/);
   assert.equal([...html.matchAll(/<h1\b/g)].length, 1);
   assert.doesNotMatch(html, /<h[1-6]>Links<\/h[1-6]>|data-visible=|data-total=/);
   assert.match(html, /<ul class="links">[\s\S]*href="\.\/Alpha\/"/); // Browsable before scripts run.
   const empty = await fixture(t, {});
   assert.equal(empty.build().status, 0);
   const emptyHtml = await empty.read('index.html');
-  assert.match(emptyHtml, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">0 links<\/h1>/);
+  assert.match(emptyHtml, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number" aria-hidden="true">0<\/span><span class="count-label"> links<\/span><\/h1>/);
   assert.equal([...emptyHtml.matchAll(/<h1\b/g)].length, 1);
   assert.match(emptyHtml, /id="hidden-toggle"[^>]*disabled>Show hidden links/);
   assert.match(emptyHtml, /No links available yet\./);
@@ -141,7 +141,7 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
   assert.match(tools, /href="\.\.\/assets\/site\.css"/);
   for (const page of [home, tools]) assert.match(page, /<div class="directory-toggles"><button id="hidden-toggle"[^>]*disabled>Show hidden links<\/button><\/div>/);
   assert.match(home, /<div class="breadcrumbs" aria-hidden="true"><\/div>/);
-  assert.match(tools, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">2 links<\/h1>/);
+  assert.match(tools, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number" aria-hidden="true">2<\/span><span class="count-label"> links<\/span><\/h1>/);
   assert.equal([...tools.matchAll(/<h1\b/g)].length, 1);
   assert.doesNotMatch(tools, /<h1>tools<\/h1>/);
   assert.match(tools, /<nav class="breadcrumbs" aria-label="Breadcrumb">.*Home<\/a> \/ tools<\/nav>/);
@@ -150,7 +150,7 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
   assert.ok(tools.indexOf('class="directory-tools"') < tools.indexOf('class="breadcrumbs"'));
   const editors = await f.read('tools/editors/index.html');
   assert.match(editors, /href="\.\.\/\.\.\/assets\/site\.css"/);
-  assert.match(editors, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">1 link<\/h1>/);
+  assert.match(editors, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number" aria-hidden="true">1<\/span><span class="count-label"> link<\/span><\/h1>/);
   assert.equal([...editors.matchAll(/<h1\b/g)].length, 1);
   assert.match(editors, /href="\.\.\/\.\.\/" data-directory-link>Home<\/a>/);
   assert.match(editors, /href="\.\.\/" data-directory-link>tools<\/a>/);
@@ -322,7 +322,7 @@ test('hidden links and hidden-only folders are hidden by default but keep their 
     assert.match(html, /<li data-hidden="true" hidden data-search="[^"]+"><div class="link-row"[^>]*><a class="code[^>]* href="\.\/.*(?:secret|SecretCode|HiddenDeep)\/"/);
   }
   const home = await f.read('index.html');
-  assert.match(home, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">4 links<\/h1>/);
+  assert.match(home, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number" aria-hidden="true">4<\/span><span class="count-label"> links<\/span><\/h1>/);
   assert.match(home, /href="\.\/tools\/nested\/" data-directory-link>nested<\/a>/);
   assert.match(home, /href="\.\/tools\/nested\/branch\/further\/VisibleDeep\/">VisibleDeep<\/a>/);
   assert.match(home, /href="\.\/shown\/">shown<\/a>/);
@@ -336,7 +336,7 @@ test('hidden links and hidden-only folders are hidden by default but keep their 
   assert.match(await f.read('tools/nested/branch/further/index.html'), /href="\.\/VisibleDeep\/">VisibleDeep<\/a>/);
   for (const page of ['onlyHidden/index.html', 'onlyHidden/nested/index.html', 'tools/private/index.html', 'tools/private/deep/index.html']) {
     const html = await f.read(page);
-    assert.match(html, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">0 links<\/h1>/);
+    assert.match(html, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number" aria-hidden="true">0<\/span><span class="count-label"> links<\/span><\/h1>/);
     assert.match(html, /<p id="empty-directory">No links listed here\.<\/p>/);
     assert.match(html, /<div hidden><ul class="links">/);
     assert.match(html, /id="hidden-toggle"[^>]*hidden>Show hidden links/);
@@ -350,7 +350,7 @@ test('hidden links and hidden-only folders are hidden by default but keep their 
   const allHidden = await fixture(t, { private: { nested: { code: { url: 'https://example.com/', hidden: true } } } });
   assert.equal(allHidden.build().status, 0);
   assert.match(await allHidden.read('index.html'), /No links listed here\./);
-  assert.match(await allHidden.read('index.html'), /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">0 links<\/h1>/);
+  assert.match(await allHidden.read('index.html'), /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number" aria-hidden="true">0<\/span><span class="count-label"> links<\/span><\/h1>/);
   assert.match(await allHidden.read('index.html'), /<li data-hidden="true" hidden><details><summary><a href="\.\/private\/" data-directory-link>/);
   assert.match(await allHidden.read('private/nested/index.html'), /No links listed here\./);
   assert.match(await allHidden.read('private/nested/code/index.html'), /https:\/\/example\.com/);
@@ -593,14 +593,19 @@ test('toggle updates hidden rows, nested search, counts, and hidden-only empty s
     const html = await site.read(page);
     assert.match(html, /id="hidden-toggle"[^>]*aria-pressed="false" hidden>Show hidden links/);
     assert.doesNotMatch(html, /data-visible=|data-total=/);
-    assert.match(html, new RegExp(`id="link-count" class="count" aria-live="polite" aria-atomic="true">${visible} link${visible === 1 ? '' : 's'}</`));
+    assert.match(html, new RegExp(`id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number" aria-hidden="true">${visible}</span><span class="count-label">${visible === 1 ? ' link' : ' links'}</span></`));
     const wrapper = { hidden: !visible };
     const list = { children, parentElement: wrapper };
     const search = { hidden: true };
     const input = { value: '', parentElement: search, addEventListener: (_, callback) => { input.update = callback; } };
     const status = { hidden: true, textContent: '' };
     const toggle = { hidden: true, textContent: 'Show hidden links', setAttribute(name, value) { this[name] = value; }, addEventListener: (_, callback) => { toggle.click = callback; } };
-    const count = { textContent: `${visible} link${visible === 1 ? '' : 's'}` };
+    const numberEl = { textContent: visible };
+  const labelEl = { textContent: visible === 1 ? ' link' : ' links' };
+  const count = {
+    get textContent() { return `${numberEl.textContent}${labelEl.textContent}`; },
+    querySelector: (sel) => sel === '.count-number' ? numberEl : sel === '.count-label' ? labelEl : null
+  };
     const empty = visible ? null : { hidden: false };
     const elements = { '#link-search': input, '.links': list, '#search-status': status, '#hidden-toggle': toggle, '#link-count': count, '#empty-directory': empty };
     runInNewContext(script, { document: { querySelector: (selector) => elements[selector] } });
@@ -779,7 +784,7 @@ test('script launchers are opt-in, quote URLs, forward arguments and statuses, a
   assert.match(home, /class="download" href="\.\/tools\/Nested\.sh"[^>]* download>Download<\/a><a class="visit"/);
   assert.match(await f.read('tools/index.html'), /class="download" href="\.\/Nested\.sh"[^>]* download>Download<\/a><a class="visit"/);
   assert.doesNotMatch(home, /class="download" href="\.\/disabled\.sh"/);
-  assert.match(home, /3 links/);
+  assert.match(home, /<span class="count-number" aria-hidden="true">3<\/span><span class="count-label"> links<\/span>/);
   assert.match(home, /class="code" href="\.\/disabled\/">disabled<\/a>/);
   assert.match(await f.read('assets/site.css'), /--script:#e8b460/);
   assert.match(await f.read('assets/site.css'), /\.download\{/);
