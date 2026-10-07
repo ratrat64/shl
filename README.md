@@ -73,7 +73,11 @@ tools:
 This creates browseable `/tools/` and `/tools/editors/` pages and redirect URLs
 `/tools/git/` and `/tools/editors/code/`. The homepage has expandable directories;
 each directory page also lists links and subdirectories. With JavaScript, folder
-links, breadcrumbs, and Home navigate without reloading; Back and Forward work too.
+links, breadcrumbs, brand, and header/footer Links and Guide navigation work
+without reloading, keeping the header, footer, and theme mounted. Guide section
+anchors also navigate without reloading; Back and Forward restore content and
+saved scroll positions. Search, hidden toggles, and expanded folders reset on
+page transitions.
 Direct URLs, refreshes, and browsing without JavaScript still use the generated
 pages. Existing top-level links keep their URLs. Directory names are their display
 labels, and a directory must contain at least one entry. A path cannot be both a
@@ -182,7 +186,10 @@ To return to Node.js 24 if the Bun workflow fails, revert the Bun migration
 commit to restore the npm lockfile and Node-based CI commands together.
 
 A successful build replaces `dist/` completely; edit the templates in
-`src/pages.mjs`, input validation in `src/links.mjs`, and output generation in
+`src/pages.mjs` (Guide, redirects, legacy forwarding, and 404), shared layout in
+`src/layout.mjs`, directory components in `src/directory.mjs`, styles in
+`src/styles.mjs`, browser behaviors and content mounting in `src/browser.mjs`,
+input validation in `src/links.mjs`, and output generation in
 `src/build.mjs`, not the generated files. Validation fails before the old
 output is removed. URL syntax is checked, but destination reachability is not.
 

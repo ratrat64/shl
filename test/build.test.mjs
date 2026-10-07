@@ -132,7 +132,7 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
   const f = await fixture(t, links);
   assert.equal(f.build().status, 0);
   const home = await f.read('index.html');
-  assert.match(home, /<details><summary><a href="\.\/tools\/" data-directory-link>tools<\/a><\/summary>/);
+  assert.match(home, /<details><summary><a href="\.\/tools\/" data-app-link>tools<\/a><\/summary>/);
   assert.match(home, /href="\.\/tools\/editors\/Code\/" title="&lt;Editor&gt;">Code<\/a>/);
   assert.match(home, /data-title="&lt;Editor&gt;"/);
   assert.match(home, /class="link-row" title="&lt;Editor&gt;"/);
@@ -146,14 +146,14 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
   assert.doesNotMatch(tools, /<h1>tools<\/h1>/);
   assert.match(tools, /<nav class="breadcrumbs" aria-label="Breadcrumb">.*Home<\/a> \/ tools<\/nav>/);
   assert.match(tools, /href="\.\/git\/">git<\/a>/);
-  assert.match(tools, /<summary><a href="\.\/editors\/" data-directory-link>editors<\/a><\/summary>/);
+  assert.match(tools, /<summary><a href="\.\/editors\/" data-app-link>editors<\/a><\/summary>/);
   assert.ok(tools.indexOf('class="directory-tools"') < tools.indexOf('class="breadcrumbs"'));
   const editors = await f.read('tools/editors/index.html');
   assert.match(editors, /href="\.\.\/\.\.\/assets\/site\.css"/);
   assert.match(editors, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number" aria-hidden="true">1<\/span><span class="count-label"> link<\/span><\/h1>/);
   assert.equal([...editors.matchAll(/<h1\b/g)].length, 1);
-  assert.match(editors, /href="\.\.\/\.\.\/" data-directory-link>Home<\/a>/);
-  assert.match(editors, /href="\.\.\/" data-directory-link>tools<\/a>/);
+  assert.match(editors, /href="\.\.\/\.\.\/" data-app-link>Home<\/a>/);
+  assert.match(editors, /href="\.\.\/" data-app-link>tools<\/a>/);
   assert.match(editors, /href="\.\/Code\/" title="&lt;Editor&gt;">Code<\/a>/);
   assert.match(editors, /class="link-row" title="&lt;Editor&gt;"/);
   for (const prefix of ['/', '/project/']) {
@@ -177,52 +177,88 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
   assert.match(await yaml.read('tools/editors/index.html'), /href="\.\/Code\/" title="&lt;Editor&gt;">Code<\/a>/);
 });
 
-test('folder navigation swaps generated pages, restores history, and falls back on failed fetches', async (t) => {
+for (const prefix of ['/', '/project/']) test(`app navigation swaps pages, handles sections/history, mounts controls, and preserves native actions at ${prefix}`, async (t) => {
   const f = await fixture(t, { tools: { git: 'https://git-scm.com/', editors: { Code: 'https://example.org/' } }, hidden: { secret: { url: 'https://example.org/private', hidden: true } } });
   assert.equal(f.build().status, 0);
-  const pages = new Map(await Promise.all(['', 'tools/', 'tools/editors/', 'hidden/', 'tools/git/'].map(async (path) =>
-    [`https://short.example/project/${path}`, await f.read(`${path}index.html`)])));
+  const emptySite = await fixture(t, {});
+  assert.equal(emptySite.build().status, 0);
+  const base = `https://short.example${prefix}`;
+  const pages = new Map(await Promise.all(['', 'guide/', 'tools/', 'tools/editors/', 'hidden/', 'tools/git/'].map(async (path) =>
+    [`${base}${path}`, await f.read(`${path}index.html`)])));
   const script = await f.read('assets/navigation.js');
-  assert.match(pages.get('https://short.example/project/'), /src="\.\/assets\/navigation\.js"/);
-  assert.match(pages.get('https://short.example/project/tools/'), /src="\.\.\/assets\/navigation\.js"/);
-  assert.doesNotMatch(await f.read('guide/index.html'), /navigation\.js/);
+  assert.match(pages.get(base), /src="\.\/assets\/navigation\.js"/);
+  assert.match(pages.get(base + 'tools/'), /src="\.\.\/assets\/navigation\.js"/);
+  assert.match(await f.read('guide/index.html'), /navigation\.js/);
 
   const location = {
-    href: 'https://short.example/project/',
+    href: base + 'guide/#about',
     get pathname() { return new URL(this.href).pathname; },
     get origin() { return new URL(this.href).origin; },
     assign(url) { this.assigned = url; },
   };
-  const makeLink = (href, base) => ({
+  const makeLink = (href, base, app = true) => ({
+    app, dataset: {},
     raw: href,
     get href() { return new URL(this.raw, base || location.href).href; },
     set href(value) { this.raw = value; },
     get pathname() { return new URL(this.href).pathname; },
     get origin() { return new URL(this.href).origin; },
     getAttribute() { return this.raw; },
+    hasAttribute(name) { return name === 'download' && !!this.download; },
+    setAttribute(name, value) { this[name] = value; },
+    removeAttribute(name) { delete this[name]; },
   });
   const main = (html, url) => {
-    const links = [...html.matchAll(/<a [^>]*href="(\.{1,2}\/[^\"]*)"/g)].map((match) => makeLink(match[1], url));
+    const content = html.match(/<main[^>]*>([\s\S]*?)<\/main>/)?.[1] || '';
+    const links = [...content.matchAll(/<a ([^>]*href="([^\"]*)"[^>]*)>/g)].map((match) => makeLink(match[2], url, match[1].includes('data-app-link')));
     const heading = { focus(options) { this.focused = options.preventScroll; } };
+    const ids = [...content.matchAll(/id="([^"]+)"/g)].map((match) => ({ id: match[1], focus(options) { this.focused = options.preventScroll; }, scrollIntoView() { this.scrolled = true; window.scrollY = 400; } }));
+    const control = (extra = {}) => ({
+      handlers: new Map(), ...extra,
+      addEventListener(name, callback) { const handlers = this.handlers.get(name) || []; handlers.push(callback); this.handlers.set(name, handlers); },
+      removeEventListener(name, callback) { this.handlers.set(name, this.handlers.get(name).filter((handler) => handler !== callback)); },
+      setAttribute(name, value) { this[name] = value; },
+    });
+    const elements = {};
+    if (content.includes('id="link-search"')) {
+      elements['#link-search'] = control({ value: '', parentElement: { hidden: true } });
+      elements['#search-status'] = { textContent: '', hidden: true };
+      elements['#copy-status'] = { textContent: '' };
+      elements['#link-count'] = { textContent: '' };
+      elements['#hidden-toggle'] = control({ disabled: /id="hidden-toggle"[^>]*disabled/.test(content), hidden: true });
+      if (content.includes('id="empty-directory"')) elements['#empty-directory'] = { hidden: false };
+      const children = [...content.matchAll(/<li([^>]*)><div class="link-row/g)].map((match) => ({
+        dataset: { search: match[1].match(/data-search="([^"]*)"/)?.[1], ...(match[1].includes('data-hidden') ? { hidden: 'true' } : {}) },
+        firstElementChild: { tagName: 'DIV' },
+      }));
+      elements['.links'] = control({ children, parentElement: { hidden: !!elements['#empty-directory'] } });
+    }
     return {
-      links, heading,
+      links, heading, ids, elements, dataset: { appPage: html.match(/data-app-page="([^"]+)"/)?.[1] },
       querySelectorAll(selector) {
-        if (selector === 'script') return [{ remove() {} }, { remove() {} }];
-        return links.filter((link) => link.raw.startsWith('.'));
+        if (selector === 'script') return [{ remove() { document.scriptsRemoved++; } }];
+        if (selector === '[id]') return ids;
+        return links;
       },
-      querySelector(selector) { return selector === 'h1' ? heading : selector === '.links' && html.includes('class="links"') ? {} : null; },
+      querySelector(selector) { return selector === 'h1' ? heading : elements[selector] || null; },
       replaceWith(next) { document.currentMain = next; },
     };
   };
-  const brand = makeLink('./');
-  const guide = makeLink('./guide/');
+  const brand = makeLink('../');
+  const guide = makeLink('../guide/');
+  const linksNav = makeLink('../');
+  guide.dataset.nav = 'guide';
+  linksNav.dataset.nav = 'links';
+  const footerGuide = makeLink('../guide/');
   const initialized = [];
   const listeners = {};
   const document = {
-    title: 'Links · shl',
-    currentMain: main(pages.get(location.href), location.href),
-    querySelector(selector) { return selector === '.brand' ? brand : selector === 'main' ? this.currentMain : null; },
-    querySelectorAll() { return [brand, guide]; },
+    title: 'Guide · shl', scriptsRemoved: 0,
+    body: { classList: { toggle(name, on) { document.directory = on; } } },
+    documentElement: { dataset: { theme: 'dark' } },
+    currentMain: main(pages.get(base + 'guide/'), location.href),
+    querySelector(selector) { return selector === '.brand' ? brand : selector === 'main' ? this.currentMain : this.currentMain.querySelector(selector); },
+    querySelectorAll(selector) { return selector === '[data-nav]' ? [linksNav, guide] : [brand, linksNav, guide, footerGuide]; },
     addEventListener(name, callback) { listeners[name] = callback; },
   };
   const history = {
@@ -230,7 +266,9 @@ test('folder navigation swaps generated pages, restores history, and falls back 
   };
   const window = { scrollY: 0, addEventListener(name, callback) { listeners[name] = callback; }, scrollTo(_x, y) { this.scrollY = y; } };
   let heldUrl, release;
+  const fetched = [];
   const fetch = async (url) => {
+    fetched.push(url);
     if (url === heldUrl) await new Promise((resolve) => { release = resolve; });
     return { ok: pages.has(url), text: async () => pages.get(url) };
   };
@@ -238,62 +276,147 @@ test('folder navigation swaps generated pages, restores history, and falls back 
     parseFromString(html) {
       const title = html.match(/<title>([^<]+)<\/title>/)?.[1];
       const url = [...pages].find(([, page]) => page === html)?.[0];
-      return { querySelector: (selector) => selector === 'title' ? title && { textContent: title } : selector === 'main[data-directory]' && html.includes('<main class="wrap" data-directory>') ? main(html, url) : null };
+      return { querySelector: (selector) => selector === 'title' ? title && { textContent: title } : selector === 'main[data-app-page]' && html.includes('data-app-page=') ? main(html, url) : null };
     }
   }
-  runInNewContext(script, { document, location, history, window, fetch, DOMParser, URL,
-    initSearch: () => initialized.push('search'), initCopy: () => initialized.push('copy') });
-  assert.equal(brand.href, 'https://short.example/project/');
-  assert.equal(guide.href, 'https://short.example/project/guide/');
+  const copied = [];
+  const timers = new Map();
+  let timer = 0;
+  runInNewContext(await f.read('assets/search.js') + '\n' + await f.read('assets/copy.js') + `
+    const search = initSearch, copy = initCopy;
+    globalThis.initSearch = () => { initialized.push('search'); search(); };
+    globalThis.initCopy = () => { initialized.push('copy'); copy(); };
+  ` + script, { document, location, history, window, fetch, DOMParser, URL, initialized,
+    navigator: { clipboard: { writeText: async (text) => copied.push(text) } },
+    clearTimeout: (id) => timers.delete(id), setTimeout: (callback) => { timers.set(++timer, callback); return timer; } });
+  assert.equal(brand.href, base);
+  assert.equal(guide.href, base + 'guide/');
   assert.equal(history.scrollRestoration, 'manual');
+  assert.equal(document.currentMain.ids.find((id) => id.id === 'about').focused, true);
+  assert.equal(fetched.length, 0);
 
   const click = async (link, options = {}) => {
     let prevented = false;
-    listeners.click({ button: 0, defaultPrevented: false, target: { closest: () => link }, preventDefault() { prevented = true; }, ...options });
+    listeners.click({ button: 0, defaultPrevented: false, target: { closest: (selector) => selector === 'a[data-app-link]' && link?.app ? link : null }, preventDefault() { prevented = true; }, ...options });
     await new Promise((resolve) => setImmediate(resolve));
     return prevented;
   };
   const folder = (suffix) => document.currentMain.links.find((link) => link.href.endsWith(suffix));
+  assert.equal(await click(brand), true);
+  assert.equal(document.title, 'Links · shl');
+  initialized.length = 0;
+  history.pushed = 0;
   assert.equal(await click(null), false); // Redirect and destination links remain native.
   assert.equal(await click(folder('/tools/'), { ctrlKey: true }), false);
   assert.equal(await click(folder('/tools/')), true);
-  assert.equal(location.pathname, '/project/tools/');
+  assert.equal(location.pathname, prefix + 'tools/');
   assert.equal(document.title, 'tools · shl');
   assert.equal(document.currentMain.heading.focused, true);
-  assert.equal(folder('/tools/git/').href, 'https://short.example/project/tools/git/');
-  assert.equal(guide.href, 'https://short.example/project/guide/');
+  assert.equal(folder('/tools/git/').href, base + 'tools/git/');
+  assert.equal(guide.href, base + 'guide/');
   assert.deepEqual(initialized, ['search', 'copy']);
   window.scrollY = 250;
   assert.equal(await click(folder('/tools/editors/')), true);
   assert.equal(history.pushed, 2);
-  assert.equal(location.pathname, '/project/tools/editors/');
+  assert.equal(location.pathname, prefix + 'tools/editors/');
   assert.equal(window.scrollY, 0);
-  heldUrl = 'https://short.example/project/tools/';
+  heldUrl = base + 'tools/';
   location.href = heldUrl;
   listeners.popstate();
-  location.href = 'https://short.example/project/tools/editors/';
+  location.href = base + 'tools/editors/';
   listeners.popstate();
   release();
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(document.title, 'editors · shl'); // A late Back response cannot replace the Forward page.
   heldUrl = null;
-  location.href = 'https://short.example/project/tools/';
+  location.href = base + 'tools/';
   listeners.popstate();
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(document.title, 'tools · shl');
   assert.equal(window.scrollY, 250);
-  location.href = 'https://short.example/project/';
+  location.href = base;
   listeners.popstate();
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(document.title, 'Links · shl');
   assert.equal(await click(folder('/hidden/')), true);
   assert.equal(initialized.length, 10); // Search and copy also initialize on hidden-only pages.
-  assert.equal(await click(makeLink('https://short.example/project/tools/git/')), true);
-  assert.equal(location.assigned, 'https://short.example/project/tools/git/'); // A redirect page is never injected.
-  pages.delete('https://short.example/project/tools/');
-  assert.equal(await click(makeLink('https://short.example/project/tools/')), true);
-  assert.equal(location.assigned, 'https://short.example/project/tools/');
+  const controls = document.currentMain.elements;
+  assert.equal(controls['#link-search'].handlers.get('input').length, 1);
+  assert.equal(controls['#hidden-toggle'].handlers.get('click').length, 1);
+  assert.equal(controls['.links'].handlers.get('click').length, 1);
+  controls['#hidden-toggle'].handlers.get('click')[0]();
+  assert.equal(controls['#hidden-toggle']['aria-pressed'], 'true');
+  assert.equal(controls['#link-count'].textContent, '1 link');
+  controls['#link-search'].value = 'missing';
+  controls['#link-search'].handlers.get('input')[0]();
+  assert.equal(controls['#link-count'].textContent, '0 links');
+  const copyLink = { href: base + 'hidden/secret/', hasAttribute: () => false, classList: { contains: () => true } };
+  await controls['.links'].handlers.get('click')[0]({ button: 0, target: { closest: () => copyLink }, preventDefault() {} });
+  assert.equal(copied.length, 1);
+  assert.equal(timers.size, 1);
+  assert.equal(await click(footerGuide), true);
+  assert.equal(timers.size, 0);
+  assert.equal(controls['#copy-status'].textContent, '');
+  assert.equal(controls['.links'].handlers.get('click').length, 0);
+  assert.equal(document.title, 'Guide · shl');
+  assert.equal(document.directory, false);
+  assert.equal(guide['aria-current'], 'page');
+  assert.equal(linksNav['aria-current'], undefined);
+  assert.equal(document.documentElement.dataset.theme, 'dark');
+  assert.equal(footerGuide.href, base + 'guide/');
+  const guideMain = document.currentMain;
+  const beforeSections = fetched.length;
+  assert.equal(await click(folder('#how-to-use')), true);
+  assert.equal(location.href, base + 'guide/#how-to-use');
+  assert.equal(guideMain.ids.find((id) => id.id === 'how-to-use').focused, true);
+  window.scrollY = 550;
+  assert.equal(await click(folder('#about')), true);
+  location.href = base + 'guide/#how-to-use';
+  listeners.popstate();
+  assert.equal(window.scrollY, 550);
+  assert.equal(document.currentMain, guideMain);
+  assert.equal(fetched.length, beforeSections);
+  assert.equal(await click(makeLink(base + 'guide/#missing')), true);
+  assert.equal(guideMain.heading.focused, true);
+  assert.equal(await click(guide), true); // Current route without fragment returns to top.
+  assert.equal(window.scrollY, 0);
+  heldUrl = base + 'tools/';
+  const pending = click(makeLink(heldUrl));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(await click(guide), true); // Same-route click invalidates the fetch.
+  release();
+  await pending;
+  assert.equal(document.currentMain, guideMain);
+  heldUrl = null;
+  assert.equal(await click(makeLink(base + 'hidden/')), true);
+  assert.equal(document.directory, true);
+  assert.equal(linksNav['aria-current'], 'page');
+  assert.equal(document.currentMain.elements['#link-search'].value, '');
+  assert.equal(document.currentMain.elements['#empty-directory'].hidden, false);
+  assert.equal(await click(makeLink(base + 'guide/#how-it-works')), true);
+  assert.equal(document.currentMain.ids.find((id) => id.id === 'how-it-works').scrolled, true);
+  const beforeNative = fetched.length;
+  for (const options of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { altKey: true }, { button: 1 }, { defaultPrevented: true }]) assert.equal(await click(brand, options), false);
+  for (const attrs of [{ target: '_blank' }, { download: true }]) assert.equal(await click(Object.assign(makeLink(base), attrs)), false);
+  for (const link of [makeLink(base + 'tools/git/', undefined, false), makeLink('https://example.org/', undefined, false), makeLink(base + 'tools/git.sh', undefined, false)]) assert.equal(await click(link), false);
+  assert.equal(fetched.length, beforeNative);
+  assert.ok(document.scriptsRemoved > 0);
+  assert.equal(await click(makeLink(base + 'tools/git/')), true);
+  assert.equal(location.assigned, base + 'tools/git/'); // A redirect page is never injected.
+  pages.delete(base + 'tools/');
+  assert.equal(await click(makeLink(base + 'tools/')), true);
+  assert.equal(location.assigned, base + 'tools/');
   assert.equal(await click(makeLink('https://other.example/tools/')), false);
+  pages.set(base, await emptySite.read('index.html'));
+  assert.equal(await click(brand), true);
+  assert.equal(document.title, 'Links · shl');
+  assert.equal(document.currentMain.elements['#link-search'], undefined);
+  assert.equal(await click(makeLink(base + 'hidden/')), true);
+  assert.equal(document.currentMain.elements['#hidden-toggle'].handlers.get('click').length, 1);
+  assert.equal(await click(brand), true);
+  assert.equal(await click(guide), true);
+  assert.equal(await click(makeLink(base + 'hidden/')), true);
+  assert.equal(document.currentMain.elements['.links'].handlers.get('click').length, 1);
 });
 
 test('hidden links and hidden-only folders are hidden by default but keep their resources', async (t) => {
@@ -318,21 +441,21 @@ test('hidden links and hidden-only folders are hidden by default but keep their 
     assert.match(html, /<div class="directory-toggles"><button id="hidden-toggle"/);
     assert.match(html, /id="hidden-toggle"[^>]*aria-pressed="false" hidden>Show hidden links/);
     assert.doesNotMatch(html, /data-visible=|data-total=/);
-    assert.match(html, /<li data-hidden="true" hidden><details><summary><a href="\.\/.*(?:private|hiddenOnly|onlyHidden)\/" data-directory-link>/);
+    assert.match(html, /<li data-hidden="true" hidden><details><summary><a href="\.\/.*(?:private|hiddenOnly|onlyHidden)\/" data-app-link>/);
     assert.match(html, /<li data-hidden="true" hidden data-search="[^"]+"><div class="link-row"[^>]*><a class="code[^>]* href="\.\/.*(?:secret|SecretCode|HiddenDeep)\/"/);
   }
   const home = await f.read('index.html');
   assert.match(home, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number" aria-hidden="true">4<\/span><span class="count-label"> links<\/span><\/h1>/);
-  assert.match(home, /href="\.\/tools\/nested\/" data-directory-link>nested<\/a>/);
+  assert.match(home, /href="\.\/tools\/nested\/" data-app-link>nested<\/a>/);
   assert.match(home, /href="\.\/tools\/nested\/branch\/further\/VisibleDeep\/">VisibleDeep<\/a>/);
   assert.match(home, /href="\.\/shown\/">shown<\/a>/);
   assert.match(home, /href="\.\/visible\/">visible<\/a>/);
   assert.match(home, /href="\.\/tools\/public\/">public<\/a>/);
   assert.match(await f.read('tools/index.html'), /href="\.\/public\/">public<\/a>/);
-  assert.match(await f.read('tools/index.html'), /href="\.\/nested\/" data-directory-link>nested<\/a>/);
-  assert.match(await f.read('tools/nested/index.html'), /href="\.\/branch\/" data-directory-link>branch<\/a>/);
-  assert.match(await f.read('tools/nested/index.html'), /<li data-hidden="true" hidden><details><summary><a href="\.\/hiddenOnly\/" data-directory-link>hiddenOnly/);
-  assert.match(await f.read('tools/nested/branch/index.html'), /href="\.\/further\/" data-directory-link>further<\/a>/);
+  assert.match(await f.read('tools/index.html'), /href="\.\/nested\/" data-app-link>nested<\/a>/);
+  assert.match(await f.read('tools/nested/index.html'), /href="\.\/branch\/" data-app-link>branch<\/a>/);
+  assert.match(await f.read('tools/nested/index.html'), /<li data-hidden="true" hidden><details><summary><a href="\.\/hiddenOnly\/" data-app-link>hiddenOnly/);
+  assert.match(await f.read('tools/nested/branch/index.html'), /href="\.\/further\/" data-app-link>further<\/a>/);
   assert.match(await f.read('tools/nested/branch/further/index.html'), /href="\.\/VisibleDeep\/">VisibleDeep<\/a>/);
   for (const page of ['onlyHidden/index.html', 'onlyHidden/nested/index.html', 'tools/private/index.html', 'tools/private/deep/index.html']) {
     const html = await f.read(page);
@@ -351,7 +474,7 @@ test('hidden links and hidden-only folders are hidden by default but keep their 
   assert.equal(allHidden.build().status, 0);
   assert.match(await allHidden.read('index.html'), /No links listed here\./);
   assert.match(await allHidden.read('index.html'), /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number" aria-hidden="true">0<\/span><span class="count-label"> links<\/span><\/h1>/);
-  assert.match(await allHidden.read('index.html'), /<li data-hidden="true" hidden><details><summary><a href="\.\/private\/" data-directory-link>/);
+  assert.match(await allHidden.read('index.html'), /<li data-hidden="true" hidden><details><summary><a href="\.\/private\/" data-app-link>/);
   assert.match(await allHidden.read('private/nested/index.html'), /No links listed here\./);
   assert.match(await allHidden.read('private/nested/code/index.html'), /https:\/\/example\.com/);
 });
@@ -391,7 +514,7 @@ test('directory clicks copy full short or long URLs while Open follows the desti
     const list = { addEventListener: (_, listener) => { list.click = listener; } };
     const timers = new Map();
     let nextTimer = 0;
-    runInNewContext(script, {
+    runInNewContext(script + '\ninitCopy();', {
       document: { querySelector: (selector) => ({ '.links': list, '#copy-status': status })[selector] },
       navigator: { clipboard: { writeText: async (text) => { copied.push(text); } } },
       setTimeout: (callback, delay) => { assert.equal(delay, 5000); timers.set(++nextTimer, callback); return nextTimer; },
@@ -401,6 +524,7 @@ test('directory clicks copy full short or long URLs while Open follows the desti
       href: new URL(href, `https://short.example${prefix}`).href,
       classList: { contains: (value) => value === kind },
       getAttribute: () => href,
+      hasAttribute: () => false,
     });
     const click = async (target, options = {}) => {
       let prevented = false;
@@ -424,17 +548,36 @@ test('directory clicks copy full short or long URLs while Open follows the desti
   const status = { textContent: '' };
   const list = { addEventListener: (_, listener) => { list.click = listener; } };
   let dismiss;
-  runInNewContext(script, {
+  runInNewContext(script + '\ninitCopy();', {
     document: { querySelector: (selector) => ({ '.links': list, '#copy-status': status })[selector] },
     navigator: { clipboard: { writeText: async () => { throw new Error('permission denied'); } } },
     setTimeout: (callback) => { dismiss = callback; }, clearTimeout: () => {},
   });
   let prevented = false;
-  await list.click({ button: 0, target: { closest: () => ({ href: 'https://short.example/project/tools/Setup/', classList: { contains: () => true } }) }, preventDefault: () => { prevented = true; } });
+  await list.click({ button: 0, target: { closest: () => ({ href: 'https://short.example/project/tools/Setup/', classList: { contains: () => true }, hasAttribute: () => false }) }, preventDefault: () => { prevented = true; } });
   assert.equal(prevented, true);
   assert.match(status.textContent, /Could not copy/);
   dismiss();
   assert.equal(status.textContent, '');
+
+  // A clipboard promise settling after a swap must not resurrect outgoing feedback.
+  const pendingStatus = { textContent: '' };
+  const pendingList = { addEventListener(_, callback) { this.click = callback; }, removeEventListener(_, callback) { assert.equal(callback, this.click); this.click = null; } };
+  let resolveCopy, timerCount = 0;
+  const context = {
+    document: { querySelector: (selector) => ({ '.links': pendingList, '#copy-status': pendingStatus })[selector] },
+    navigator: { clipboard: { writeText: () => new Promise((resolve) => { resolveCopy = resolve; }) } },
+    setTimeout: () => { timerCount++; }, clearTimeout() {},
+  };
+  runInNewContext(script + '\ninitCopy();', context);
+  const pendingCopy = pendingList.click({ button: 0, target: { closest: () => ({ href: 'https://short.example/code/', classList: { contains: () => true }, hasAttribute: () => false }) }, preventDefault() {} });
+  context.cleanupCopy();
+  resolveCopy();
+  await pendingCopy;
+  assert.equal(pendingStatus.textContent, '');
+  assert.equal(timerCount, 0);
+  assert.equal(pendingList.click, null);
+  runInNewContext(script + '\ninitCopy();', { document: { querySelector: () => null } });
 });
 
 test('search filters nested links on the homepage and directory pages', async (t) => {
@@ -467,7 +610,9 @@ test('search filters nested links on the homepage and directory pages', async (t
   const count = { textContent: '3 links' };
   const disabledToggle = { disabled: true, hidden: false, addEventListener() { throw new Error('disabled toggle should not activate'); } };
   const elements = { '#link-search': input, '.links': list, '#search-status': status, '#link-count': count, '#hidden-toggle': disabledToggle };
-  runInNewContext(await f.read('assets/search.js'), { document: { querySelector: (selector) => elements[selector] } });
+  runInNewContext(await f.read('assets/search.js') + '\ninitSearch();', { document: { querySelector: () => null } });
+  runInNewContext(await f.read('assets/search.js') + '\ninitSearch();', { document: { querySelector: (selector) => selector === '#link-search' ? {} : null } });
+  runInNewContext(await f.read('assets/search.js') + '\ninitSearch();', { document: { querySelector: (selector) => elements[selector] } });
   assert.equal(search.hidden, false);
   assert.equal(disabledToggle.hidden, false);
 
@@ -554,7 +699,7 @@ test('tags are displayed safely and searchable on home and nested pages without 
     const status = { hidden: true, textContent: '' };
     const count = { textContent: page === 'index.html' ? '3 links' : '2 links' };
     const toggle = { hidden: true, textContent: 'Show hidden links', setAttribute(name, value) { this[name] = value; }, addEventListener: (_, callback) => { toggle.click = callback; } };
-    runInNewContext(await f.read('assets/search.js'), { document: { querySelector: (selector) => ({ '#link-search': input, '.links': list, '#search-status': status, '#hidden-toggle': toggle, '#link-count': count })[selector] ?? null } });
+    runInNewContext(await f.read('assets/search.js') + '\ninitSearch();', { document: { querySelector: (selector) => ({ '#link-search': input, '.links': list, '#search-status': status, '#hidden-toggle': toggle, '#link-count': count })[selector] ?? null } });
     input.value = '#HOW TO';
     input.update();
     assert.equal(status.textContent, '');
@@ -608,7 +753,7 @@ test('toggle updates hidden rows, nested search, counts, and hidden-only empty s
   };
     const empty = visible ? null : { hidden: false };
     const elements = { '#link-search': input, '.links': list, '#search-status': status, '#hidden-toggle': toggle, '#link-count': count, '#empty-directory': empty };
-    runInNewContext(script, { document: { querySelector: (selector) => elements[selector] } });
+    runInNewContext(script + '\ninitSearch();', { document: { querySelector: (selector) => elements[selector] } });
     assert.equal(toggle.hidden, false);
     assert.equal(search.hidden, !visible);
     return { html, input, status, toggle, count, empty, wrapper };
@@ -629,7 +774,7 @@ test('toggle updates hidden rows, nested search, counts, and hidden-only empty s
   const nestedCode = leaf('code https://example.com/code', true);
   const hiddenGroup = group('onlyHidden', [group('nested', [nestedCode], true)], true);
   const home = await exercise('index.html', [folder, hiddenGroup, leaf('public https://example.com/public'), secret], 2);
-  assert.match(home.html, /<li data-hidden="true" hidden><details><summary><a href="\.\/onlyHidden\/" data-directory-link>/);
+  assert.match(home.html, /<li data-hidden="true" hidden><details><summary><a href="\.\/onlyHidden\/" data-app-link>/);
   const deepHref = home.html.match(/href="(\.\/folder\/private\/deep\/)"/)?.[1];
   assert.ok(deepHref, 'nested short link was generated');
   for (const prefix of ['/', '/project/']) {
@@ -719,7 +864,7 @@ test('information pages use relative navigation and shared theme assets', async 
   assert.equal(f.build().status, 0);
   const home = await f.read('index.html');
   assert.match(home, /<title>Links · shl<\/title>/);
-  assert.match(home, /class="brand" href="\.\/" data-directory-link>shl<\/a>/);
+  assert.match(home, /class="brand" href="\.\/" data-app-link>shl<\/a>/);
   assert.match(home, /<footer class="footer">[\s\S]*?<p>shl<\/p>/);
   assert.match(home, /href="\.\/assets\/site\.css"/);
   assert.match(home, /href="\.\/guide\/"/);
