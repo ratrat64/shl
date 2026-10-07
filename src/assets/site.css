@@ -274,11 +274,16 @@ p {
   margin: 0;
 }
 .links li {
-  padding: 0.65rem 0;
   overflow-wrap: anywhere;
 }
-.links li:has(> .link-row):hover,
-.links li:has(> .link-row):focus-within,
+.link-row,
+.links summary {
+  min-height: 3.125rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: 4px;
+}
+.link-row:hover,
+.link-row:focus-within,
 .links summary:hover,
 .links summary:focus-within {
   background: var(--wash);
@@ -300,6 +305,11 @@ summary {
   cursor: pointer;
   color: var(--ink);
   font-weight: 600;
+  line-height: 1.8rem;
+  list-style-position: inside;
+  white-space: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 summary:focus-visible {
   outline: 2px solid var(--accent);
@@ -324,14 +334,14 @@ summary a:hover {
 }
 .link-row {
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  grid-template-columns: max-content minmax(4rem, 1fr) max-content;
   gap: 1rem;
   align-items: center;
   overflow-x: auto;
   scrollbar-width: none;
 }
 .link-row.script-row {
-  grid-template-columns: max-content minmax(0, 1fr) max-content max-content;
+  grid-template-columns: max-content minmax(4rem, 1fr) max-content max-content;
 }
 .link-row:has(.tags) {
   grid-template-columns: max-content max-content minmax(4rem, 1fr) max-content;
@@ -370,6 +380,23 @@ summary a:hover {
   text-decoration: underline;
   color: var(--accent);
 }
+@media (hover: hover) and (pointer: fine) {
+  .destination {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .link-row:hover .destination,
+  .link-row:focus-within .destination {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+@media (any-pointer: coarse) {
+  .destination {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
 .destination-start {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -392,7 +419,6 @@ summary a:hover {
   color: var(--script);
 }
 .tags {
-  max-width: 9rem;
   min-width: 3rem;
   padding: 0;
   border: 0;
@@ -402,8 +428,6 @@ summary a:hover {
   line-height: 1.5;
   text-align: left;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .tags:hover {
   background: var(--wash);
@@ -549,6 +573,13 @@ main.minimal-document {
   }
 }
 @media (max-width: 500px) {
+  .link-row {
+    gap: 0.35rem;
+    grid-template-columns: max-content minmax(3rem, 1fr) max-content;
+  }
+  .link-row.script-row {
+    grid-template-columns: max-content minmax(3rem, 1fr) max-content max-content;
+  }
   .link-row:has(.tags) {
     gap: 0.35rem;
     grid-template-columns: max-content max-content minmax(3rem, 1fr) max-content;
@@ -557,9 +588,6 @@ main.minimal-document {
     grid-template-columns:
       max-content max-content minmax(3rem, 1fr)
       max-content max-content;
-  }
-  .tags {
-    max-width: 5rem;
   }
 }
 @media (prefers-reduced-motion: reduce) {

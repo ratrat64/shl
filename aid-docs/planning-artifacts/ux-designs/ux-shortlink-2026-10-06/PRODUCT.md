@@ -2,6 +2,8 @@
 
 <!-- impeccable:product-schema 1 -->
 
+Updated: 2026-10-07
+
 ## Platform
 
 web
@@ -24,7 +26,8 @@ One JSON or YAML link map is the source of truth. The build validates it and gen
 
 ## Capabilities and Constraints
 
-- Link entries accept an absolute HTTP(S) destination, an optional title, an optional `script: true` flag for a `.sh` launcher, an optional boolean `hidden` flag to omit a link from directory listings, counts, and search by default, and optional tags displayed inline beside codes and included in search. Tag labels stay on one line and reveal their full text when selected. Visitors can reveal hidden links with the directory toggle.
+- Link entries accept an absolute HTTP(S) destination, an optional title, an optional `script: true` flag for a `.sh` launcher, an optional boolean `hidden` flag to omit a link from directory listings, counts, and search by default, and optional tags displayed inline beside codes and included in search. Full tag labels stay on one line without ellipsis; crowded rows scroll horizontally, and selecting labels optionally opens a convenient native popover. Visitors can reveal hidden links with the directory toggle.
+- Destinations appear on row hover or focus-within only in hover-capable, fine-pointer mode with no coarse input available, with their layout space reserved. Any available coarse pointer, including hybrid touch/mouse devices, forces destinations visible; touch and non-hover modes always show them too. Long URLs stay on one line with middle truncation, preserving the full accessible and copy value.
 - Published links and destinations, including hidden links, remain public in `links.json`, redirect pages, and optional launchers. Hiding controls discoverability, not secrecy. There is no backend, database, anonymous submission, click tracking, or HTTP 301/302 redirect.
 - Short codes are case-insensitively unique and follow the documented reserved-name rules. Destination syntax is validated, not reachability.
 - Bun 1.4.2 runs the build and checks after `bun ci` installs the YAML parser; no frontend framework is wanted.

@@ -97,9 +97,18 @@ docs:
         </p>
         <p>
           Add <code>tags: [documentation, github]</code> to a link object to
-          show inline topic labels beside its code. Select the labels to see the
-          full tags when they are shortened. Search by tag name or by its
+          show full inline topic labels beside its code on one line. Crowded
+          rows scroll horizontally; selecting labels optionally opens a
+          convenient popover with all tags. Search by tag name or by its
           displayed <code>#tag</code> label, including in nested directories.
+        </p>
+        <p>
+          On hover-capable fine-pointer devices without coarse input,
+          destinations appear when a row is hovered or focused, without shifting
+          content. Coarse-pointer and touch devices always show them. Long URLs
+          stay on one line with middle truncation; assistive technology and
+          copying retain the full URL. Select a destination to copy it, or use
+          Open to visit it.
         </p>
         <p>
           Set <code>hidden: true</code> on a link object to omit it from
