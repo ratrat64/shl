@@ -30,7 +30,7 @@ const renderLinkRow = ({ code, url, title, script, tags, hidden, prefix, href })
   const cut = split > 0 ? originLength + split + 1 : url.length;
   const searchText = `${code} ${script ? 'script ' : ''}${url} ${tags.join(' ')} ${tags.map((tag) => `#${tag}`).join(' ')}`.trim();
   return `
-       <li${hidden ? ' data-hidden="true" hidden' : ''}${title ? ` data-title="${esc(title)}"` : ''} data-search="${esc(searchText)}"><div class="link-row${script ? ' script-row' : ''}"${title ? ` title="${esc(title)}"` : ''}><a class="code${script ? ' script-link' : ''}" href="${esc(href)}"${title ? ` title="${esc(title)}"` : ''}>${esc(code)}${script ? '<span class="script-label">script</span>' : ''}</a>
+       <li${hidden ? ' data-hidden="true" hidden' : ''}${title ? ` data-title="${esc(title)}"` : ''} data-search="${esc(searchText)}"><div class="link-row${script ? ' script-row' : ''}"${title ? ` title="${esc(title)}"` : ''}><a class="code${script ? ' script-link' : ''}" href="${esc(href)}"${title ? ` title="${esc(title)}"` : ''}>${esc(code)}</a>
             <a class="destination" href="${esc(url)}" aria-label="Copy destination: ${esc(url)}"${title ? '' : ` title="${esc(url)}"`}><span class="sr-only">${esc(url)}</span><span class="destination-start" aria-hidden="true">${esc(url.slice(0, cut))}</span><span class="destination-end" aria-hidden="true">${esc(url.slice(cut))}</span></a>${script ? `<a class="download" href="${esc(`./${prefix}${code}.sh`)}" aria-label="Download script for ${esc(code)}" download>Download</a>` : ''}<a class="visit" href="${esc(url)}" aria-label="Open destination for ${esc(code)}">Open</a></div>${tags.length ? `<span class="tags">${tags.map((tag) => `#${esc(tag)}`).join(' · ')}</span>` : ''}</li>`;
 };
 
