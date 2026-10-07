@@ -18,8 +18,6 @@ colors:
   surface-dark: "#111715"
   ink-dark: "#c6d0ca"
   secondary-dark: "#96a59d"
-  hidden-light: "#5c6a61"
-  hidden-dark: "#788a80"
   rule-dark: "#63736b"
   wash-dark: "#111b16"
 typography:
@@ -54,7 +52,7 @@ A compact index puts codes, destinations, and search above everything else. Slee
 
 Teal is reserved for standard links and focus; amber marks executable-script entries, with their Download action as a second cue instead of a SCRIPT label. Dark mode uses a pure black page (#000), softly green-tinted panels and softened light ink; light mode uses an off-white page and white panels. The dark palette is deliberately lower in brightness; hidden-row text remains readable with a distinct subdued role. Respect system light/dark preference and retain the visitor's saved theme override.
 
-The frontmatter roles map to the CSS tokens in `src/styles.mjs`: paper → `--bg`, surface → `--panel`, ink → `--ink`, secondary → `--muted`, hidden → `--hidden-ink`, rule → `--line`, action → `--accent`, script → `--script`, and wash → `--wash`, with light/dark variants above.
+The frontmatter roles map to the CSS tokens in `src/styles.mjs`: paper → `--bg`, surface → `--panel`, ink → `--ink`, secondary → `--muted`, rule → `--line`, action → `--accent`, script → `--script`, and wash → `--wash`, with light/dark variants above.
 
 ## Typography
 
@@ -92,7 +90,7 @@ A code copies its full short URL on click; script-enabled codes use amber and ha
 
 Copy feedback appears as a small, flat floating panel near the viewport edge and never displaces directory content.
 
-Link rows and folder summaries use the theme wash on hover and focus-within, preserving visible focus outlines. Revealed hidden links use the hidden-ink role across codes, destinations, tags and actions, with lighter-weight codes (400 instead of 600). Their buttons have neutral subdued fills and edges. Hidden-only folder summaries also use hidden ink and lighter weight. Do not add hidden or SCRIPT labels or reduce whole-row opacity; keep text readable and focus outlines distinct.
+Link rows and folder summaries use the theme wash on hover and focus-within, preserving visible focus outlines. Revealed hidden links use exactly the regular colors and font weights, with reduced opacity across the row and tags: 80% in dark mode and 94% in light mode. Hidden-only folder summaries use the same opacity without dimming their nested lists again. Keyboard focus restores full row or summary opacity so focus outlines stay clear. Do not add hidden or SCRIPT labels.
 
 ## Do's and Don'ts
 

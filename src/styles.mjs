@@ -1,8 +1,8 @@
 export const cssVariables = `
-  :root{color-scheme:light;--bg:#f6f7f5;--panel:#fff;--ink:#252b29;--muted:#59645f;--hidden-ink:#5c6a61;--line:#7a8580;--accent:#006b60;--script:#895400;--wash:#e8eeeb}
-  @media(prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#000;--panel:#111715;--ink:#c6d0ca;--muted:#96a59d;--hidden-ink:#788a80;--line:#63736b;--accent:#64b6a4;--script:#c6a36a;--wash:#111b16}}
-  :root[data-theme=light]{color-scheme:light;--bg:#f6f7f5;--panel:#fff;--ink:#252b29;--muted:#59645f;--hidden-ink:#5c6a61;--line:#7a8580;--accent:#006b60;--script:#895400;--wash:#e8eeeb}
-  :root[data-theme=dark]{color-scheme:dark;--bg:#000;--panel:#111715;--ink:#c6d0ca;--muted:#96a59d;--hidden-ink:#788a80;--line:#63736b;--accent:#64b6a4;--script:#c6a36a;--wash:#111b16}
+  :root{color-scheme:light;--bg:#f6f7f5;--panel:#fff;--ink:#252b29;--muted:#59645f;--hidden-opacity:.94;--line:#7a8580;--accent:#006b60;--script:#895400;--wash:#e8eeeb}
+  @media(prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#000;--panel:#111715;--ink:#c6d0ca;--muted:#96a59d;--hidden-opacity:.8;--line:#63736b;--accent:#64b6a4;--script:#c6a36a;--wash:#111b16}}
+  :root[data-theme=light]{color-scheme:light;--bg:#f6f7f5;--panel:#fff;--ink:#252b29;--muted:#59645f;--hidden-opacity:.94;--line:#7a8580;--accent:#006b60;--script:#895400;--wash:#e8eeeb}
+  :root[data-theme=dark]{color-scheme:dark;--bg:#000;--panel:#111715;--ink:#c6d0ca;--muted:#96a59d;--hidden-opacity:.8;--line:#63736b;--accent:#64b6a4;--script:#c6a36a;--wash:#111b16}
 `;
 
 export const styles = cssVariables + `
@@ -50,8 +50,8 @@ export const styles = cssVariables + `
   .links{list-style:none;padding:0;margin:0}
   .links li{padding:.65rem 0;overflow-wrap:anywhere}
   .links li:has(>.link-row):hover,.links li:has(>.link-row):focus-within,.links summary:hover,.links summary:focus-within{background:var(--wash)}
-  .links li[data-hidden=true]>.link-row,.links li[data-hidden=true]>.tags{--accent:var(--hidden-ink);--script:var(--hidden-ink);--muted:var(--hidden-ink)}
-  .links li[data-hidden=true]>.link-row .code,.links li[data-hidden=true]>details>summary{color:var(--hidden-ink);font-weight:400}
+  .links li[data-hidden=true]>.link-row,.links li[data-hidden=true]>.tags,.links li[data-hidden=true]>details>summary{opacity:var(--hidden-opacity)}
+  .links li[data-hidden=true]>.link-row:focus-within,.links li[data-hidden=true]>details>summary:focus-within{opacity:1}
   .links .links{margin:.35rem 0 0 .75rem;padding-left:1rem}
   summary{cursor:pointer;color:var(--ink);font-weight:600}
   summary:focus-visible{outline:2px solid var(--accent);outline-offset:4px}

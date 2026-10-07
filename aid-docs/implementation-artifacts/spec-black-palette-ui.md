@@ -26,6 +26,7 @@ Refresh the existing directory with a black dark-mode background and a fitting h
 - User refinement: remove hidden text labels and their mobile styling; use muted code colors alone. Add subtle teal button fills and amber Download fills, strengthening on hover while retaining disabled states.
 - User refinement: soften dark palette brightness and button edges, remove SCRIPT labels, and distinguish hidden rows across codes, destinations, tags and actions using a dedicated subdued color and lighter code weight. Download remains the script affordance.
 - Alignment with main: preserve the app-navigation refactor; shared CSS now lives in `src/styles.mjs`, branding in `src/layout.mjs`, and row markup in `src/directory.mjs`. Retain the upstream browser lifecycle and navigation regression checks.
+- User refinement: hidden links retain normal colors and font weight and differ only through lower opacity (80% dark, 94% light). Remove the hidden-color role; restore full opacity on keyboard focus. Apply opacity separately to rows, tags and hidden-only summaries to avoid dimming nested entries twice.
 
 ## Review Triage Log
 
