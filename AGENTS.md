@@ -37,3 +37,11 @@
 
 ## Deployment
 - `.github/workflows/deploy.yml` checks, builds, and deploys on pushes to `main` or manual dispatch. Only `dist/` is uploaded; an optional root `CNAME` is copied there by the build.
+
+## Shared UI ownership and consistency
+- Before adding or changing UI, inspect and reuse the existing component, helper, or pattern. Extract repeated structure or behavior with the same responsibility; keep unique page content local.
+- Render the shared site shell (header, navigation, theme control, and footer) through `src/layout.mjs`; pages supply content inside `<main>`. Reuse directory components in `src/directory.mjs` and browser behavior in `src/browser.mjs`; do not duplicate them in page templates.
+- Keep shared styles and design tokens in `src/styles.mjs`. Scope page-specific styles to page content; do not override shared chrome through page selectors unless the variant is explicitly approved and documented in `aid-docs/planning-artifacts/ux-designs/ux-shortlink-2026-10-06/DESIGN.md` and the adjacent `EXPERIENCE.md`.
+- Keep shared chrome visually consistent across Links, nested directories, and Guide, except active navigation state and documented variants. Reconcile conflicting design instructions before implementing a new consistency rule.
+- For shared UI changes, verify generated structure and rendered appearance across those pages in light/dark themes and desktop/mobile layouts, including direct loads and in-app navigation. Reuse existing checks; add a focused regression check when it can catch the changed behavior.
+- Do not treat shared markup as proof of visual consistency: body classes and CSS overrides can change the same component's appearance. Check those selectors and the design specifications when diagnosing differences.
