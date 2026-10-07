@@ -2,7 +2,7 @@
 title: 'Modular reload-free app navigation'
 type: 'feature'
 created: '2026-10-07'
-status: 'in-review'
+status: 'done'
 baseline_commit: '247ccc42f7f006fc004e1b09c7e2a1813332e8e2'
 route: 'dispatch'
 review_loop_iteration: 0
@@ -69,6 +69,20 @@ context: []
 
 ## Review Triage Log
 
+- Blind 1 — medium, patch: scrolling during a slow fetch was lost because only click-time scroll was saved. Capture it again immediately before replacing the outgoing view; regression passes.
+- Blind 2 — medium, patch: CSS smooth scrolling applied to history restoration and could save intermediate positions during rapid navigation. History scrolling now explicitly uses instant behavior; routing assertions pass.
+- Blind 3 — low, rejected: nonexistent Guide fragments go to the heading instead of preserving scroll. Generated Guide anchors all have matching sections; the missing-fragment view remains usable as required. Extra branching for malformed links is unwarranted.
+- Blind 4 — low, rejected: search/copy require navigation startup and its prerequisite scripts. All generated pages load those deferred assets in order; blocked/missing assets leave native static browsing available. Independent initialization would add duplicate lifecycle paths for exceptional asset failures.
+- Blind 5 — medium, patch: an indefinitely pending fetch/body did not reach fallback. Native ten-second AbortSignal timeout now bounds both; timeout and rejection checks pass.
+- Blind 6 — low, rejected: slow requests have no pending announcement. This is a transient feedback improvement rather than a broken navigation outcome; adding loading-state machinery is unnecessary for this change.
+- Blind 7 — low, patch: public scroll documentation omitted repeated-URL sharing. README now documents most-recent scroll per URL.
+- Blind 8 — medium, patch: the temporary browser runner was not reproducible from the repository. README now contains a manual browser procedure covering persistent shell identity, theme, focus, history, controls, prefixes, and disabled JavaScript.
+- Blind 9 — medium, patch: missing title/heading and unsupported app marker branches lacked regression proof. All three responses now assert fallback without view or history mutation.
+- Blind 10 — medium, patch: distinct click races and stale rejection lacked regression proof. Reverse completion and obsolete failures now assert the newest view wins without extra history/fallback.
+- Edge 1 — medium, patch: indefinitely pending response/body could strand intercepted navigation. Same timeout fix as Blind 5; both timeout checks ran and passed.
+- Verification 1 — medium, patch: fabricated shell anchors bypassed generated markers/navigation keys. Fixtures now derive shell anchors and selector membership from generated HTML at both prefixes.
+- Verification 2 — medium, patch: concatenating scripts independently hid emitted startup-order regressions. Fixtures now load actual generated deferred script tags in order and exercise Guide-to-directory search/copy initialization.
+
 ## Verification
 
 - `bun --version` — Bun 1.4.2.
@@ -83,3 +97,4 @@ context: []
 - Full regression suite and build passed; routing checks execute real search/copy initializers against simulated controls at `/` and `/project/`, covering all matrix rows and outgoing clipboard cleanup.
 - Headless Chrome via the existing temporary Playwright installation passed direct Guide entry, shell/theme identity, same-route clicks, Guide fragment Back/Forward, nested folders/breadcrumbs, footer navigation, hidden-only controls/copy/reset, and no-JavaScript browsing at root, project prefix, and an empty-home fixture. Smoke runner: `/tmp/opencode/check-shl-app-navigation.mjs` (temporary verification artifact, not a project dependency).
 - Deployment-specific GitHub Pages recovery was not exercised in a deployed browser; its unchanged regression checks passed.
+- After review patches, full verification passed again: `bun test --timeout 30000 ./test/build.test.mjs` (18 passed, 0 failed) and `bun build.mjs` (26 links). Review fixes add native fetch timeouts, final outgoing scroll capture, instant history restoration, generated-shell/startup verification, invalid-page cases, and distinct-click race proof.
