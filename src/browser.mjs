@@ -1,8 +1,8 @@
 export const themeScript = `(() => {
   const root = document.documentElement;
-  const button = document.querySelector('.theme-toggle');
-  if (!button) return;
   try { const saved = localStorage.getItem('shortlink-theme'); if (saved === 'light' || saved === 'dark') root.dataset.theme = saved; } catch {}
+  const button = document.querySelector('[data-theme-control]');
+  if (!button) return;
   const update = () => { button.textContent = 'Theme: ' + (root.dataset.theme || 'system'); };
   update();
   button.addEventListener('click', () => {
@@ -171,7 +171,6 @@ export const navigationScript = `(() => {
       globalThis.cleanupCopy?.();
       document.querySelector('main').replaceWith(main);
       document.title = title.textContent;
-      document.body.classList.toggle('directory-page', main.dataset.appPage === 'links');
       for (const link of document.querySelectorAll('[data-nav]')) {
         if (link.dataset.nav === main.dataset.appPage) link.setAttribute('aria-current', 'page');
         else link.removeAttribute('aria-current');

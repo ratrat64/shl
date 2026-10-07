@@ -10,3 +10,10 @@
 - source_spec: `aid-docs/implementation-artifacts/spec-local-preview-command.md`
   summary: Update AGENTS.md local preview instructions to use the working npm command.
   evidence: AGENTS.md still recommends `serve` and claims its `cleanUrls: false` setting preserves dotted directory pages, but that command serves directory listings instead of generated pages.
+- source_spec: `spec-modular-ui.md`
+  summary: Verify saved-theme first-paint behavior before deciding whether an early restoration hook is needed.
+  evidence: Asset-backed deferred restoration predates this task; code review raised a possible flash, but no browser paint trace establishes it. Embedded documents run the same restoration synchronously. Capture a paint trace under opposite system/saved themes to settle the claim.
+
+- source_spec: `spec-modular-ui.md`
+  summary: Give script-disabled 404 a coherent final heading instead of the existing checking state.
+  evidence: Existing 404 markup defaults to Checking that link and One moment; without JavaScript only the noscript explanation clarifies that recovery cannot run. This pre-existing state was preserved by the shared-shell refactor.

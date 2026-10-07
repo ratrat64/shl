@@ -196,9 +196,30 @@ input validation in `src/links.mjs`, and output generation in
 `src/build.mjs`, not the generated files. Validation fails before the old
 output is removed. URL syntax is checked, but destination reachability is not.
 
+`src/layout.mjs` owns the document foundation used by every HTML page. Links,
+nested directories, Guide, and 404 compose its shared borderless shell;
+destination and legacy forwards use its minimal document without chrome and
+share forwarding logic in `src/pages.mjs`. The 404 and minimal documents embed
+the same styles and storage-tolerant theme script, so nested or unknown request
+paths cannot break their foundations. Recovery rebases shell links after the
+first readable ancestor map; unavailable maps retain the relative fallback.
+`src/links.mjs` owns validated leaf interpretation and the directory tree used
+for rendering and counts. Shared tokens and control styles have one owner in
+`src/styles.mjs`; content selectors must not change shell appearance. See
+[architecture AD-7–AD-9](aid-docs/planning-artifacts/architecture/architecture-shortlink-2026-10-04/ARCHITECTURE-SPINE.md).
+
 For a focused check: `bun test --test-name-pattern="404" ./test/build.test.mjs`.
 The checks execute generated JavaScript in Bun with simulated browser APIs,
 and Bash launchers with a stubbed downloader.
+With installed Chrome (`google-chrome`, or set `CHROME_BIN`), the suite also
+compares shell geometry and computed styles on Links, folders, Guide, and 404
+at 390px and 1440px in light/dark themes, under root and project prefixes.
+It covers direct loads, script-disabled native documents, and shell-preserving
+app transitions, plus rendered tag disclosures. Chrome checks report a skip
+when the browser is unavailable; a skipped check is not rendered verification.
+CI requires Chrome via `SHL_REQUIRE_BROWSER=1`. To run the same required-browser
+check locally: `SHL_REQUIRE_BROWSER=1 bun test --timeout 30000 ./test/build.test.mjs`.
+Set `CHROME_BIN` to the browser executable if it is not named `google-chrome`.
 After deploying, smoke-test a known code, a wrong-case code (with and without a
 trailing slash), and an unknown code in a browser. Repeat under a project prefix
 when changing routing; local preview servers may serve 404 pages differently

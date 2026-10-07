@@ -3,18 +3,27 @@ name: Shortlink — Existing System
 type: architecture-spine
 purpose: build-substrate
 altitude: feature
-paradigm: static-site generation with progressive enhancement
+paradigm: component composition within static-site generation and progressive enhancement
 scope: Existing link publication, browser directory/routing, and Bash launchers
 status: final
 created: 2026-10-04
-updated: 2026-10-04
-binds: [link-map, builder, directory, browser-routing, launchers, publication]
+updated: 2026-10-07
+binds: [link-map, builder, document, shell, components, styles, browser-lifecycle, browser-routing, launchers, publication]
 sources:
   - README.md
   - aid-docs/planning-artifacts/ux-designs/ux-shortlink-2026-10-06/PRODUCT.md
   - aid-docs/planning-artifacts/ux-designs/ux-shortlink-2026-10-06/DESIGN.md
   - build.mjs
-  - build.test.mjs
+  - src/layout.mjs
+  - src/directory.mjs
+  - src/styles.mjs
+  - src/browser.mjs
+  - src/pages.mjs
+  - src/links.mjs
+  - test/build.test.mjs
+  - AGENTS.md
+  - aid-docs/planning-artifacts/ux-designs/ux-shortlink-2026-10-06/EXPERIENCE.md
+  - aid-docs/implementation-artifacts/spec-modular-ui.md
   - .github/workflows/check.yml
   - .github/workflows/deploy.yml
   - aid-docs/planning-artifacts/prds/prd-shortlink-2026-10-02/prd.md
@@ -26,9 +35,11 @@ companions: []
 
 ## Design Paradigm
 
-**Static-site generation with progressive enhancement.** The build compiles a repository-owned link map into a public static site. Browser scripts enhance those artifacts; Bash launchers execute external destinations on the caller's machine.
+**Component composition within static-site generation and progressive enhancement.** Pure renderers compose shared foundations and responsibility-owned components into static documents. Browser modules enhance them; Bash launchers execute external destinations on the caller's machine.
 
-This spine ratifies the system at `main` commit `7b2e8d9`. Its invariants bind future changes; file organization and version details are code-owned seed.
+Existing-system evidence was refreshed against `053844fe08b546f6a4690c029d19b09d00a92822`; AD-7–AD-9 bind the approved modular consistency change in `spec-modular-ui.md`. File organization and runtime pins are code-owned seed.
+
+AD-7–AD-9 are verified against this task's working tree, not claimed to exist in that baseline commit. The approved modularity task adds no dependencies; AD-1's general future-extension allowance does not override stricter task constraints.
 
 ## Invariants & Rules
 
@@ -42,7 +53,7 @@ This spine ratifies the system at `main` commit `7b2e8d9`. Its invariants bind f
 
 - **Binds:** Source loading, validation, rendering, browser recovery, and machine-readable publication.
 - **Prevents:** Format-specific semantics, independently maintained indexes, and disagreement about directories versus links.
-- **Rule:** Exactly one root `links.json`, `links.yaml`, or `links.yml` is authoritative. JSON and YAML accept the same nested map: a URL string or object containing `url` is a link; an object without `url` is a nonempty directory. The root may be empty. Link objects accept an optional string `title` and boolean `script`; only `script: true` enables a launcher. Destinations must parse as absolute HTTP(S) URLs. Generate public `dist/links.json` from that same validated map, preserving nesting, keys, casing, and configured destinations. Listings, redirect pages, launchers, and recovery must derive from this source; all entries are public and listed today.
+- **Rule:** Exactly one root `links.json`, `links.yaml`, or `links.yml` is authoritative. JSON and YAML accept the same nested map: a URL string or object containing `url` is a link; an object without `url` is a nonempty directory. The root may be empty. Link objects accept optional string `title`, boolean `script` and `hidden`, and an array of nonblank string `tags`; only `script: true` enables a launcher. Destinations must parse as absolute HTTP(S) URLs. Generate public `dist/links.json` from that same validated map, preserving nesting, keys, casing, and configured values. Listings, redirects, launchers, and recovery derive from this source. Hidden entries remain public and routable; listings/search/counts omit them until the visitor reveals them. Hiding is discoverability, not secrecy.
 
 ### AD-3 — One namespace and hosting-independent routing [ADOPTED]
 
@@ -60,17 +71,43 @@ This spine ratifies the system at `main` commit `7b2e8d9`. Its invariants bind f
 
 - **Binds:** Directory pages, guide, search, theme, and browser recovery.
 - **Prevents:** A JavaScript-only library, remote search state, and inconsistent visitor-state ownership.
-- **Rule:** Static HTML supports browsing and expandable nested directories without JavaScript. Every directory has a browseable page and breadcrumbs; names sort case-insensitively within each group. Search filters only the current page's subtree, case-insensitively, using recorded codes, titles, destinations, and nested folder names; it does not index destination content. Reveal matching descendants by expanding their ancestor groups, announce counts/no matches, and restore visibility when clearing search. Directory and guide share theme semantics: system preference by default, with a browser-local override that tolerates unavailable storage. Search and wrong-case recovery require JavaScript; recovery also needs map retrieval. Keep semantic links/disclosures, labeled search, visible keyboard focus, visible code/destination pairing, full destinations available to assistive technology, and text identification of scripts alongside color. Preserve the compact, reference-first Working Index direction, with discovery secondary; exact styling belongs to `DESIGN.md`. `/about/` and `/how-it-works/` remain forwards to guide sections.
+- **Rule:** Static HTML supports browsing and expandable nested directories without JavaScript. Every directory has a browseable page and breadcrumbs; names sort case-insensitively within each group. Search filters the current subtree and active hidden-visibility pool, case-insensitively, using recorded codes, titles, destinations, tags, and nested folder names; it does not index destination content. Reveal matching descendants through their ancestor groups; update the single live count and no-match state. Keep semantic links/disclosures, labeled search, visible keyboard focus, code/destination pairing, full destinations for assistive technology, and a Download action identifying script links alongside color. Tags use native inline disclosure without shifting rows. Copy feedback is a polite non-displacing status. Exact content styling belongs to `DESIGN.md` under AD-8. `/about/` and `/how-it-works/` remain forwards to Guide sections. Search, copy, and wrong-case recovery are enhancements; recovery needs map retrieval. Theme and lifecycle ownership follow AD-9.
 
 ### AD-6 — Repository checks and static publication own operations [ADOPTED]
 
 - **Binds:** PR validation, build entry point, artifacts, and deployment.
 - **Prevents:** Deploying source/tooling, assuming deploy-time tests, or adding an application-service environment.
 - **Rule:** Run builds from the repository root. PR validation targeting `main` installs dependencies, runs the regression suite, then builds; the existing `AGENTS.md`-only exception skips both. Pushes to `main` or manual dispatch install, build, and deploy only `dist/` to GitHub Pages; deployment does not rerun regression tests. Include `.nojekyll` and copy an optional root `CNAME`. Repository rulesets control merge requirements; DNS, domain selection, and HTTPS setup remain external hosting configuration. A local preview is a static artifact preview, not an application environment. Routing changes require the existing root/project-prefix checks and a deployed browser smoke test because simulated browser tests do not establish Pages 404 behavior.
+- **Rendered check execution:** CI runs browser checks in required mode; browser absence is a verification failure, not a skip. Ordinary optional local suite runs do not substitute for AD-9's executed rendered evidence.
+
+### AD-7 — Compose single-owner components and foundations [ADOPTED]
+
+- **Binds:** All document producers, directory rendering, and shared data interpretation.
+- **Prevents:** Copied document wrappers, shell/row markup, traversals, and inconsistent string/object link interpretation.
+- **Rule:** Every HTML page composes one shared document foundation. Home, nested directories, Guide, and 404 compose one header/navigation/theme-control/footer shell; pages supply content inside main. Destination and legacy redirects use the minimal-document variant without chrome, retaining the same foundations and shared forwarding responsibility. Reuse directory tools, groups, rows, and tag disclosure renderers wherever those responsibilities recur. Share pure entry interpretation and traversal helpers across their consumers; validation stays at the input boundary. Do not copy logic, layout, or styling for the same responsibility. Keep unique content local; extract actual repetition rather than speculative wrappers. Use plain ES-module composition, not a framework, component registry, or universal renderer. Context-specific output encoding remains mandatory under AD-4.
+- **Dependency boundary:** Keep the import graph acyclic. Pages/components depend on foundations and pure helpers; those foundations do not import their composing pages. Build-time helper co-location with loading/validation is allowed, but generated browser code cannot require filesystem, YAML, or builder capabilities. Extract a neutral leaf only when shared consumers need it to preserve dependency direction.
+- **Data boundary:** Treat validated raw entries and borrowed directory slices as read-only through publication. Detached view projections belong to their view; reusable shared projections are read-only. Transient controllers cannot mutate the source snapshot or attach state to a shared cached projection. No cloning/freezing framework or cache is required.
+
+### AD-8 — Consistent component styling, independent of page identity [ADOPTED]
+
+- **Binds:** Shared chrome, theme tokens, controls, content styles, and design instructions.
+- **Prevents:** Identical components appearing differently through body classes, page selectors, copied declarations, or locally documented exceptions.
+- **Rule:** Theme roles and each component's shared declarations have one owner. Shared chrome has identical geometry, typography, spacing, colors, controls, and responsive behavior at equal viewport/theme across every shell page, except active navigation state. Header/footer are borderless everywhere; Guide content separators remain local to its content. Page content styles stay within main and cannot restyle chrome. Variants express component purpose or state (script action, disabled control, minimal redirect), never page identity. A change to this invariant requires an explicit architecture amendment, synchronized design/agent rules, and affected checks; documenting a local override is insufficient.
+
+### AD-9 — One browser lifecycle and rendered consistency gate [ADOPTED]
+
+- **Binds:** Theme, content mounting, navigation, recovery, and shared-component verification.
+- **Prevents:** Duplicate listeners, stale content behavior, theme drift, positional coupling of behavior to visual classes, and markup-only consistency claims.
+- **Rule:** Theme is document/shell-lifetime: share storage-tolerant restoration on every document, including without a control. CSS system preference is baseline; JavaScript restores saved overrides and keeps the control label consistent. Cross-page app navigation cleans outgoing asynchronous behavior before main replacement, then mounts content once, resetting search, hidden visibility, and folder disclosures. Same-page/fragment navigation does not remount/reset. Preserve title/active navigation, accessible focus, history/fragments, stale-request suppression, native failure fallback, and the existing per-URL scroll restoration limit. Theme and shell survive transitions. 404 recovery and minimal forwarding are direct-document behaviors outside app mounting; native links remain functional without JavaScript.
+- **Component integration:** Renderers and behavior share an owner-published contract: href/download semantics, disclosure targets, copy kind, pressed/disabled state, and consumed hooks must change together. Existing structural component classes/IDs may be dual-use contracts; a behavior must not borrow an unrelated control's visual class or depend on control order. Theme therefore has its dedicated hook rather than selecting the hidden toggle's shared styling class.
+- **Recovery boundary:** 404 embeds shared styles/theme because its requested asset base is unknown. After the first readable ancestor map, rebase site-local shell links and stop probing even if no entry matches; use native navigation. Without a readable map or JavaScript, retain relative fallback without claiming a known project root. Requests have no application-level deadline; final not-found state depends on request completion.
+- **Verification gate:** Verify structure and real computed appearance across home, nested directories, Guide, and 404 in light/dark and desktop/mobile, including direct/native loads and applicable app transitions. Verify minimal redirect foundations and root/project-prefix recovery separately. Reuse the existing harness; a skipped/unavailable browser check does not satisfy rendered verification. Record an executed, successful affected matrix before declaring the gate complete.
 
 ### Dependency direction
 
 Arrows identify what each unit depends on. Published consumers cannot write back to the source map or require the builder at request time.
+
+The diagrams project responsibility dependencies rather than exhaustively enumerate allowed imports; AD-7's acyclic/capability boundaries apply to every edge.
 
 ```mermaid
 flowchart TD
@@ -88,27 +125,44 @@ flowchart TD
     Browser -->|navigates to| Destination
 ```
 
+```mermaid
+flowchart TD
+    Directory[Home and nested directory content] --> DirectoryComponents[Directory renderers]
+    DirectoryComponents --> EntryHelpers[Shared entry interpretation and traversal]
+    Directory --> Shell[Shared shell]
+    Guide[Guide content] --> Shell
+    NotFound[404 content and recovery] --> Shell
+    Shell --> Document[Shared document foundation]
+    Redirects[Minimal redirects] --> Document
+    Shell --> Navigation[Shared navigation definition]
+    Document --> Styles[Shared tokens and component styles]
+    Document --> Theme[Shared theme behavior]
+    AppNavigation[App navigation] --> Lifecycle[Shared content mount and cleanup]
+```
+
 ## Consistency Conventions
 
 | Concern | Convention |
 | --- | --- |
 | Namespace | Case-preserving output, case-insensitive sibling uniqueness and browser lookup. Reserve `index`, `404`, `assets`, `links`, `about`, `guide`, `how-it-works`, `index.html`, `404.html`, `links.json`, and `cname` in any casing; reject launcher filename collisions. |
-| Shared data | Directory/link distinction is the presence of `url`, not depth or filename. Public JSON preserves the validated input shape; optional titles and launcher flags have identical meaning in JSON and YAML. |
+| Shared data | Directory/link distinction is the presence of `url`, not depth or filename. Public JSON preserves validated input shape; title/script/hidden/tags semantics match across formats and consumers. |
+| Component ownership | Shared document/shell, directory components, styles/tokens, browser lifecycle, and entry interpretation each have one owner. Pages compose; they do not fork shared responsibilities. |
+| Variants | Purpose/state belongs to a component; page identity cannot alter shared chrome. Minimal redirect omits chrome rather than redefining it. |
 | Mutation | Repository edits publish on the next deployment; retargeting preserves the code path, deletion removes generated resources on successful publication. No application editing endpoint or embedded writer credentials. |
 | Errors and trust | Invalid input exits nonzero before output replacement; unknown browser paths end in a readable fallback. Escape at the consuming context rather than treating validated URLs as safe code. |
 
 ## Stack
 
-Observed seed, verified on 2026-10-04; these are not additional dependency pins.
+Observed repository pins, reality-checked on 2026-10-07; these are not claims of latest available releases.
 
 | Name | Version |
 | --- | --- |
-| Node.js build/test runtime | 24 major in CI; 24.21.0 is the verified current LTS patch |
+| Bun build/test runtime | 1.4.2 in package metadata and CI |
 | `yaml` build dependency | 2.9.1 in lockfile; package range `^2.8.1` |
 
-Generated HTML/CSS/JavaScript require no frontend package runtime. Launchers require Bash, curl, mktemp, and rm. GitHub Pages/Actions are hosted services, not repository-versioned runtime dependencies.
+Generated HTML/CSS/JavaScript require no frontend package runtime. Launchers require Bash, curl, mktemp, and rm. Rendered checks use installed Chrome; its version is not pinned by the application. GitHub Pages/Actions are hosted services, not repository-versioned runtime dependencies.
 
-Verification sources: [Node releases](https://nodejs.org/en/about/previous-releases), [published YAML package](https://registry.npmjs.org/yaml/2.9.1), and [Pages static hosting and site types](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages). The lockfile and workflows own the actual installed/CI versions.
+Verification sources: `package.json`, `bun.lock`, both workflows, `bun --version`, and passing `bun ci`/baseline tests. Existing Pages fit was verified in the original run against [Pages static hosting and site types](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages); no new platform is selected.
 
 ## Structural Seed
 
@@ -123,13 +177,14 @@ flowchart LR
     Local[Local build] --> Preview[Static local preview]
 ```
 
-Current code lives in `build.mjs`; behavioral checks live in `build.test.mjs`, run with `node --test build.test.mjs`. Templates generate the assets and pages. Neither that single-file layout nor a fixed module tree is an invariant. There is no configured staging site or separate application infrastructure. Branch protection is recommended repository configuration, not established by the arrows above.
+`build.mjs` forwards to `src/build.mjs`; `src/links.mjs` owns loading/validation, `src/layout.mjs` owns document/shell composition, `src/directory.mjs` owns directory components, `src/pages.mjs` owns unique page content and forwarding/recovery, `src/styles.mjs` owns styles/tokens, and `src/browser.mjs` owns browser behaviors. `test/build.test.mjs` runs with `bun test --timeout 30000 ./test/build.test.mjs`. Responsibility ownership is binding; filenames may change together with callers and instruction pointers. There is no configured staging site or separate application infrastructure. Hosting policies remain configuration, not implied by the diagrams.
 
 ## Deferred
 
-- **Internal layout and templating:** Choose module boundaries when a concrete maintenance/extension change needs them; preserve AD-1–AD-6 rather than standardizing a speculative tree.
+- **Further component extraction:** Add boundaries only for a repeated or independently changing responsibility; preserve AD-7–AD-9. Do not introduce speculative registries or a framework.
 - **Performance targets and scale evidence:** The approved PRD expects hundreds of links but supplies no measured capacity or latency target. Maintainer revisits when the library grows or search slows; no indexing service is implied.
 - **External automated writers:** GitHub's repository API is the selected external editing approach, not an implemented Shortlink API client. The automation maintainer settles credentials, permissions, and concurrent repository edits when setting up the first writer; repository-owned publication remains binding.
-- **Future product extensions:** Hidden listings, editing conveniences, and taxonomy guidelines require a separately scoped feature decision. Today all entries are listed/public and maintainers choose grouping within the existing namespace rules.
+- **Future product extensions:** New editing conveniences and taxonomy guidelines need separate feature decisions. Hidden listing and searchable tags already follow AD-2/AD-5; all configured entries remain public.
 - **Build write-failure recovery:** Revisit staged/atomic output replacement only if recovery from failures after validation becomes a requirement; current output-integrity guarantees stop at validation-before-deletion.
+- **Bounded 404 recovery:** Add a request deadline if maintainers require bounded completion under stalled networks; current theme/native shell is usable while recovery waits, with no latency promise.
 - **Other providers, environments, and operations:** Revisit staging, provider portability, monitoring, and availability targets when deployment needs change. Today operations use repository checks and GitHub Pages deployment; no service-level guarantee or managed application fleet is asserted.

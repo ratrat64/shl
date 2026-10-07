@@ -2,14 +2,14 @@
 title: Shortlink — Current Product
 status: final
 created: 2026-10-02
-updated: 2026-10-03
+updated: 2026-10-07
 ---
 
 # PRD: Shortlink
 
 ## 1. Purpose and Vision
 
-Capture Shortlink's existing capabilities for maintainers and downstream planning, without turning future ideas into current requirements. This PRD combines the maintainer's Vision + Features coaching decisions with the implementation at commit `565f20c`. `README.md` supplies usage guidance; `DESIGN.md` supplies the existing visual direction. Technical details and future possibilities are preserved in [addendum.md](addendum.md).
+Capture Shortlink's existing capabilities for maintainers and downstream planning, without turning future ideas into current requirements. The original coaching baseline was commit `565f20c`; current contracts were reconciled on 2026-10-07 against the implemented product and approved modular consistency update. `README.md` supplies usage guidance; the UX design documents and architecture spine own visual and component contracts. Technical details and future possibilities are preserved in [addendum.md](addendum.md).
 
 **Vision:** Help engineers and small-to-medium teams organize scattered project resources behind memorable, stable short links, making everyday setup and automation easier to repeat and share.
 
@@ -25,7 +25,7 @@ Currently a personal tool, intended for small-to-medium teams. The intended main
 
 ### Concrete Scenario
 
-**UJ-1 — Rat sets up a new VM.** Rat has a known-working oh-my-posh setup script in another repository. Rat maintains a commit-pinned destination under `scripts/ohmyposh-setup-stable`, publishes it through a checked pull request, and uses its short `.sh` launcher URL in a `curl | bash` command. The directory provides a reference when the short code is forgotten. The short code does not itself guarantee a working or immutable destination.
+**UJ-1 — Rat sets up a new VM.** Rat has a known-working oh-my-posh setup script in another repository. Rat maintains a commit-pinned destination under `setup/ohmyposh/stable`, publishes it through a checked pull request, and uses its short `.sh` launcher URL in a `curl | bash` command. The directory provides a reference when the short code is forgotten. The short code does not itself guarantee a working or immutable destination.
 
 ## 3. Glossary
 
@@ -39,7 +39,7 @@ Currently a personal tool, intended for small-to-medium teams. The intended main
 
 ### 4.1 Repository-Maintained Library
 
-**FR-1 — Edit the link map.** Maintainers can add, retarget, or remove entries in exactly one of `links.json`, `links.yaml`, or `links.yml`. Entries accept a destination string or an object with `url`, optional string `title`, and optional boolean `script`. Missing or multiple source files fail validation. Retargeting preserves the short path; deleting an entry removes its generated resources on the next successful publication.
+**FR-1 — Edit the link map.** Maintainers can add, retarget, or remove entries in exactly one of `links.json`, `links.yaml`, or `links.yml`. Entries accept a destination string or an object with `url`, optional string `title`, boolean `script`/`hidden`, and an array of nonblank string `tags`. Missing or multiple source files fail validation. Retargeting preserves the short path; deleting an entry removes its generated resources on the next successful publication.
 
 **FR-2 — Organize resources.** Maintainers can choose short codes and nested directories without a fixed taxonomy. Directories must contain entries and cannot simultaneously be redirects. An empty root library is allowed and displays guidance for adding a first entry.
 
@@ -59,13 +59,13 @@ Currently a personal tool, intended for small-to-medium teams. The intended main
 
 **FR-8 — Browse the library.** The homepage lists entries with expandable nested directories. Each directory has its own page with breadcrumbs. Entries are sorted case-insensitively by name within each group. Short codes link to their browser redirect pages, while directory names link to directory pages.
 
-**FR-9 — Understand entries.** Show short codes alongside destinations; visually shorten long destinations while retaining the full destination for assistive technology. Optional titles appear on hover and remain searchable. Script-enabled entries have both a distinct color and a text label. Every entry is listed today; there is no hidden-link flag.
+**FR-9 — Understand entries.** Show short codes alongside destinations; visually shorten long destinations while retaining the full destination for assistive technology. Optional titles appear on hover and remain searchable. Script-enabled entries have distinct color and a Download action. Tags appear inline with native disclosure of full text. Hidden entries are omitted from listings, counts, and search until Show hidden links reveals them; their destinations, redirect pages, launchers, and public-map entries remain public. Codes/destinations copy with JavaScript; Open visits the destination. Native links remain navigable without JavaScript.
 
 The existing visual direction is a compact, flat "Working Index": codes, destinations, and search take priority over decorative cards. `DESIGN.md` defines its system typography, theme colors, and responsive layout.
 
-**FR-10 — Search the current subtree.** With JavaScript enabled, search on the homepage or a directory page filters that page's entries and descendants case-insensitively by short code, title, destination URL, and nested folder names. Matching descendants become visible in expanded groups. Show a matching-link count or a no-match message; clearing the query restores visibility. This is text filtering, not destination-content indexing or ranked search. A directory page does not search outside its subtree.
+**FR-10 — Search the current subtree.** With JavaScript enabled, search filters the current subtree and active hidden-visibility pool case-insensitively by code, title, destination, tags, and nested folder names. Matching descendants become visible in expanded groups. Update the single live link count and show a no-match message when appropriate; clearing the query restores visibility. This is text filtering, not destination-content indexing or ranked search. A directory page does not search outside its subtree.
 
-**FR-11 — Read guidance and choose a theme.** A guide explains the product, usage, and operation. Former About and How-it-works URLs forward to guide sections. Directory and guide pages follow the system light/dark preference and allow a browser-saved override when storage is available.
+**FR-11 — Read guidance and choose a theme.** A guide explains the product, usage, and operation. Former About and How-it-works URLs forward to guide sections. Every HTML document shares theme/style foundations: CSS follows system preference and JavaScript restores browser-saved overrides when storage is available. Links, directories, Guide, and 404 share the same shell; destination and legacy forwards remain minimal. Shared chrome is borderless and page-independent under architecture AD-7–AD-9.
 
 ### 4.4 Script Execution and Automation
 
@@ -82,13 +82,14 @@ The existing visual direction is a compact, flat "Working Index": codes, destina
 - **Validation and output integrity:** Invalid link-map input fails before existing output is replaced. Successful builds regenerate the output completely; there is no claim of atomic recovery from subsequent write failures.
 - **Untrusted values:** Display configured values as escaped text and quote destinations safely in generated HTML, inline scripts, and Bash launchers.
 - **Usability and accessibility:** Existing pages use labeled search, a status announcement, visible keyboard focus, semantic links/disclosures, responsive layouts, and script identification that does not rely on color alone. Browsing works without JavaScript; search and wrong-case recovery do not. These are observed affordances, not a claim of audited accessibility conformance.
+- **Component consistency:** Compose single-owner layout, styling, data interpretation, and browser behavior; do not fork shared responsibilities by page. The architecture spine and UX documents define ownership and rendered verification.
 - **Scale:** Observe search responsiveness with hundreds of links before claiming scale performance. No latency, availability, or maximum-library-size guarantee has been established.
 
 ## 6. Current Scope and Non-Goals
 
 Current scope is the version-controlled library, validation, browser routing, directory/search, guide/theme, optional launchers, and static publication described above. Existing manual config editing remains supported alongside the selected external GitHub API automation approach.
 
-Current scope excludes hidden entries, an application editing UI or CLI, application-level access management, anonymous submissions, built-in click tracking, automatic destination health checks, automatic script version selection, and HTTP redirects. A dedicated application API conflicts with the no-backend constraint and is not a planned enhancement.
+Current scope excludes an application editing UI or CLI, application-level access management, anonymous submissions, built-in click tracking, automatic destination health checks, automatic script version selection, and HTTP redirects. Hidden entries and searchable tags are implemented; hiding does not provide access control. A dedicated application API conflicts with the no-backend constraint and is not a planned enhancement.
 
 Future possibilities are recorded separately in the addendum, with no delivery commitment.
 
@@ -107,6 +108,6 @@ The maintainer approved this consolidated interpretation. No unresolved product-
 
 - **Scale evidence:** No numeric search-performance target or representative hundreds-of-links measurement exists. Owner: maintainer. Revisit when growing the library or investigating slow search.
 - **Automation evidence:** GitHub API editing is the selected external approach; credentials, API permissions, and a working automation are outside the current application's implementation. Owner: automation maintainer. Revisit when setting up the first automated writer.
-- **Deployment evidence:** Existing routing tests simulate browser APIs; real Pages behavior needs a deployed browser smoke test when routing changes. No routing change is proposed here.
+- **Deployment evidence:** Routing tests simulate browser APIs and a local fallback server; real Pages behavior still needs a deployed browser smoke test when routing changes.
 
 Expected scale and audience are explicit maintainer statements. No inferred capability is treated as an implemented feature.

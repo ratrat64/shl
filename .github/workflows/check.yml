@@ -39,6 +39,8 @@ jobs:
         run: bun ci
       - name: Test
         if: steps.changes.outputs.run_checks == 'true'
+        env:
+          SHL_REQUIRE_BROWSER: '1'
         run: bun test --timeout 30000 ./test/build.test.mjs
       - name: Build
         if: steps.changes.outputs.run_checks == 'true'

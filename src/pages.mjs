@@ -1,4 +1,5 @@
-import { esc, scriptString, page as shell } from './layout.mjs';
+import { esc, scriptString, documentPage, page as shell, NAV_ITEMS } from './layout.mjs';
+import { isDirectory, linkUrl } from './links.mjs';
 
 const shellString = (value) => "'" + value.replace(/'/g, "'\\''") + "'";
 
@@ -10,24 +11,15 @@ curl -fsSL -o "$script" -- ${shellString(url)}
 bash "$script" "$@"
 `;
 
-export const redirectPage = ({ url, title }) => `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex">
-<title>Redirecting · shl</title>
-<link rel="canonical" href="${esc(url)}">
-<meta http-equiv="refresh" content="0; url=${esc(url)}">
-<link rel="stylesheet" href="./assets/site.css">
-<script>location.replace(${scriptString(url)});</script>
-</head>
-<body>
-  <p>Taking you to ${esc(title || url)}</p>
-  <p><a href="${esc(url)}">Continue now</a></p>
-</body>
-</html>
-`;
+const forwardingPage = (title, url, content) => documentPage({
+  title, embedded: true,
+  head: `<meta name="robots" content="noindex"><link rel="canonical" href="${esc(url)}"><meta http-equiv="refresh" content="0; url=${esc(url)}">`,
+  body: `<main class="wrap minimal-document">${content}</main>`,
+  scripts: `<script data-behavior="forward">location.replace(${scriptString(url)});</script>`,
+});
+
+export const redirectPage = ({ url, title }) => forwardingPage('Redirecting', url,
+  `<p>Taking you to ${esc(title || url)}</p><p><a href="${esc(url)}">Continue now</a></p>`);
 
 export const guidePage = (source) => shell('Guide', 'guide', '../', `<article class="prose">
    <h1>Guide</h1>
@@ -54,27 +46,23 @@ docs:
    <p>See the <a href="https://github.com/ratrat64/shortlink#readme">repository documentation</a> for custom domains, local builds, and full validation rules.</p></section>
    </article>`);
 
-export const oldInfoPage = (section) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Guide · shl</title><meta http-equiv="refresh" content="0; url=../guide/#${section}"><link rel="canonical" href="../guide/#${section}"></head><body><p><a href="../guide/#${section}">Continue to the guide</a></p></body></html>`;
+export const oldInfoPage = (section) => {
+  const url = `../guide/#${section}`;
+  return forwardingPage('Guide', url,
+    `<p><a href="${esc(url)}">Continue to the guide</a></p>`);
+};
 
 // GitHub Pages serves 404.html for anything unmatched. Catches codes that only
 // differ by case, plus typos.
-export const notFoundPage = () => `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Link not found · shl</title>
-<link rel="stylesheet" href="./assets/site.css">
-</head>
-<body>
-<main class="wrap prose">
+export const notFoundPage = () => shell('Link not found', 'not-found', './', `<article class="prose">
   <h1 id="head">Checking that link</h1>
    <p class="lead" id="msg">One moment.</p>
    <p><a class="code" id="home" href="./">Home</a></p>
    <noscript><p>This link could not be found. Enable JavaScript to check for a differently capitalized code.</p></noscript>
-</main>
-<script>
+</article>`, { embedded: true, scripts: `<script data-behavior="recovery">
 (async () => {
+  const isDirectory = ${isDirectory.toString()};
+  const linkUrl = ${linkUrl.toString()};
   const parts = location.pathname.split('/').filter(Boolean);
   const seg = parts.at(-1) || '';
   const home = document.getElementById('home');
@@ -87,25 +75,27 @@ export const notFoundPage = () => `<!doctype html>
       let entry = await res.json();
       const canonical = [];
       for (const segment of parts.slice(depth)) {
-        const hit = entry && typeof entry === 'object' && !('url' in entry)
+        const hit = isDirectory(entry)
           ? Object.entries(entry).find(([c]) => c.toLowerCase() === segment.toLowerCase()) : null;
         if (!hit) { entry = null; break; }
         canonical.push(hit[0]);
         entry = hit[1];
       }
       home.href = base;
-      if (entry && typeof entry === 'object' && !('url' in entry)) {
+      const navItems = ${scriptString(NAV_ITEMS)};
+      for (const link of document.querySelectorAll('.site-head a, .footer a[data-app-link]')) {
+        const item = navItems.find(item => item.key === link.dataset.nav);
+        link.href = base + (item ? item.path : link.classList.contains('brand') ? '' : 'guide/');
+      }
+      if (isDirectory(entry)) {
         location.replace(base + canonical.join('/') + '/');
         return;
       }
-      if (entry) { location.replace(typeof entry === 'string' ? entry : entry.url); return; }
+      if (entry) { location.replace(linkUrl(entry)); return; }
       break;
     } catch (e) { /* try next */ }
   }
   document.getElementById('head').textContent = 'Link not found';
   document.getElementById('msg').textContent = seg ? '"' + seg + '" is not a short link here.' : 'That address does not exist.';
 })();
-</script>
-</body>
-</html>
-`;
+</script>` });
