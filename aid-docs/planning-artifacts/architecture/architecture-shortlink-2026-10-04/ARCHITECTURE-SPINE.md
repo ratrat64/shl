@@ -11,7 +11,7 @@ updated: 2026-10-04
 binds: [link-map, builder, directory, browser-routing, launchers, publication]
 sources:
   - README.md
-  - PRODUCT.md
+  - aid-docs/planning-artifacts/ux-designs/ux-shortlink-2026-10-06/PRODUCT.md
   - aid-docs/planning-artifacts/ux-designs/ux-shortlink-2026-10-06/DESIGN.md
   - build.mjs
   - build.test.mjs

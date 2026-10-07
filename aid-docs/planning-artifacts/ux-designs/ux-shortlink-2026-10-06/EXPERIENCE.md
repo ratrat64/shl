@@ -5,7 +5,7 @@ sources:
   - .memlog.md
   - DESIGN.md
   - ../../../../README.md
-  - ../../../../PRODUCT.md
+  - PRODUCT.md
   - ../../../../links.yaml
 updated: 2026-10-07
 ---
