@@ -36,16 +36,16 @@ export const redirectPage = ({ url, title }) => `<!doctype html>
 `;
 
 export const cssVariables = `
-  :root{color-scheme:light;--bg:#f6f6f6;--panel:#fff;--ink:#2a2a2a;--muted:#666;--line:#e0e0e0;--accent:#1a5fb0;--script:#9b6000;--wash:#eeefef}
-  @media(prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#121212;--panel:#1a1a1a;--ink:#e8e8e8;--muted:#999;--line:#2a2a2a;--accent:#8ab8ff;--script:#e8b460;--wash:#1e1e1e}}
-  :root[data-theme=light]{color-scheme:light;--bg:#f6f6f6;--panel:#fff;--ink:#2a2a2a;--muted:#666;--line:#e0e0e0;--accent:#1a5fb0;--script:#9b6000;--wash:#eeefef}
-  :root[data-theme=dark]{color-scheme:dark;--bg:#121212;--panel:#1a1a1a;--ink:#e8e8e8;--muted:#999;--line:#2a2a2a;--accent:#8ab8ff;--script:#e8b460;--wash:#1e1e1e}
+  :root{color-scheme:light;--bg:#f6f7f5;--panel:#fff;--ink:#252b29;--muted:#59645f;--line:#7a8580;--accent:#006b60;--script:#895400;--wash:#e8eeeb}
+  @media(prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#000;--panel:#111715;--ink:#e0e7e3;--muted:#a0afa7;--line:#63736b;--accent:#79d6c3;--script:#e9bf7a;--wash:#17221d}}
+  :root[data-theme=light]{color-scheme:light;--bg:#f6f7f5;--panel:#fff;--ink:#252b29;--muted:#59645f;--line:#7a8580;--accent:#006b60;--script:#895400;--wash:#e8eeeb}
+  :root[data-theme=dark]{color-scheme:dark;--bg:#000;--panel:#111715;--ink:#e0e7e3;--muted:#a0afa7;--line:#63736b;--accent:#79d6c3;--script:#e9bf7a;--wash:#17221d}
 `;
 
 export const styles = cssVariables + `
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
-  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 ui-sans-serif,system-ui,-apple-system,sans-serif}
+  body{margin:0;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);font:16px/1.55 ui-sans-serif,system-ui,-apple-system,sans-serif}
   ::selection{background:var(--accent);color:var(--bg)}
   a{color:var(--accent);text-underline-offset:.22em}
   a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
@@ -55,6 +55,7 @@ export const styles = cssVariables + `
   .site-head{border-bottom:1px solid var(--line)}
   .head-inner{min-height:64px;display:flex;align-items:center;gap:1.5rem;padding-block:.65rem}
   .brand{color:var(--ink);font-weight:700;letter-spacing:-.035em;font-size:1.2rem;text-decoration:none;line-height:1}
+  .brand-slash{color:var(--accent)}.brand-slash:last-child{color:var(--script)}
   .nav{display:flex;gap:1.5rem;align-items:center;margin-left:auto}
   .nav a{color:var(--muted);font-size:.9rem;text-decoration:none}
   .nav a[aria-current=page]{color:var(--ink);text-decoration:underline;text-decoration-color:var(--accent);text-underline-offset:.45em}
@@ -62,7 +63,7 @@ export const styles = cssVariables + `
   .theme-toggle{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:4px;padding:.35rem .7rem;font-size:.85rem;white-space:nowrap}
   .theme-toggle:hover{background:var(--wash)}
   .theme-toggle:disabled{background:var(--wash);color:var(--muted);cursor:default}
-  main{padding-top:clamp(1.5rem,3vw,2.5rem);padding-bottom:4rem;min-height:70vh}
+  main.wrap{width:100%;flex:1;margin-block:0;padding-top:clamp(1.5rem,3vw,2.5rem);padding-bottom:4rem}
   h1,h2,h3,p{margin-top:0}
   h1{font-size:clamp(1.8rem,3vw,2.4rem);letter-spacing:-.035em;line-height:1.2;margin-bottom:1rem}
   h2{font-size:clamp(1.25rem,2vw,1.5rem);letter-spacing:-.025em;line-height:1.25;margin-bottom:.8rem}
@@ -84,6 +85,9 @@ export const styles = cssVariables + `
   .search-status{font-size:.9rem;color:var(--muted);margin:0 0 .5rem}
   .links{list-style:none;padding:0;margin:0}
   .links li{padding:.65rem 0;overflow-wrap:anywhere}
+  .links li:has(>.link-row):hover,.links li:has(>.link-row):focus-within,.links summary:hover,.links summary:focus-within{background:var(--wash)}
+  .links li[data-hidden=true]>.link-row .code,.links li[data-hidden=true]>details>summary{color:var(--muted)}
+  .hidden-label{color:var(--muted);font:400 .7rem/1.5 ui-sans-serif,system-ui,sans-serif;margin-left:.5rem}
   .links .links{margin:.35rem 0 0 .75rem;padding-left:1rem}
   summary{cursor:pointer;color:var(--ink);font-weight:600}
   summary:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
@@ -116,7 +120,7 @@ export const styles = cssVariables + `
   .prose pre code{overflow-wrap:normal}
   .footer{border-top:1px solid var(--line);padding-block:1.5rem;color:var(--muted);font-size:.87rem}
   .footer .wrap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}.footer p{margin:0}
-  @media(max-width:740px){.head-inner{flex-wrap:wrap;gap:.75rem}.nav{gap:1rem}.directory-tools{align-items:stretch;flex-direction:column}.directory-actions{width:100%;grid-template-columns:minmax(0,1fr)}.directory-toggles{grid-column:1}.link-row{gap:.5rem}.footer .wrap{display:block}}
+  @media(max-width:740px){.head-inner{flex-wrap:wrap;gap:.75rem}.nav{gap:1rem}.directory-tools{align-items:stretch;flex-direction:column}.directory-actions{width:100%;grid-template-columns:minmax(0,1fr)}.directory-toggles{grid-column:1}.link-row{gap:.5rem}.hidden-label{display:block;margin-left:0}.footer .wrap{display:block}}
   @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 `;
 
@@ -295,7 +299,7 @@ export const NAV_ITEMS = [
 ];
 
 const header = (active, depth) => `<header class="site-head"><div class="wrap head-inner">
- <a class="brand" href="${depth}"${active === 'links' ? ' data-directory-link' : ''}>shl</a>
+ <a class="brand" href="${depth}"${active === 'links' ? ' data-directory-link' : ''}><span class="brand-slash">/</span>shl<span class="brand-slash">/</span></a>
  <nav class="nav" aria-label="Main navigation">
  ${NAV_ITEMS.map(({ label, path, key }) => `<a href="${depth}${path}"${active === 'links' && key === 'links' ? ' data-directory-link' : ''}${active === key ? ' aria-current="page"' : ''}>${label}</a>`).join('')}
  </nav><button class="theme-toggle" type="button" aria-label="Change color theme">Theme: system</button></div></header>`;
@@ -343,7 +347,7 @@ const renderLinkRow = ({ code, url, title, script, tags, hidden, prefix, href })
   const cut = split > 0 ? originLength + split + 1 : url.length;
   const searchText = `${code} ${script ? 'script ' : ''}${url} ${tags.join(' ')} ${tags.map((tag) => `#${tag}`).join(' ')}`.trim();
   return `
-       <li${hidden ? ' data-hidden="true" hidden' : ''}${title ? ` data-title="${esc(title)}"` : ''} data-search="${esc(searchText)}"><div class="link-row${script ? ' script-row' : ''}"${title ? ` title="${esc(title)}"` : ''}><a class="code${script ? ' script-link' : ''}" href="${esc(href)}"${title ? ` title="${esc(title)}"` : ''}>${esc(code)}${script ? '<span class="script-label">script</span>' : ''}</a>
+        <li${hidden ? ' data-hidden="true" hidden' : ''}${title ? ` data-title="${esc(title)}"` : ''} data-search="${esc(searchText)}"><div class="link-row${script ? ' script-row' : ''}"${title ? ` title="${esc(title)}"` : ''}><a class="code${script ? ' script-link' : ''}" href="${esc(href)}"${title ? ` title="${esc(title)}"` : ''}>${esc(code)}${script ? '<span class="script-label">script</span>' : ''}${hidden ? '<span class="hidden-label">hidden</span>' : ''}</a>
             <a class="destination" href="${esc(url)}" aria-label="Copy destination: ${esc(url)}"${title ? '' : ` title="${esc(url)}"`}><span class="sr-only">${esc(url)}</span><span class="destination-start" aria-hidden="true">${esc(url.slice(0, cut))}</span><span class="destination-end" aria-hidden="true">${esc(url.slice(cut))}</span></a>${script ? `<a class="download" href="${esc(`./${prefix}${code}.sh`)}" aria-label="Download script for ${esc(code)}" download>Download</a>` : ''}<a class="visit" href="${esc(url)}" aria-label="Open destination for ${esc(code)}">Open</a></div>${tags.length ? `<span class="tags">${tags.map((tag) => `#${esc(tag)}`).join(' · ')}</span>` : ''}</li>`;
 };
 

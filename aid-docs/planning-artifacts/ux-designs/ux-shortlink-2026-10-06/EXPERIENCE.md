@@ -7,14 +7,14 @@ sources:
   - ../../../../README.md
   - ../../../../PRODUCT.md
   - ../../../../links.yaml
-updated: 2026-10-06
+updated: 2026-10-07
 ---
 
 # Directory Experience: Shortlink
 
 ## Foundation
 
-The Working Index is a compact, static directory for finding and using public short links. Apply the visual roles in [DESIGN.md](DESIGN.md): standard actions use {colors.action-light}/{colors.action-dark}, scripts use {colors.script-light}/{colors.script-dark}, and page and text surfaces retain {colors.paper-light}/{colors.paper-dark} and {colors.ink-light}/{colors.ink-dark}. Respect system light/dark preference and the visitor's theme override. Hidden links control discoverability, not secrecy.
+The Working Index is a compact, static directory for finding and using public short links. Apply the refreshed high-contrast, easy-on-the-eyes palette in [DESIGN.md](DESIGN.md): standard actions use teal {colors.action-light}/{colors.action-dark}, scripts use amber {colors.script-light}/{colors.script-dark}, and page and text surfaces use {colors.paper-light}/{colors.paper-dark} and {colors.ink-light}/{colors.ink-dark}. Dark mode has a pure black background (#000) and softened light ink; light mode has an off-white background. Respect system light/dark preference and the visitor's saved theme override. Hidden links control discoverability, not secrecy.
 
 ## Information Architecture
 
@@ -28,9 +28,11 @@ Use short, functional labels. The visible search placeholder is exactly "Search 
 
 ## Component Patterns
 
-- **Directory tools:** On every directory page the count is the sole heading on the left; a single-line search and a compact grouped area for the hidden-links toggle sit on the right. Reserve the same control columns without hidden descendants: search retains its size and position, while Show hidden links stays visible, muted and disabled. Use the same {typography.display} size for home and nested counts, not the muted row metadata style; use the existing {colors.ink-light}/{colors.ink-dark} roles. Search uses {rounded.control} and existing surface/rule roles; no new palette.
+- **Directory tools:** On every directory page the count is the sole heading on the left; a single-line search and a compact grouped area for the hidden-links toggle sit on the right. Reserve the same control columns without hidden descendants: search retains its size and position, while Show hidden links stays visible, muted and disabled. Use the same {typography.display} size for home and nested counts, not the muted row metadata style; use {colors.ink-light}/{colors.ink-dark}. Search uses {rounded.control}, {colors.surface-light}/{colors.surface-dark} and {colors.rule-light}/{colors.rule-dark}.
 - **Directory rows:** Code and destination remain side by side; code copies the full short URL, destination copies its full URL, and Open visits the destination. Script links retain their visible script label and existing amber role. Folder names open their pages and disclosure expands the nested list. Optional titles remain available on hover and searchable; tags remain visible below entries. Keep the existing middle-truncation behavior for long destinations while preserving full values for copying and assistive technology.
-- **Navigation:** Keep Links and Guide, active-link underline, theme control and keyboard focus treatment. Remove directory-page framing rules below the header and above the footer; separate sections by space, as specified in DESIGN.md. Keep guide section rules.
+- **Row emphasis:** Link rows and folder summaries use {colors.wash-light}/{colors.wash-dark} on hover and focus-within. Revealed hidden codes and hidden-only folder summaries use {colors.secondary-light}/{colors.secondary-dark}; hidden links have a visible hidden label. Hidden script codes remain muted while retaining the visible script label. Keep destinations and actions readable rather than dimming entire rows.
+- **Navigation:** The header brand reads `/shl/`, with `shl` in {colors.ink-light}/{colors.ink-dark}, the leading slash in teal {colors.action-light}/{colors.action-dark}, and the trailing slash in amber {colors.script-light}/{colors.script-dark}. Keep Links and Guide, active-link underline, theme control and keyboard focus treatment. Remove directory-page framing rules below the header and above the footer; separate sections by space, as specified in DESIGN.md. Keep guide section rules.
+- **Footer:** The page shell fills at least the viewport height, with main content growing to put the footer at the bottom on short pages. On long pages it follows content in normal flow without covering it.
 - **Copy feedback:** A polite status message appears after copying a code or destination (or a clipboard failure) in a fixed toast that never changes the listing's position; clear it after five seconds. A second copy resets the timer.
 
 ## State Patterns
@@ -46,11 +48,11 @@ Typing filters the current directory's descendants. Folder disclosure expands or
 
 ## Accessibility Floor
 
-Keep the search input programmatically labelled even with its visual label hidden; the placeholder is not its label. Preserve visible keyboard focus and text cues for script links. Expose the hidden-links toggle state programmatically (for example, `aria-pressed`) as well as through its label. Announce changes to the single count through a polite live region without another visible number; do not announce duplicate result counts. Retain the count heading, folder breadcrumbs, full destination text for assistive technology and functional links when JavaScript is off.
+Keep the search input programmatically labelled even with its visual label hidden; the placeholder is not its label. Preserve visible keyboard focus and text cues for script and hidden links; focus-within row wash supplements rather than replaces focus outlines. Muted hidden codes remain legible in both themes. Expose the hidden-links toggle state programmatically (for example, `aria-pressed`) as well as through its label. Announce changes to the single count through a polite live region without another visible number; do not announce duplicate result counts. Retain the count heading, folder breadcrumbs, full destination text for assistive technology and functional links when JavaScript is off.
 
 ## Responsive & Platform
 
-Use the centered directory width in DESIGN.md on desktop; at narrow widths wrap search and grouped controls beneath the count, with search able to fill the available width. Keep the breadcrumb row one line high, horizontally scrollable for long paths, and reserve it on home so rows do not shift. Preserve the two-column code/destination relationship where possible and the existing small-screen row behavior. Static GitHub Pages HTML remains the baseline; JavaScript enhances filtering, toggling, copying and in-page directory navigation.
+Use the centered directory width in DESIGN.md on desktop; at narrow widths wrap search and grouped controls beneath the count, with search able to fill the available width. Keep the breadcrumb row one line high, horizontally scrollable for long paths, and reserve it on home so rows do not shift. Preserve the two-column code/destination relationship where possible and the existing small-screen row behavior. Below 740px the hidden label sits below its code so it does not consume destination width. Static GitHub Pages HTML remains the baseline; JavaScript enhances filtering, toggling, copying and in-page directory navigation.
 
 ## Key Flows
 

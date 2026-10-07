@@ -615,7 +615,7 @@ test('toggle updates hidden rows, nested search, counts, and hidden-only empty s
   };
 
   const homeMarkup = await f.read('index.html');
-  const titled = homeMarkup.match(/<li([^>]*)><div class="link-row" title="Private notes"><a class="code" href="([^"]+)" title="Private notes">secret<\/a>/);
+  const titled = homeMarkup.match(/<li([^>]*)><div class="link-row" title="Private notes"><a class="code" href="([^"]+)" title="Private notes">secret<span class="hidden-label">hidden<\/span><\/a>/);
   assert.ok(titled, 'generated hidden titled link is present');
   const [, attributes, secretHref] = titled;
   assert.match(attributes, /data-hidden="true" hidden data-title="Private notes"/);
@@ -719,7 +719,7 @@ test('information pages use relative navigation and shared theme assets', async 
   assert.equal(f.build().status, 0);
   const home = await f.read('index.html');
   assert.match(home, /<title>Links · shl<\/title>/);
-  assert.match(home, /class="brand" href="\.\/" data-directory-link>shl<\/a>/);
+  assert.match(home, /class="brand" href="\.\/" data-directory-link><span class="brand-slash">\/<\/span>shl<span class="brand-slash">\/<\/span><\/a>/);
   assert.match(home, /<footer class="footer">[\s\S]*?<p>shl<\/p>/);
   assert.match(home, /href="\.\/assets\/site\.css"/);
   assert.match(home, /href="\.\/guide\/"/);
@@ -739,7 +739,7 @@ test('information pages use relative navigation and shared theme assets', async 
     }
   }
   assert.match(await f.read('assets/site.css'), /data-theme=dark/);
-  assert.match(await f.read('assets/site.css'), /--bg:#121212/);
+  assert.match(await f.read('assets/site.css'), /--bg:#000/);
   const theme = await f.read('assets/theme.js');
   assert.match(theme, /shortlink-theme/);
   const button = { addEventListener() {} };
@@ -786,7 +786,7 @@ test('script launchers are opt-in, quote URLs, forward arguments and statuses, a
   assert.doesNotMatch(home, /class="download" href="\.\/disabled\.sh"/);
   assert.match(home, /<span class="count-number" aria-hidden="true">3<\/span><span class="count-label"> links<\/span>/);
   assert.match(home, /class="code" href="\.\/disabled\/">disabled<\/a>/);
-  assert.match(await f.read('assets/site.css'), /--script:#e8b460/);
+  assert.match(await f.read('assets/site.css'), /--script:#e9bf7a/);
   assert.match(await f.read('assets/site.css'), /\.download\{/);
   assert.match(await f.read('assets/site.css'), /\.link-row\.script-row\{grid-template-columns:max-content minmax\(0,1fr\) max-content max-content\}/);
   assert.match(await f.read('tools/Nested/index.html'), /http-equiv="refresh"/);
