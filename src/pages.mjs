@@ -46,7 +46,7 @@ docs:
    </ol>
     <p>Change a URL to retarget a code; delete its entry to remove it. Nest objects for directories. Codes start with a letter or number and may also contain dots, underscores, and hyphens; sibling names cannot differ only by case.</p>
      <p>Optional: <code>script: true</code> builds a <code>&lt;path&gt;.sh</code> launcher. Use exact casing and no trailing slash; only run scripts from trusted sources.</p>
-     <p>Add <code>tags: [documentation, github]</code> to a link object to show topic labels under it. Search by tag name or by its displayed <code>#tag</code> label, including in nested directories.</p>
+     <p>Add <code>tags: [documentation, github]</code> to a link object to show inline topic labels beside its code. Select the labels to see the full tags when they are shortened. Search by tag name or by its displayed <code>#tag</code> label, including in nested directories.</p>
     <p>Set <code>hidden: true</code> on a link object to omit it from directory listings, counts, and search by default. Use Show hidden links on a directory page to reveal hidden entries. Its redirect and optional launcher still work, and the destination remains public in <code>links.json</code>. Hiding controls discoverability, not secrecy.</p></section>
    <section id="how-it-works"><h2>How it works</h2>
    <p>The build validates codes, collisions, and URL syntax before replacing output. Each link gets a redirect page with JavaScript, meta refresh, and a clickable fallback. Directories get browsable pages.</p>

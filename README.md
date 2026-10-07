@@ -50,7 +50,9 @@ automation:
 
 Short form is just `code: https://example.com/`. Long form adds an optional string `title` shown
 on the redirect fallback page, a `tags` array of nonblank strings, or a boolean `hidden` (default `false`).
-Tags appear under directory entries; type a tag (with or without its `#` prefix) in Search links to filter matching links
+Tags appear on one line beside each short code without increasing row height;
+select the labels to see the full tags if they are shortened. Type a tag (with or
+without its `#` prefix) in Search links to filter matching links
 (case-insensitive, including nested links). JSON entries use the same `"tags": ["documentation", "github"]` format.
 Set `hidden: true`
 to omit a link from directory listings, counts, and search by default. Visitors can
