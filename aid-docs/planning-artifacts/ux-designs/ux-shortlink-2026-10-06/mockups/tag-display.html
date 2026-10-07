@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Compact tags comparison · shl</title>
+  <style>
+    :root{color-scheme:light;--bg:#f6f6f6;--panel:#fff;--ink:#2a2a2a;--muted:#666;--line:#e0e0e0;--accent:#1a5fb0;--script:#9b6000;--wash:#eeefef}
+    @media(prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#121212;--panel:#1a1a1a;--ink:#e8e8e8;--muted:#999;--line:#2a2a2a;--accent:#8ab8ff;--script:#e8b460;--wash:#1e1e1e}}
+    :root[data-theme=light]{color-scheme:light;--bg:#f6f6f6;--panel:#fff;--ink:#2a2a2a;--muted:#666;--line:#e0e0e0;--accent:#1a5fb0;--script:#9b6000;--wash:#eeefef}
+    :root[data-theme=dark]{color-scheme:dark;--bg:#121212;--panel:#1a1a1a;--ink:#e8e8e8;--muted:#999;--line:#2a2a2a;--accent:#8ab8ff;--script:#e8b460;--wash:#1e1e1e}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 ui-sans-serif,system-ui,-apple-system,sans-serif}
+    ::selection{background:var(--accent);color:var(--bg)}
+    main{max-width:1160px;margin:auto;padding:2rem clamp(1rem,3vw,2.5rem) 4rem}
+    header{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:2rem}
+    h1{font-size:clamp(1.8rem,3vw,2.4rem);letter-spacing:-.035em;line-height:1.2;margin:0}
+    h2{font-size:clamp(1.25rem,2vw,1.5rem);letter-spacing:-.025em;margin:0 0 .4rem}
+    p{color:var(--muted);max-width:68ch;margin:0 0 1.5rem}
+    button,a{font:inherit;touch-action:manipulation}
+    button{cursor:pointer}
+    button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+    .theme,.open{background:transparent;border:1px solid var(--line);border-radius:4px;padding:.2rem .55rem;font-size:.85rem;white-space:nowrap}
+    .theme{color:var(--ink)}
+    .theme:hover,.open:hover,.tag-control:hover{background:var(--wash)}
+    .comparison{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3rem}
+    .comparison.full-width{grid-template-columns:1fr}
+    .controls{display:flex;gap:.5rem;flex-wrap:wrap}
+    section{min-width:0}
+    .description{min-height:3.1em}
+    .links{list-style:none;margin:0;padding:0}
+    .row{display:grid;grid-template-columns:max-content minmax(0,9rem) minmax(0,1fr) max-content;gap:.7rem;align-items:center;min-width:0;min-height:52px;padding:.65rem 0;overflow-x:auto}
+    .compact .row{grid-template-columns:max-content 2.2rem minmax(0,1fr) max-content}
+    .code{font:600 .94rem/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--accent);white-space:nowrap;text-decoration:none}
+    .code:hover{text-decoration:underline}
+    .script .code{color:var(--script)}
+    .script-label{font:600 .7rem/1.5 ui-sans-serif,system-ui,sans-serif;margin-left:.35rem;text-transform:uppercase;letter-spacing:.04em}
+    .tag-control{min-width:0;border:0;background:transparent;color:var(--muted);font-size:.78rem;padding:0;text-align:left;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .compact .tag-control{text-align:center}
+    .destination{position:relative;display:flex;min-width:0;white-space:nowrap;color:var(--muted);font-size:.85rem;text-decoration:none}
+    .destination:hover{color:var(--accent);text-decoration:underline}
+    .start{overflow:hidden;text-overflow:ellipsis}
+    .end{flex-shrink:0;max-width:55%;overflow:hidden;text-overflow:ellipsis}
+    .open{color:var(--accent);text-decoration:none}
+    .note{font-size:.85rem;margin-top:1.5rem}
+    .tag-panel{position:fixed;inset:auto;margin:0;max-width:min(22rem,calc(100vw - 2rem));max-height:calc(100dvh - 2rem);overflow:auto;padding:.7rem .9rem;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--ink);font-size:.85rem;overflow-wrap:anywhere}
+    .tag-panel strong{display:block;margin-bottom:.3rem}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    @media(max-width:1000px){.comparison{grid-template-columns:1fr;gap:3rem}.description{min-height:0}}
+    @media(max-width:500px){header{align-items:flex-start;flex-direction:column}.row{grid-template-columns:max-content minmax(0,5rem) minmax(0,1fr) max-content;gap:.4rem}.compact .row{grid-template-columns:max-content 1.6rem minmax(0,1fr) max-content}}
+  </style>
+</head>
+<body>
+  <main>
+    <header><h1>Compact tags</h1><div class="controls"><button class="theme layout" type="button" aria-pressed="false">Full-width views</button><button class="theme theme-switch" type="button">Switch theme</button></div></header>
+    <p>Two treatments for the same links. Click a tag label to inspect all tags; both keep tagged and untagged rows the same height.</p>
+    <div class="comparison">
+      <section aria-labelledby="inline-heading">
+        <h2 id="inline-heading">Inline labels</h2>
+        <p class="description">Tags stay visible on one line. Long labels truncate; click to see the full list.</p>
+        <ul class="links" data-variant="inline"></ul>
+        <p class="note">Easier to scan by topic. Tags share horizontal space with the destination.</p>
+      </section>
+      <section class="compact" aria-labelledby="compact-heading">
+        <h2 id="compact-heading">Tag-count popover</h2>
+        <p class="description">A compact # count reveals the tags in a floating panel when selected.</p>
+        <ul class="links" data-variant="compact"></ul>
+        <p class="note">More room for destinations. Inspect tags with a click, tap, or keyboard activation.</p>
+      </section>
+    </div>
+    <p class="note">Includes an untagged link, a script, and long tags. Resize the window to compare narrow layouts. Escape or clicking outside closes a tag panel.</p>
+  </main>
+  <script>
+    const samples = [
+      {code:'gh',url:'https://github.com/',tags:[]},
+      {code:'docs',url:'https://docs.github.com/en/pages',tags:['documentation','github']},
+      {code:'bun',url:'https://bun.com/docs',tags:['javascript','runtime','tooling']},
+      {code:'stable',url:'https://example.com/setup/ohmyposh/stable.sh',tags:['shell','setup','ohmyposh'],script:true},
+      {code:'reference',url:'https://developer.mozilla.org/en-US/docs/Web',tags:['web-development-reference-and-accessibility-resources','documentation','frontend','accessibility','learning']},
+      {code:'a-very-long-short-link-code-for-reference',url:'https://example.com/reference',tags:['reference']}
+    ];
+    const element = (tag, className, text) => {
+      const node = document.createElement(tag);
+      node.className = className;
+      if (text) node.textContent = text;
+      return node;
+    };
+    for (const list of document.querySelectorAll('.links')) {
+      for (const [index, sample] of samples.entries()) {
+        const row = element('li', 'row' + (sample.script ? ' script' : ''));
+        const code = element('a', 'code', sample.code);
+        code.href = sample.url;
+        if (sample.script) code.append(element('span', 'script-label', 'script'));
+        row.append(code);
+        const slot = element('span', 'tag-slot');
+        if (sample.tags.length) {
+          const id = `${list.dataset.variant}-tags-${index}`;
+          const tags = sample.tags.map(tag => '#' + tag).join(' · ');
+          const button = element('button', 'tag-control', list.dataset.variant === 'inline' ? tags : '#' + sample.tags.length);
+          button.type = 'button';
+          button.setAttribute('aria-label', list.dataset.variant === 'inline' ? `${tags}. Show all tags for ${sample.code}` : `Show ${sample.tags.length} tags for ${sample.code}`);
+          button.setAttribute('popovertarget', id);
+          const panel = element('div', 'tag-panel');
+          panel.id = id;
+          panel.setAttribute('popover', 'auto');
+          panel.append(element('strong', '', `Tags for ${sample.code}`), element('span', '', tags));
+          panel.addEventListener('toggle', event => {
+            if (event.newState !== 'open') return;
+            const rect = button.getBoundingClientRect();
+            panel.anchorButton = button;
+            panel.anchorTop = rect.top;
+            panel.anchorLeft = rect.left;
+            panel.style.left = Math.max(16, Math.min(rect.left, innerWidth - panel.offsetWidth - 16)) + 'px';
+            panel.style.top = Math.max(16, Math.min(rect.bottom + 8, innerHeight - panel.offsetHeight - 16)) + 'px';
+          });
+          slot.append(button, panel);
+        }
+        // The slot participates directly in the row grid; panels use the browser top layer.
+        slot.style.display = 'contents';
+        if (!sample.tags.length) slot.append(element('span', ''));
+        row.append(slot);
+        const destination = element('a', 'destination');
+        destination.href = sample.url;
+        destination.append(element('span', 'sr-only', sample.url));
+        const cut = Math.ceil(sample.url.length / 2);
+        for (const [className, text] of [['start', sample.url.slice(0,cut)], ['end', sample.url.slice(cut)]]) {
+          const part = element('span', className, text);
+          part.setAttribute('aria-hidden', 'true');
+          destination.append(part);
+        }
+        const open = element('a', 'open', 'Open');
+        open.href = sample.url;
+        open.setAttribute('aria-label', 'Open destination for ' + sample.code);
+        row.append(destination, open);
+        list.append(row);
+      }
+    }
+    document.querySelector('.layout').addEventListener('click', event => {
+      const fullWidth = document.querySelector('.comparison').classList.toggle('full-width');
+      event.currentTarget.setAttribute('aria-pressed', String(fullWidth));
+      event.currentTarget.textContent = fullWidth ? 'Side-by-side views' : 'Full-width views';
+      closePanels();
+    });
+    document.querySelector('.theme-switch').addEventListener('click', () => {
+      const root = document.documentElement;
+      const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+      root.dataset.theme = dark ? 'light' : 'dark';
+    });
+    // Close anchored panels when their trigger moves so they cannot float over unrelated rows.
+    addEventListener('resize', closePanels);
+    addEventListener('scroll', event => {
+      if (event.target instanceof Element && event.target.closest('.tag-panel')) return;
+      for (const panel of document.querySelectorAll(':popover-open')) {
+        if (!panel.anchorButton) continue;
+        const rect = panel.anchorButton.getBoundingClientRect();
+        if (rect.top !== panel.anchorTop || rect.left !== panel.anchorLeft) panel.hidePopover();
+      }
+    }, true);
+    function closePanels() {
+      for (const panel of document.querySelectorAll(':popover-open')) panel.hidePopover();
+    }
+  </script>
+</body>
+</html>
