@@ -53,13 +53,15 @@ export const styles = cssVariables + `
   summary a{color:inherit;text-decoration:none}
   summary a:hover{text-decoration:underline}
   .breadcrumbs{height:2rem;line-height:1.5rem;white-space:nowrap;overflow-x:auto;overflow-y:hidden;margin:0 0 .5rem;color:var(--muted);font-size:.9rem}
-  .link-row{display:grid;grid-template-columns:max-content minmax(0,1fr) max-content;gap:1rem;align-items:center;overflow-x:auto}
+  .link-row{display:grid;grid-template-columns:max-content minmax(0,1fr) max-content;gap:1rem;align-items:center;overflow-x:auto;scrollbar-width:none}
   .link-row.script-row{grid-template-columns:max-content minmax(0,1fr) max-content max-content}
+  .link-row:has(.tags){grid-template-columns:max-content minmax(3rem,9rem) minmax(4rem,1fr) max-content}
+  .link-row.script-row:has(.tags){grid-template-columns:max-content minmax(3rem,9rem) minmax(4rem,1fr) max-content max-content}
   .code{font:600 .94rem/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;text-decoration:none;color:var(--accent);white-space:nowrap}
   .code:hover{text-decoration:underline}
   .script-link{color:var(--script)}
   .script-label{font:600 .7rem/1.5 ui-sans-serif,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.04em;margin-left:.5rem}
-  .destination{display:flex;min-width:0;color:var(--muted);font-size:.85rem;white-space:nowrap;text-decoration:none}
+  .destination{position:relative;display:flex;min-width:0;color:var(--muted);font-size:.85rem;white-space:nowrap;text-decoration:none}
   .destination:hover{text-decoration:underline;color:var(--accent)}
   .destination-start{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .destination-end{flex-shrink:0;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -67,7 +69,11 @@ export const styles = cssVariables + `
   .visit:hover{background:var(--wash)}
   .download{border:1px solid var(--line);border-radius:4px;padding:.2rem .55rem;text-decoration:none;font-size:.85rem;white-space:nowrap;color:var(--script)}
   .download:hover{background:var(--wash)}
-  .tags{display:block;color:var(--muted);font-size:.78rem;margin-top:.2rem}
+  .tags{min-width:0;padding:0;border:0;background:transparent;color:var(--muted);font-size:.78rem;line-height:1.5;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tags:hover{background:var(--wash)}
+  .tag-panel{display:none;width:max-content;max-width:min(22rem,calc(100vw - 2rem));max-height:calc(100dvh - 2rem);overflow:auto;padding:.7rem .9rem;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--ink);font-size:.85rem;overflow-wrap:anywhere}
+  .tag-panel:popover-open{display:block}
+  @supports(position-area:bottom){.tag-panel{inset:auto;position-area:bottom span-right;position-try-fallbacks:flip-block,flip-inline;margin:.5rem 0}}
   #copy-status:empty{display:none}
   #copy-status:not(:empty){position:fixed;bottom:1rem;right:1rem;z-index:1;max-width:min(24rem,calc(100vw - 2rem));margin:0;padding:.55rem .8rem;background:var(--panel);border:1px solid var(--line);border-radius:4px;color:var(--ink)}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
@@ -80,5 +86,6 @@ export const styles = cssVariables + `
   .footer{border-top:1px solid var(--line);padding-block:1.5rem;color:var(--muted);font-size:.87rem}
   .footer .wrap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}.footer p{margin:0}
   @media(max-width:740px){.head-inner{flex-wrap:wrap;gap:.75rem}.nav{gap:1rem}.directory-tools{align-items:stretch;flex-direction:column}.directory-actions{width:100%;grid-template-columns:minmax(0,1fr)}.directory-toggles{grid-column:1}.link-row{gap:.5rem}.footer .wrap{display:block}}
+  @media(max-width:500px){.link-row:has(.tags){gap:.35rem;grid-template-columns:max-content minmax(3rem,5rem) minmax(3rem,1fr) max-content}.link-row.script-row:has(.tags){grid-template-columns:max-content minmax(3rem,5rem) minmax(3rem,1fr) max-content max-content}}
   @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 `;

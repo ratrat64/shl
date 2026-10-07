@@ -2,7 +2,7 @@
 name: Shortlink
 description: A clear, static directory for short links.
 status: final
-updated: 2026-10-06
+updated: 2026-10-07
 colors:
   action-light: "#1a5fb0"
   action-dark: "#8ab8ff"
@@ -85,6 +85,8 @@ The count is every directory page's visual heading, not a small aside or a secon
 A code copies its full short URL on click; script-enabled codes use amber and a visible script label. Destinations copy their full URL on click, and an Open control at the row end follows it. Folder names link to their browseable pages while the disclosure marker expands the nested list. Optional titles appear on hover over codes and remain searchable. Destinations display their ends without wrapping; the full URL is available for copying and to assistive technology.
 
 Copy feedback appears as a small, flat floating panel near the viewport edge and never displaces directory content.
+
+Tags sit inline between the code and destination in muted text at the existing metadata size. Cap their width at 9rem (5rem below 500px), keep them on one line, and truncate with an ellipsis rather than increasing row height. Reserve at least 3rem for the labels and 4rem for the destination (3rem below 500px); let long-code or script rows scroll horizontally instead of reducing either target to zero. Horizontal scrollbar chrome must not add row height. Selecting the labels reveals the full tags in a flat floating panel using existing surface, rule, ink, and control-radius roles. Place it near the labels where CSS anchor positioning is supported; otherwise use the browser's centered popover. See EXPERIENCE.md for keyboard and dismissal behavior.
 
 ## Do's and Don'ts
 

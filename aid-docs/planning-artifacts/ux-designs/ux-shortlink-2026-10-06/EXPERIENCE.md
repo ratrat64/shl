@@ -7,7 +7,7 @@ sources:
   - ../../../../README.md
   - ../../../../PRODUCT.md
   - ../../../../links.yaml
-updated: 2026-10-06
+updated: 2026-10-07
 ---
 
 # Directory Experience: Shortlink
@@ -29,7 +29,7 @@ Use short, functional labels. The visible search placeholder is exactly "Search 
 ## Component Patterns
 
 - **Directory tools:** On every directory page the count is the sole heading on the left; a single-line search and a compact grouped area for the hidden-links toggle sit on the right. Reserve the same control columns without hidden descendants: search retains its size and position, while Show hidden links stays visible, muted and disabled. Use the same {typography.display} size for home and nested counts, not the muted row metadata style; use the existing {colors.ink-light}/{colors.ink-dark} roles. Search uses {rounded.control} and existing surface/rule roles; no new palette.
-- **Directory rows:** Code and destination remain side by side; code copies the full short URL, destination copies its full URL, and Open visits the destination. Script links retain their visible script label and existing amber role. Folder names open their pages and disclosure expands the nested list. Optional titles remain available on hover and searchable; tags remain visible below entries. Keep the existing middle-truncation behavior for long destinations while preserving full values for copying and assistive technology.
+- **Directory rows:** Code and destination remain side by side; code copies the full short URL, destination copies its full URL, and Open visits the destination. Script links retain their visible script label and existing amber role. Folder names open their pages and disclosure expands the nested list. Optional titles remain available on hover and searchable. Tags appear inline beside codes, stay on one line, and truncate without adding row height. Select the labels to reveal all tags in a floating panel that does not move the list. Use a native button/popover: Enter or Space opens it, Escape and outside clicks dismiss it, and complete tag names remain in the button's accessible name. The panel supports scrolling for long content and works without JavaScript in browsers supporting HTML popovers. Tags remain searchable whether shortened or revealed. Keep the existing middle-truncation behavior for long destinations while preserving full values for copying and assistive technology.
 - **Navigation:** Keep Links and Guide, active-link underline, theme control and keyboard focus treatment. Remove directory-page framing rules below the header and above the footer; separate sections by space, as specified in DESIGN.md. Keep guide section rules.
 - **Copy feedback:** A polite status message appears after copying a code or destination (or a clipboard failure) in a fixed toast that never changes the listing's position; clear it after five seconds. A second copy resets the timer.
 
