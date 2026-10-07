@@ -1621,7 +1621,9 @@ test("directory highlights match, full tags stay inline, and destinations reveal
       tags: ["shell"],
     },
     plain: { url: "https://example.com/plain", tags: ["reference"] },
-    folder: { nested: { url: "https://example.com/a/very/long/path/setup.sh" } },
+    folder: {
+      nested: { url: "https://example.com/a/very/long/path/setup.sh" },
+    },
     ["long-folder-".repeat(12)]: { plain: "https://example.com/folder" },
     ["long-code-".repeat(12)]: "https://example.com/plain",
     ["long-script-".repeat(12)]: {
@@ -1637,13 +1639,14 @@ test("directory highlights match, full tags stay inline, and destinations reveal
       try {
         const frame = event.target;
         const doc = frame.contentDocument;
+        doc.documentElement.style.scrollBehavior = 'auto';
         const win = frame.contentWindow;
         const rules = [...doc.styleSheets].flatMap(sheet => [...sheet.cssRules]);
         const pointerRule = rules.find(rule => rule.conditionText === '(hover: hover) and (pointer: fine)');
         const coarseRule = rules.find(rule => rule.conditionText === '(any-pointer: coarse)');
         if (!pointerRule || !coarseRule) throw new Error('Missing pointer visibility rules');
         const hover = doc.createElement('style');
-        hover.textContent = [...pointerRule.cssRules].filter(rule => rule.selectorText?.includes(':hover')).map(rule => rule.selectorText.replaceAll(':hover', '.verify-hover') + '{' + rule.style.cssText + '}').join('');
+        hover.textContent = [...pointerRule.cssRules].filter(rule => rule.selectorText?.includes(':hover') || rule.selectorText?.includes(':focus-within')).map(rule => rule.selectorText.replaceAll(':hover', '.verify-hover').replaceAll(':focus-within', '.verify-focus') + '{' + rule.style.cssText + '}').join('');
         doc.head.append(hover);
         for (const folder of doc.querySelectorAll('summary')) {
           if (folder.getBoundingClientRect().height !== 50 || win.getComputedStyle(folder).whiteSpace !== 'nowrap') throw new Error('Folder summary geometry failed');
@@ -1669,9 +1672,9 @@ test("directory highlights match, full tags stay inline, and destinations reveal
               row.classList.add('verify-hover');
               if (win.getComputedStyle(destination).opacity !== '1') throw new Error('Hover did not reveal destination');
               row.classList.remove('verify-hover');
-              row.querySelector('.code').focus();
+              row.classList.add('verify-focus');
               if (win.getComputedStyle(destination).opacity !== '1') throw new Error('Focus did not reveal destination');
-              row.querySelector('.code').blur();
+              row.classList.remove('verify-focus');
               pointerRule.media.mediaText = 'not all';
               if (win.getComputedStyle(destination).opacity !== '1') throw new Error('Non-hover destination hidden');
               pointerRule.media.mediaText = 'all';
@@ -1709,11 +1712,8 @@ test("directory highlights match, full tags stay inline, and destinations reveal
     });
   </script></body></html>`,
   );
-  const html = runChrome(
-    chrome,
-    f.cwd,
-    pathToFileURL(join(f.cwd, "dist", "layout-check.html")).href,
-  );
+  const base = await browserServer(t, f.cwd);
+  const html = runChrome(chrome, f.cwd, base + "/layout-check.html");
   assert.match(html, /<body data-layout-check="passed">/, html);
 });
 
