@@ -72,7 +72,7 @@ Flat by design: surfaces use color instead of shadows; directory entries are sep
 
 ## Shapes
 
-Directory rows are square and unruled. Inputs and code blocks have subtle 4px corners.
+Link rows and folder summaries are unruled with subtle 4px corners. Inputs and code blocks also have 4px corners.
 
 ## Components
 
@@ -94,11 +94,15 @@ Column consistency applies when interactive tools are shown. Preserve the existi
 
 A code copies its full short URL on click; script-enabled codes use amber and have a Download action without a SCRIPT label. Destinations copy their full URL on click, and an Open control at the row end follows it. Folder names link to their browseable pages while the disclosure marker expands the nested list. Optional titles appear on hover over codes and remain searchable. Destinations display their ends without wrapping; the full URL is available for copying and to assistive technology.
 
+Only in hover-capable, fine-pointer mode with no coarse input available, destination text is visually hidden with opacity until row hover or focus-within. Its layout space and full accessible value remain reserved, so revealing it never shifts content. Any available coarse pointer, including hybrid touch/mouse devices, forces destinations visible; touch and non-hover modes always show them too. Long URLs remain on one line with the existing middle truncation; copying retains the full value. Every row variant, tagged or untagged, standard or script, reserves at least 4rem for the destination (3rem below 500px). Open and Download remain visible.
+
 Copy feedback appears as a small, flat floating panel near the viewport edge and never displaces directory content.
 
-Tags sit inline between the code and destination in muted text at the existing metadata size. Cap their width at 9rem (5rem below 500px), keep them on one line, and truncate with an ellipsis rather than increasing row height. Let the tag track fit its actual label width so the gap to destinations stays consistent. Reserve at least 3rem for the labels and 4rem for the destination (3rem below 500px); let long-code or script rows scroll horizontally instead of reducing either target to zero. Horizontal scrollbar chrome must not add row height. Selecting the labels reveals the full tags in a flat floating panel using existing surface, rule, ink, and control-radius roles. Place it near the labels where CSS anchor positioning is supported; otherwise use the browser's centered popover. See EXPERIENCE.md for keyboard and dismissal behavior.
+Tags sit inline between the code and destination in muted text at the existing metadata size. Show full labels on one line with no width cap or ellipsis, without increasing row height. Let the tag track fit its actual label width so the gap to destinations stays consistent. Reserve at least 3rem for the labels; let crowded rows scroll horizontally instead of wrapping tags or reducing either target to zero. Horizontal scrollbar chrome must not add row height. Retain the native tag-button popover as an optional convenient view of all tags, not a requirement for reading shortened labels. Its flat floating panel uses existing surface, rule, ink, and control-radius roles. Place it near the labels where CSS anchor positioning is supported; otherwise use the browser's centered popover. See EXPERIENCE.md for unchanged keyboard and dismissal behavior.
 
-Link rows and folder summaries use the theme wash on hover and focus-within, preserving visible focus outlines. Revealed hidden links use exactly the regular colors and font weights, with reduced opacity across the row and tags: 80% in dark mode and 94% in light mode. Hidden-only folder summaries use the same opacity without dimming their nested lists again. Keyboard focus restores full row or summary opacity so focus outlines stay clear. Do not add hidden or SCRIPT labels.
+Folder summaries stay on one line and scroll horizontally for long names, preserving the full name and disclosure marker without ellipsis or wrapping. Their height remains 50px; scrollbar chrome must not increase it.
+
+Link rows and folder summaries share a 50px minimum height (3.125rem), 10px vertical and 12px horizontal padding (.625rem .75rem), and a 4px radius. Both use the theme wash on hover and focus-within, preserving visible focus outlines; folder wash applies only to the summary, never its descendant list. Revealed hidden links use exactly the regular colors and font weights, with reduced opacity across the row and tags: 80% in dark mode and 94% in light mode. Hidden-only folder summaries use the same opacity without dimming their nested lists again. Keyboard focus restores full row or summary opacity so focus outlines stay clear. Do not add hidden or SCRIPT labels.
 
 ## Do's and Don'ts
 

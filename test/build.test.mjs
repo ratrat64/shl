@@ -1606,7 +1606,7 @@ test("search filters nested links on the homepage and directory pages", async (t
   assert.equal(tools.firstElementChild.open, true);
 });
 
-test("inline tags keep row height and usable tag/destination targets on narrow script rows", async (t) => {
+test("directory highlights match, full tags stay inline, and destinations reveal accessibly", async (t) => {
   const chrome = availableChrome(t);
   if (!chrome) return;
   const f = await fixture(t, {
@@ -1621,6 +1621,13 @@ test("inline tags keep row height and usable tag/destination targets on narrow s
       tags: ["shell"],
     },
     plain: { url: "https://example.com/plain", tags: ["reference"] },
+    folder: { nested: { url: "https://example.com/a/very/long/path/setup.sh" } },
+    ["long-folder-".repeat(12)]: { plain: "https://example.com/folder" },
+    ["long-code-".repeat(12)]: "https://example.com/plain",
+    ["long-script-".repeat(12)]: {
+      url: "https://example.com/setup.sh",
+      script: true,
+    },
   });
   assert.equal(f.build().status, 0);
   await writeFile(
@@ -1630,15 +1637,59 @@ test("inline tags keep row height and usable tag/destination targets on narrow s
       try {
         const frame = event.target;
         const doc = frame.contentDocument;
+        const win = frame.contentWindow;
+        const rules = [...doc.styleSheets].flatMap(sheet => [...sheet.cssRules]);
+        const pointerRule = rules.find(rule => rule.conditionText === '(hover: hover) and (pointer: fine)');
+        const coarseRule = rules.find(rule => rule.conditionText === '(any-pointer: coarse)');
+        if (!pointerRule || !coarseRule) throw new Error('Missing pointer visibility rules');
+        const hover = doc.createElement('style');
+        hover.textContent = [...pointerRule.cssRules].filter(rule => rule.selectorText?.includes(':hover')).map(rule => rule.selectorText.replaceAll(':hover', '.verify-hover') + '{' + rule.style.cssText + '}').join('');
+        doc.head.append(hover);
+        for (const folder of doc.querySelectorAll('summary')) {
+          if (folder.getBoundingClientRect().height !== 50 || win.getComputedStyle(folder).whiteSpace !== 'nowrap') throw new Error('Folder summary geometry failed');
+          folder.focus();
+          if (win.getComputedStyle(folder).outlineWidth !== '2px') throw new Error('Folder keyboard focus missing');
+          folder.blur();
+        }
         for (const width of [320, 390, 1440]) {
           frame.style.width = width + 'px';
           await new Promise(resolve => setTimeout(resolve, 30));
           for (const theme of ['light', 'dark']) {
             doc.documentElement.dataset.theme = theme;
+            const summary = doc.querySelector('summary');
+            for (const row of doc.querySelectorAll('.link-row')) {
+              const style = win.getComputedStyle(row);
+              const summaryStyle = win.getComputedStyle(summary);
+              if (row.getBoundingClientRect().height !== 50 || row.getBoundingClientRect().height !== summary.getBoundingClientRect().height) throw new Error('Link/folder highlights differ');
+              if (style.padding !== summaryStyle.padding || style.paddingTop !== '10px' || style.paddingLeft !== '12px' || style.borderRadius !== '4px') throw new Error('Highlight padding/radius mismatch');
+              const destination = row.querySelector('.destination');
+              pointerRule.media.mediaText = 'all';
+              coarseRule.media.mediaText = 'not all';
+              if (win.getComputedStyle(destination).opacity !== '0') throw new Error('Desktop destination visible before hover');
+              row.classList.add('verify-hover');
+              if (win.getComputedStyle(destination).opacity !== '1') throw new Error('Hover did not reveal destination');
+              row.classList.remove('verify-hover');
+              row.querySelector('.code').focus();
+              if (win.getComputedStyle(destination).opacity !== '1') throw new Error('Focus did not reveal destination');
+              row.querySelector('.code').blur();
+              pointerRule.media.mediaText = 'not all';
+              if (win.getComputedStyle(destination).opacity !== '1') throw new Error('Non-hover destination hidden');
+              pointerRule.media.mediaText = 'all';
+              coarseRule.media.mediaText = 'all';
+              if (win.getComputedStyle(destination).opacity !== '1') throw new Error('Hybrid touch destination hidden');
+              coarseRule.media.mediaText = 'not all';
+              if (win.getComputedStyle(destination).whiteSpace !== 'nowrap' || destination.getBoundingClientRect().width < 48) throw new Error('Destination wraps or collapses');
+              if (row.scrollWidth > row.clientWidth) {
+                row.scrollLeft = row.scrollWidth;
+                if (row.querySelector('.visit').getBoundingClientRect().right > row.getBoundingClientRect().right) throw new Error('Open action unreachable by scrolling');
+                row.scrollLeft = 0;
+              }
+            }
             for (const button of doc.querySelectorAll('.tags')) {
               const row = button.closest('li');
               const destination = row.querySelector('.destination');
               if (button.getBoundingClientRect().width < 40 || destination.getBoundingClientRect().width < 40) throw new Error('Collapsed target at ' + width + ' for ' + button.textContent + ': ' + button.getBoundingClientRect().width + '/' + destination.getBoundingClientRect().width);
+              if (win.getComputedStyle(button).maxWidth !== 'none' || button.scrollWidth > button.clientWidth) throw new Error('Tag label is capped or truncated');
               const before = row.getBoundingClientRect().height;
               const next = button.nextSibling;
               button.remove();
@@ -2555,7 +2606,7 @@ test("script launchers are opt-in, quote URLs, forward arguments and statuses, a
   assert.match(await f.read("assets/site.css"), /\.download\s*\{/);
   assert.match(
     await f.read("assets/site.css"),
-    /\.link-row\.script-row\s*\{\s*grid-template-columns:\s*max-content minmax\(0,\s*1fr\) max-content max-content;?\s*\}/,
+    /\.link-row\.script-row\s*\{\s*grid-template-columns:\s*max-content minmax\(4rem,\s*1fr\) max-content max-content;?\s*\}/,
   );
   assert.match(await f.read("tools/Nested/index.html"), /http-equiv="refresh"/);
   assert.match(await f.read("Run/index.html"), /http-equiv="refresh"/);

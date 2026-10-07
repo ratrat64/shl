@@ -15,6 +15,12 @@ The single link count on each page updates with search and the hidden-links togg
 Click a short code to copy its full short URL, or a destination to copy its full URL;
 use **Open** beside the destination to visit it. Without JavaScript, the links
 remain navigable and hidden links stay hidden.
+On hover-capable, fine-pointer devices with no coarse input available, destination
+text appears when the row is hovered or focus is within it, with space reserved
+to prevent layout shifts. Any available coarse pointer, including hybrid
+touch/mouse devices, forces it visible; touch and non-hover devices always show it
+too. Long URLs stay on one line, shortened visually in the middle; accessible text
+and copying retain the full URL.
 
 ## Setup
 
@@ -50,8 +56,9 @@ automation:
 
 Short form is just `code: https://example.com/`. Long form adds an optional string `title` shown
 on the redirect fallback page, a `tags` array of nonblank strings, or a boolean `hidden` (default `false`).
-Tags appear on one line beside each short code without increasing row height;
-select the labels to see the full tags if they are shortened. Type a tag (with or
+Full tag labels appear on one line beside each short code without ellipsis or
+increasing row height; crowded rows scroll horizontally. Select the labels for
+an optional convenient popover showing all tags. Type a tag (with or
 without its `#` prefix) in Search links to filter matching links
 (case-insensitive, including nested links). JSON entries use the same `"tags": ["documentation", "github"]` format.
 Set `hidden: true`
@@ -257,7 +264,11 @@ Repeat on a deployed project-prefix URL such as `/<repo>/guide/#about`.
 - `dist/404.html` — GitHub Pages serves this for anything unmatched. It reads
   `links.json` client-side and catches wrong-case codes before giving up.
 - `dist/index.html` — a directory with expandable nested groups, sorted by name,
-  showing visible short codes beside destinations (with long URLs shortened visually in the middle).
+  showing short codes with space reserved beside them for destinations. Destinations
+  appear on row hover or focus-within on hover-capable, fine-pointer devices with no
+  coarse input available; any coarse pointer (including hybrid touch/mouse devices),
+  touch or non-hover mode keeps them visible. Long URLs stay on one line, shortened
+  visually in the middle, with full accessible and copy values.
   Show hidden links reveals hidden entries and hidden-only groups on the homepage and eligible directory pages.
   Hover a code for its optional title; titles remain searchable. Select a code to copy its
   short link, select a destination to copy its full URL, or use Open to visit the destination.
