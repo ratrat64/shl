@@ -4,6 +4,35 @@ import { parseDocument } from 'yaml';
 export const CODE_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 export const RESERVED_NAMES = new Set(['index', '404', 'assets', 'links', 'about', 'guide', 'how-it-works', 'index.html', '404.html', 'links.json', 'cname']);
 
+export const isDirectory = (value) => value !== null && typeof value === 'object' && !Array.isArray(value) && !('url' in value);
+export const linkUrl = (value) => typeof value === 'string' ? value : value?.url;
+
+// Consumers call this only after validating the original fields below.
+export const linkFields = (value) => ({
+  url: linkUrl(value),
+  title: typeof value === 'string' ? '' : value.title ?? '',
+  script: value?.script === true,
+  hidden: value?.hidden === true,
+  tags: (value?.tags ?? []).map(tag => tag.trim()),
+});
+
+export const entryCounts = (nodes) => ({
+  total: nodes.reduce((n, node) => n + node.total, 0),
+  visible: nodes.reduce((n, node) => n + node.visible, 0),
+});
+
+export const entryTree = (entries, prefix = '') => Object.entries(entries)
+  .sort(([a], [b]) => a.toLowerCase() < b.toLowerCase() ? -1 : 1)
+  .map(([code, value]) => {
+    const node = { code, prefix, href: `./${prefix}${code}/`, isDirectory: isDirectory(value) };
+    if (!node.isDirectory) {
+      const fields = linkFields(value);
+      return { ...node, ...fields, total: 1, visible: fields.hidden ? 0 : 1 };
+    }
+    const children = entryTree(value, `${prefix}${code}/`);
+    return { ...node, children, ...entryCounts(children) };
+  });
+
 export function validateCode(code, path, seen) {
   const problems = [];
   if (!CODE_RE.test(code)) problems.push(`"${path.join('/')}" — codes must start with a letter or number and contain only letters, numbers, . _ -`);
@@ -72,16 +101,16 @@ export async function loadLinks() {
     active.add(entries);
     directories.push({ path, entries });
     for (const [code, value] of Object.entries(entries)) {
+      const before = problems.length;
       const full = [...path, code];
       const name = full.join('/');
       problems.push(...validateCode(code, full, seen));
 
-      if (value && typeof value === 'object' && !Array.isArray(value) && !('url' in value)) {
+      if (isDirectory(value)) {
         collect(value, full);
         continue;
       }
-      const url = typeof value === 'string' ? value : value?.url;
-      const title = typeof value === 'object' ? value?.title ?? '' : '';
+      const url = linkUrl(value);
       if (typeof value !== 'string' && (!value || typeof value !== 'object' || Array.isArray(value))) {
         problems.push(`"${name}" — expected a URL string, an object with url, or a directory`);
       }
@@ -100,8 +129,8 @@ export async function loadLinks() {
       }
       const urlError = validateUrl(url, name);
       if (urlError) problems.push(urlError);
-      links.push({ code: name, url, title, script: value?.script === true, hidden: value?.hidden === true });
       if (value?.script === true) launchers.push(code);
+      if (problems.length === before) links.push({ code: name, ...linkFields(value) });
     }
     for (const code of launchers) {
       const filename = `${code}.sh`;

@@ -68,13 +68,17 @@ The [homepage composition](mockups/directory.html) illustrates the alignment at 
 
 ## Elevation & Depth
 
-Flat by design: surfaces use color instead of shadows; directory entries are separated by space rather than rules. On directory pages remove the two framing rules below the header and above the footer; use spacing to separate sections instead. Guide section rules remain.
+Flat by design: surfaces use color instead of shadows; directory entries are separated by space rather than rules. The shared header and footer are borderless on every shell page, including Links, nested directories, Guide, and 404; use spacing to separate sections instead. Guide content section rules remain.
 
 ## Shapes
 
 Directory rows are square and unruled. Inputs and code blocks have subtle 4px corners.
 
 ## Components
+
+### Ownership and composition
+
+Follow AD-7–AD-9 in the [architecture spine](../../architecture/architecture-shortlink-2026-10-04/ARCHITECTURE-SPINE.md). Every HTML page reuses the document, theme, and style foundations. Browsable pages compose the same header/navigation/theme-control/footer shell; destination and legacy redirects select the minimal document without chrome. Shared components keep the same geometry, typography, color, spacing, and responsive behavior at equal viewport/theme, except active navigation state. Page-specific content stays inside main; it cannot restyle chrome. Variants identify component purpose or state, never page identity. Shared markup alone does not establish visual consistency: verify computed appearance and page/navigation states.
 
 ### Navigation
 
@@ -83,6 +87,8 @@ The header brand reads `/shl/`: `shl` uses ink, the leading slash uses teal acti
 ### Directory tools
 
 The count is every directory page's visual heading, not a small aside or a second search-result number. Keep the search label accessible but visually hidden; the visible placeholder is "Search link, title or tag". Reserve the same search and toggle columns on every directory page so the search size and position do not shift. The toggle stays visible but muted and disabled when there are no hidden links; otherwise it sits beside search on desktop and below it, right-aligned, on mobile. The same count responds to searching and to the hidden-links toggle; see EXPERIENCE.md for states and announcements.
+
+Column consistency applies when interactive tools are shown. Preserve the existing empty states: an empty site has no search, and an all-hidden subtree hides search until links are revealed. With JavaScript disabled, search and enabled hidden toggles remain hidden; disabled toggles remain visible.
 
 ### Directory rows
 
@@ -99,7 +105,7 @@ Link rows and folder summaries use the theme wash on hover and focus-within, pre
 ### Do:
 - **Do** keep link codes and destinations readable together.
 - **Do** use shared color roles so light and dark modes retain the same hierarchy.
-- **Do** separate directory sections with spacing rather than header/footer framing rules.
+- **Do** separate shell sections with spacing rather than header/footer framing rules on every page.
 
 ### Don't:
 - **Don't** hide destinations behind decorative cards or rely on color alone for keyboard focus.

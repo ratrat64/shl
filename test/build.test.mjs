@@ -4,10 +4,53 @@ import { mkdtemp, readFile, writeFile, mkdir, rm, unlink } from 'node:fs/promise
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createContext, runInContext, runInNewContext } from 'node:vm';
 
 const buildScript = fileURLToPath(new URL('../build.mjs', import.meta.url));
+
+function availableChrome(t) {
+  const chrome = process.env.CHROME_BIN || 'google-chrome';
+  if (spawnSync(chrome, ['--version']).status === 0) return chrome;
+  assert.notEqual(process.env.SHL_REQUIRE_BROWSER, '1', 'SHL_REQUIRE_BROWSER=1 requires installed Chrome (set CHROME_BIN if needed)');
+  t.skip('Chrome is not installed');
+}
+
+function runChrome(chrome, cwd, url, flags = []) {
+  const result = spawnSync(chrome, [
+    '--headless', '--no-sandbox', '--disable-gpu', '--allow-file-access-from-files',
+    `--user-data-dir=${join(cwd, 'chrome-profile')}`, '--virtual-time-budget=20000', '--dump-dom', ...flags, url,
+  ], { encoding: 'utf8', timeout: 25000 });
+  assert.equal(result.status, 0, result.stderr);
+  return result.stdout;
+}
+
+async function browserServer(t, cwd) {
+  const server = spawn(process.execPath, ['-e', `
+    const server = Bun.serve({ port: 0, async fetch(request) {
+      const url = new URL(request.url);
+      const path = decodeURIComponent(url.pathname).replace(/^\\/project(?=\\/)/, '');
+      const file = Bun.file(${JSON.stringify(join(cwd, 'dist'))} + path + (path.endsWith('/') ? 'index.html' : ''));
+      const headers = url.searchParams.has('native') ? { 'Content-Security-Policy': "script-src 'none'" } : {};
+      if (await file.exists()) {
+        if (url.searchParams.has('fallback')) {
+          const html = (await file.text()).replace(/<meta http-equiv="refresh"[^>]*>/, '').replace(/<script data-behavior="forward">[\\s\\S]*?<\\/script>/, '');
+          return new Response(html, { headers: { ...headers, 'Content-Type': 'text/html' } });
+        }
+        return new Response(file, { headers });
+      }
+      return new Response(Bun.file(${JSON.stringify(join(cwd, 'dist', '404.html'))}), { status: 404 });
+    } });
+    console.log(server.port);
+  `], { stdio: ['ignore', 'pipe', 'pipe'] });
+  t.after(() => server.kill());
+  const port = await new Promise((resolve, reject) => {
+    server.stdout.once('data', data => resolve(Number(data.toString().trim())));
+    server.once('error', reject);
+    server.once('exit', code => reject(new Error('Preview server exited: ' + code)));
+  });
+  return `http://localhost:${port}`;
+}
 
 async function fixture(t, links, source = 'links.json') {
   const cwd = await mkdtemp(join(tmpdir(), 'shortlink-'));
@@ -20,7 +63,11 @@ async function fixture(t, links, source = 'links.json') {
   };
 }
 
-const scripts = (html) => [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
+const behaviorScript = (html, name) => {
+  const matches = [...html.matchAll(new RegExp(`<script data-behavior="${name}">([\\s\\S]*?)<\\/script>`, 'g'))];
+  assert.equal(matches.length, 1, `one ${name} script`);
+  return matches[0][1];
+};
 
 test('build produces a minimal site, copies the map and CNAME, and cleans stale output', async (t) => {
   const links = { Mixed: { url: 'https://example.com/path', title: 'Example' }, plain: 'http://example.org/' };
@@ -114,14 +161,16 @@ test('homepage lists sorted links safely with project-relative URLs and handles 
   assert.match(html, /&lt;script&gt;title&lt;\/script&gt;/);
   assert.match(html, /https:\/\/example\.com\/\?q=&lt;img&gt;&amp;x=&quot;quoted&quot;/);
   assert.doesNotMatch(html, /<script>title|<img|undefined/);
-  assert.match(html, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number" aria-hidden="true">3<\/span><span class="count-label"> links<\/span><\/h1>/);
+  assert.match(html, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number">3<\/span><span class="count-label"> links<\/span><\/h1>/);
+  const liveHeading = html.match(/<h1\b[^>]*aria-live="polite"[^>]*>[\s\S]*?<\/h1>/)[0];
+  assert.doesNotMatch(liveHeading, /aria-hidden="true"/, 'the single live heading exposes both its number and label');
   assert.equal([...html.matchAll(/<h1\b/g)].length, 1);
   assert.doesNotMatch(html, /<h[1-6]>Links<\/h[1-6]>|data-visible=|data-total=/);
   assert.match(html, /<ul class="links">[\s\S]*href="\.\/Alpha\/"/); // Browsable before scripts run.
   const empty = await fixture(t, {});
   assert.equal(empty.build().status, 0);
   const emptyHtml = await empty.read('index.html');
-  assert.match(emptyHtml, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number" aria-hidden="true">0<\/span><span class="count-label"> links<\/span><\/h1>/);
+  assert.match(emptyHtml, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number">0<\/span><span class="count-label"> links<\/span><\/h1>/);
   assert.equal([...emptyHtml.matchAll(/<h1\b/g)].length, 1);
   assert.match(emptyHtml, /id="hidden-toggle"[^>]*disabled>Show hidden links/);
   assert.match(emptyHtml, /No links available yet\./);
@@ -141,7 +190,7 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
   assert.match(tools, /href="\.\.\/assets\/site\.css"/);
   for (const page of [home, tools]) assert.match(page, /<div class="directory-toggles"><button id="hidden-toggle"[^>]*disabled>Show hidden links<\/button><\/div>/);
   assert.match(home, /<div class="breadcrumbs" aria-hidden="true"><\/div>/);
-  assert.match(tools, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number" aria-hidden="true">2<\/span><span class="count-label"> links<\/span><\/h1>/);
+  assert.match(tools, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number">2<\/span><span class="count-label"> links<\/span><\/h1>/);
   assert.equal([...tools.matchAll(/<h1\b/g)].length, 1);
   assert.doesNotMatch(tools, /<h1>tools<\/h1>/);
   assert.match(tools, /<nav class="breadcrumbs" aria-label="Breadcrumb">.*Home<\/a> \/ tools<\/nav>/);
@@ -150,7 +199,7 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
   assert.ok(tools.indexOf('class="directory-tools"') < tools.indexOf('class="breadcrumbs"'));
   const editors = await f.read('tools/editors/index.html');
   assert.match(editors, /href="\.\.\/\.\.\/assets\/site\.css"/);
-  assert.match(editors, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number" aria-hidden="true">1<\/span><span class="count-label"> link<\/span><\/h1>/);
+  assert.match(editors, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number">1<\/span><span class="count-label"> link<\/span><\/h1>/);
   assert.equal([...editors.matchAll(/<h1\b/g)].length, 1);
   assert.match(editors, /href="\.\.\/\.\.\/" data-app-link>Home<\/a>/);
   assert.match(editors, /href="\.\.\/" data-app-link>tools<\/a>/);
@@ -163,8 +212,7 @@ test('nested JSON and YAML build themed directory pages and redirects', async (t
   assert.match(await f.read('tools/editors/Code/index.html'), /&lt;img&gt;/);
   const css = await f.read('assets/site.css');
   assert.doesNotMatch(css, /\.links li\{[^}]*border-bottom|\.links \.links\{[^}]*border-left/);
-  assert.match(css, /\.directory-page \.site-head,\.directory-page \.footer\{border:0\}/);
-  assert.match(css, /\.footer\{border-top:1px solid var\(--line\)/);
+  assert.doesNotMatch(css, /directory-page|\.site-head\{[^}]*border|\.footer\{[^}]*border/);
   assert.match(css, /\.prose section\{border-top:1px solid var\(--line\)/);
   assert.match(css, /\.code\{[^}]*white-space:nowrap/);
   assert.match(css, /\.destination-start\{[^}]*text-overflow:ellipsis/);
@@ -268,10 +316,9 @@ for (const prefix of ['/', '/project/']) test(`app navigation swaps pages, handl
   const listeners = {};
   const document = {
     title: entryHtml.match(/<title>([^<]+)<\/title>/)[1], scriptsRemoved: 0,
-    body: { classList: { toggle(name, on) { document.directory = on; } } },
     documentElement: { dataset: {} },
     currentMain: main(pages.get(base + 'guide/'), location.href),
-    querySelector(selector) { return selector === '.theme-toggle' ? themeButton : selector === '.brand' ? brand : selector === 'main' ? this.currentMain : this.currentMain.querySelector(selector); },
+    querySelector(selector) { return selector === '[data-theme-control]' ? themeButton : selector === '.brand' ? brand : selector === 'main' ? this.currentMain : this.currentMain.querySelector(selector); },
     querySelectorAll(selector) { return selector === '[data-nav]' ? shellLinks.filter((link) => link.hasAttribute('data-nav')) : selector === '.site-head a, .footer a' ? persistentLinks : []; },
     addEventListener(name, callback) { listeners[name] = callback; },
   };
@@ -386,7 +433,6 @@ for (const prefix of ['/', '/project/']) test(`app navigation swaps pages, handl
   assert.equal(controls['#copy-status'].textContent, '');
   assert.equal(controls['.links'].handlers.get('click').length, 0);
   assert.equal(document.title, 'Guide · shl');
-  assert.equal(document.directory, false);
   assert.equal(guide['aria-current'], 'page');
   assert.equal(linksNav['aria-current'], undefined);
   assert.equal(document.documentElement.dataset.theme, 'dark');
@@ -417,7 +463,6 @@ for (const prefix of ['/', '/project/']) test(`app navigation swaps pages, handl
   assert.equal(document.currentMain, guideMain);
   heldUrl = null;
   assert.equal(await click(makeLink(base + 'hidden/')), true);
-  assert.equal(document.directory, true);
   assert.equal(linksNav['aria-current'], 'page');
   assert.equal(document.currentMain.elements['#link-search'].value, '');
   assert.equal(document.currentMain.elements['#empty-directory'].hidden, false);
@@ -562,7 +607,7 @@ test('hidden links and hidden-only folders are hidden by default but keep their 
     assert.match(html, /<li data-hidden="true" hidden data-search="[^"]+"><div class="link-row"[^>]*><a class="code[^>]* href="\.\/.*(?:secret|SecretCode|HiddenDeep)\/"/);
   }
   const home = await f.read('index.html');
-  assert.match(home, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number" aria-hidden="true">4<\/span><span class="count-label"> links<\/span><\/h1>/);
+  assert.match(home, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number">4<\/span><span class="count-label"> links<\/span><\/h1>/);
   assert.match(home, /href="\.\/tools\/nested\/" data-app-link>nested<\/a>/);
   assert.match(home, /href="\.\/tools\/nested\/branch\/further\/VisibleDeep\/">VisibleDeep<\/a>/);
   assert.match(home, /href="\.\/shown\/">shown<\/a>/);
@@ -576,7 +621,7 @@ test('hidden links and hidden-only folders are hidden by default but keep their 
   assert.match(await f.read('tools/nested/branch/further/index.html'), /href="\.\/VisibleDeep\/">VisibleDeep<\/a>/);
   for (const page of ['onlyHidden/index.html', 'onlyHidden/nested/index.html', 'tools/private/index.html', 'tools/private/deep/index.html']) {
     const html = await f.read(page);
-    assert.match(html, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number" aria-hidden="true">0<\/span><span class="count-label"> links<\/span><\/h1>/);
+    assert.match(html, /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number">0<\/span><span class="count-label"> links<\/span><\/h1>/);
     assert.match(html, /<p id="empty-directory">No links listed here\.<\/p>/);
     assert.match(html, /<div hidden><ul class="links">/);
     assert.match(html, /id="hidden-toggle"[^>]*hidden>Show hidden links/);
@@ -590,7 +635,7 @@ test('hidden links and hidden-only folders are hidden by default but keep their 
   const allHidden = await fixture(t, { private: { nested: { code: { url: 'https://example.com/', hidden: true } } } });
   assert.equal(allHidden.build().status, 0);
   assert.match(await allHidden.read('index.html'), /No links listed here\./);
-  assert.match(await allHidden.read('index.html'), /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number" aria-hidden="true">0<\/span><span class="count-label"> links<\/span><\/h1>/);
+  assert.match(await allHidden.read('index.html'), /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number">0<\/span><span class="count-label"> links<\/span><\/h1>/);
   assert.match(await allHidden.read('index.html'), /<li data-hidden="true" hidden><details><summary><a href="\.\/private\/" data-app-link>/);
   assert.match(await allHidden.read('private/nested/index.html'), /No links listed here\./);
   assert.match(await allHidden.read('private/nested/code/index.html'), /https:\/\/example\.com/);
@@ -781,8 +826,8 @@ test('search filters nested links on the homepage and directory pages', async (t
 });
 
 test('inline tags keep row height and usable tag/destination targets on narrow script rows', async (t) => {
-  const chrome = process.env.CHROME_BIN || 'google-chrome';
-  if (spawnSync(chrome, ['--version']).status !== 0) return t.skip('Chrome is not installed');
+  const chrome = availableChrome(t);
+  if (!chrome) return;
   const f = await fixture(t, {
     example: { url: 'https://example.com/setup.sh', script: true, tags: ['documentation', 'a-very-long-tag-for-disclosure'] },
     'long-script-code': { url: 'https://example.com/setup.sh', script: true, tags: ['shell'] },
@@ -821,13 +866,8 @@ test('inline tags keep row height and usable tag/destination targets on narrow s
       } catch (error) { document.body.dataset.layoutCheck = error.message; }
     });
   </script></body></html>`);
-  const result = spawnSync(chrome, [
-    '--headless', '--no-sandbox', '--disable-gpu', '--allow-file-access-from-files',
-    `--user-data-dir=${join(f.cwd, 'chrome-profile')}`, '--virtual-time-budget=2000', '--dump-dom',
-    pathToFileURL(join(f.cwd, 'dist', 'layout-check.html')).href,
-  ], { encoding: 'utf8', timeout: 15000 });
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /<body data-layout-check="passed">/, result.stdout);
+  const html = runChrome(chrome, f.cwd, pathToFileURL(join(f.cwd, 'dist', 'layout-check.html')).href);
+  assert.match(html, /<body data-layout-check="passed">/, html);
 });
 
 test('inline tag disclosures target the correct link when codes repeat in different folders', async (t) => {
@@ -927,7 +967,7 @@ test('toggle updates hidden rows, nested search, counts, and hidden-only empty s
     const html = await site.read(page);
     assert.match(html, /id="hidden-toggle"[^>]*aria-pressed="false" hidden>Show hidden links/);
     assert.doesNotMatch(html, /data-visible=|data-total=/);
-    assert.match(html, new RegExp(`id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number" aria-hidden="true">${visible}</span><span class="count-label">${visible === 1 ? ' link' : ' links'}</span></`));
+    assert.match(html, new RegExp(`id="link-count" class="count" aria-live="polite" aria-atomic="true"><span class="count-number">${visible}</span><span class="count-label">${visible === 1 ? ' link' : ' links'}</span></`));
     const wrapper = { hidden: !visible };
     const list = { children, parentElement: wrapper };
     const search = { hidden: true };
@@ -1095,12 +1135,272 @@ test('redirect script safely preserves destinations containing HTML and quotes',
   const f = await fixture(t, { safe: { url, title: '<img src=x onerror=alert(1)>' } });
   assert.equal(f.build().status, 0);
   const html = await f.read('safe/index.html');
-  assert.equal(scripts(html).length, 1);
+  const script = behaviorScript(html, 'forward');
   assert.doesNotMatch(html, /<img|<script>alert/);
   let destination;
-  runInNewContext(scripts(html)[0], { location: { replace: (value) => { destination = value; } } });
+  runInNewContext(script, { location: { replace: (value) => { destination = value; } } });
   assert.equal(destination, url);
   assert.match(html, /&lt;img/);
+});
+
+test('every document shares theme foundations, including minimal forwards and asset-independent 404', async (t) => {
+  const f = await fixture(t, { tools: { deep: { code: 'https://example.com/' } } });
+  assert.equal(f.build().status, 0);
+  const theme = await f.read('assets/theme.js');
+  const css = await f.read('assets/site.css');
+  for (const path of ['tools/deep/code/index.html', 'about/index.html', 'how-it-works/index.html', '404.html']) {
+    const html = await f.read(path);
+    assert.match(html, /<meta name="color-scheme" content="light dark">/);
+    assert.ok(html.includes(`<style>${css}</style>`), path + ' embeds the shared styles');
+    assert.equal(behaviorScript(html, 'theme'), theme);
+    assert.doesNotMatch(html, /(?:href|src)="[^" ]*assets\//);
+    if (path !== '404.html') {
+      assert.doesNotMatch(html, /<header|<footer|<button[^>]*data-theme-control/);
+      const decode = text => text.replace(/&(?:amp|quot|#39|lt|gt);/g, entity => ({ '&amp;': '&', '&quot;': '"', '&#39;': "'", '&lt;': '<', '&gt;': '>' })[entity]);
+      const refresh = decode(html.match(/<meta http-equiv="refresh" content="0; url=([^"]+)"/)[1]);
+      const canonical = decode(html.match(/<link rel="canonical" href="([^"]+)"/)[1]);
+      for (const prefix of ['/', '/project/']) {
+        const base = `https://short.example${prefix}${path}`;
+        const expected = path.startsWith('tools/') ? 'https://example.com/' : `https://short.example${prefix}guide/#${path.split('/')[0]}`;
+        assert.equal(new URL(refresh, base).href, expected);
+        assert.equal(new URL(canonical, base).href, expected);
+      }
+      let destination;
+      runInNewContext(behaviorScript(html, 'forward'), { location: { replace: url => { destination = url; } } });
+      assert.equal(destination, path.startsWith('tools/') ? 'https://example.com/' : `../guide/#${path.split('/')[0]}`);
+    } else {
+      assert.match(html, /<header class="site-head">/);
+      assert.match(html, /<footer class="footer">/);
+      assert.match(html, /data-theme-control/);
+    }
+  }
+  for (const saved of ['light', 'dark', 'invalid', null, 'blocked']) {
+    for (const control of [false, true]) {
+      const root = { dataset: {} };
+      const button = { addEventListener(name, handler) { this[name] = handler; } };
+      runInNewContext(theme, {
+        document: { documentElement: root, querySelector(selector) { assert.equal(selector, '[data-theme-control]'); return control ? button : null; } },
+        localStorage: {
+          getItem() { if (saved === 'blocked') throw new Error('storage blocked'); return saved; },
+          setItem() { throw new Error('storage blocked'); },
+        },
+        matchMedia: () => ({ matches: true }),
+      });
+      assert.equal(root.dataset.theme, ['light', 'dark'].includes(saved) ? saved : undefined);
+      if (control) {
+        assert.equal(button.textContent, 'Theme: ' + (root.dataset.theme || 'system'));
+        button.click();
+        assert.equal(root.dataset.theme, saved === 'light' ? 'dark' : 'light');
+        assert.equal(button.textContent, 'Theme: ' + root.dataset.theme);
+      }
+    }
+  }
+});
+
+test('shared shell renders consistently across direct/native loads and app navigation in both themes and viewport sizes', async (t) => {
+  const chrome = availableChrome(t);
+  if (!chrome) return;
+  const f = await fixture(t, {});
+  const origin = await browserServer(t, f.cwd);
+  await writeFile(join(f.cwd, 'links.json'), JSON.stringify({
+    tools: { git: 'https://git-scm.com/', private: { url: 'https://example.com/private', hidden: true } },
+    local: origin + '/guide/#about',
+    localProject: origin + '/project/guide/#about',
+  }));
+  assert.equal(f.build().status, 0);
+  await writeFile(join(f.cwd, 'dist', 'shell-check.html'), `<!doctype html><html><body><iframe style="height:900px;border:0"></iframe><script>
+    (async () => {
+      try {
+        const frame = document.querySelector('iframe');
+        const wait = () => new Promise(resolve => setTimeout(resolve, 30));
+        const load = path => new Promise(resolve => { frame.onload = resolve; frame.src = path; });
+        const system = new URL(location.href).searchParams.get('system');
+        const palette = { light: ['rgb(246, 247, 245)', 'rgb(37, 43, 41)'], dark: ['rgb(0, 0, 0)', 'rgb(198, 208, 202)'] };
+        const checkPalette = (doc, theme) => {
+          const style = frame.contentWindow.getComputedStyle(doc.body);
+          if (JSON.stringify([style.backgroundColor, style.color]) !== JSON.stringify(palette[theme])) throw new Error('Wrong palette: ' + theme);
+        };
+        localStorage.removeItem('shortlink-theme');
+        if (matchMedia('(prefers-color-scheme: dark)').matches !== (system === 'dark')) throw new Error('System preference flag did not apply');
+        for (const native of [false, true]) {
+          frame.setAttribute('sandbox', native ? 'allow-same-origin' : 'allow-same-origin allow-scripts');
+          for (const path of ['/', '/tools/', '/guide/', '/tools/unknown/', '/local/?fallback=1']) {
+            await load(path);
+            const doc = frame.contentDocument;
+            if (doc.documentElement.hasAttribute('data-theme')) throw new Error('System case used an override');
+            checkPalette(doc, system);
+          }
+        }
+        document.body.dataset.systemCheck = system;
+        // The system-dark run independently exercises the media-query palette; run the override matrix once.
+        if (system === 'light') {
+        const snapshot = doc => ['header', 'footer'].map(selector => {
+          const element = doc.querySelector(selector);
+          if (!element) throw new Error('Missing ' + selector);
+          return [element, ...element.querySelectorAll('*')].map(node => {
+            const active = node.matches('.nav a[aria-current=page]');
+            const style = frame.contentWindow.getComputedStyle(node);
+            const rect = node.getBoundingClientRect();
+            const props = ['display', 'fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'padding', 'margin', 'gap', 'borderWidth', 'borderStyle', 'borderRadius', 'backgroundColor', 'alignItems', 'justifyContent', 'flexWrap'];
+            props.push('color', 'borderColor', 'textDecoration', 'outlineWidth', 'outlineStyle', 'outlineColor', 'outlineOffset');
+            const result = { tag: node.tagName, x: rect.x, width: rect.width, height: rect.height, style: props.map(prop => style[prop]) };
+            if (active) {
+              node.removeAttribute('aria-current');
+              for (const prop of ['color', 'borderColor', 'textDecoration', ...(style.outlineStyle === 'none' ? ['outlineColor'] : [])]) result.style[props.indexOf(prop)] = style[prop];
+              node.setAttribute('aria-current', 'page');
+            }
+            return result;
+          });
+        });
+        const equal = (actual, expected, label) => {
+          if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+            const a = actual.flat(), b = expected.flat();
+            const index = a.findIndex((value, i) => JSON.stringify(value) !== JSON.stringify(b[i]));
+            throw new Error('Chrome mismatch: ' + label + ' node ' + index + ': ' + JSON.stringify(a[index]) + ' expected ' + JSON.stringify(b[index]));
+          }
+        };
+        const shellGeometry = doc => {
+          const win = frame.contentWindow;
+          const header = doc.querySelector('header'), footer = doc.querySelector('footer'), main = doc.querySelector('main');
+          const h = header.getBoundingClientRect(), f = footer.getBoundingClientRect(), m = main.getBoundingClientRect();
+          if (win.getComputedStyle(header).borderBottomWidth !== '0px' || win.getComputedStyle(footer).borderTopWidth !== '0px') throw new Error('Chrome is not borderless');
+          if (h.top + win.scrollY !== 0 || m.top < h.bottom || f.top < m.bottom || ['fixed', 'absolute'].includes(win.getComputedStyle(footer).position)) throw new Error('Shell overlaps or leaves normal flow');
+          if (!doc.querySelector('.prose section') && Math.abs(f.bottom + win.scrollY - win.innerHeight) > 1) throw new Error('Short-page footer is not at bottom');
+          const dark = win.getComputedStyle(doc.documentElement).colorScheme === 'dark';
+          for (const link of doc.querySelectorAll('.nav a:not([aria-current])')) {
+            const style = win.getComputedStyle(link);
+            if (style.color !== (dark ? 'rgb(150, 165, 157)' : 'rgb(89, 100, 95)') || style.textDecorationLine !== 'none') throw new Error('Inactive navigation styling broken');
+          }
+        };
+        const controlStates = doc => {
+          const win = frame.contentWindow, button = doc.querySelector('[data-theme-control]');
+          const state = () => { const s = win.getComputedStyle(button); return [s.color, s.backgroundColor, s.borderColor, s.outlineWidth, s.outlineStyle, s.outlineColor, s.outlineOffset]; };
+          const normal = state();
+          button.focus();
+          if (!button.matches(':focus-visible') || win.getComputedStyle(button).outlineWidth !== '2px' || win.getComputedStyle(button).outlineStyle !== 'solid') throw new Error('Theme focus outline missing');
+          const focused = state();
+          button.blur();
+          // Alias the real hover selectors to force their state in the dump-DOM harness.
+          const hover = doc.createElement('style');
+          hover.textContent = [...doc.styleSheets].flatMap(sheet => [...sheet.cssRules]).filter(rule => rule.selectorText?.includes(':hover')).map(rule => rule.selectorText.replaceAll(':hover', '.verify-hover') + '{' + rule.style.cssText + '}').join('');
+          doc.head.append(hover);
+          button.classList.add('verify-hover');
+          const hovered = state();
+          if (hovered[1] === normal[1]) throw new Error('Theme hover fill missing');
+          button.classList.remove('verify-hover');
+          for (const link of doc.querySelectorAll('.nav a')) {
+            link.classList.add('verify-hover');
+            if (win.getComputedStyle(link).color !== focused[5]) throw new Error('Navigation hover color missing');
+            link.classList.remove('verify-hover');
+          }
+          hover.remove();
+          const outlines = [...doc.querySelectorAll('.site-head a, .footer a')].map(link => {
+            link.focus();
+            const style = win.getComputedStyle(link);
+            if (!link.matches(':focus-visible') || style.outlineWidth !== '2px' || style.outlineStyle !== 'solid') throw new Error('Shared link focus outline missing');
+            const outline = [style.outlineWidth, style.outlineStyle, style.outlineColor, style.outlineOffset];
+            link.blur();
+            return outline;
+          });
+          return [normal, focused, hovered, outlines];
+        };
+        for (const prefix of ['/', '/project/']) {
+          for (const width of [390, 1440]) {
+            frame.style.width = width + 'px';
+            for (const theme of ['light', 'dark']) {
+              localStorage.setItem('shortlink-theme', theme);
+              let baseline;
+              let controls;
+              for (const native of [false, true]) {
+                let directBaseline;
+                frame.setAttribute('sandbox', native ? 'allow-same-origin' : 'allow-same-origin allow-scripts');
+                for (const path of ['', 'tools/', 'guide/', 'tools/unknown/']) {
+                  await load(prefix + path);
+                  const doc = frame.contentDocument;
+                  if (native) doc.documentElement.dataset.theme = theme;
+                  else {
+                    for (let tries = 0; path.includes('unknown') && doc.getElementById('head').textContent !== 'Link not found' && tries < 50; tries++) await wait();
+                    if (doc.documentElement.dataset.theme !== theme) throw new Error('Theme was not restored');
+                  }
+                  await wait();
+                  checkPalette(doc, theme);
+                  shellGeometry(doc);
+                  if (!native) {
+                    const states = controlStates(doc);
+                    if (!controls) controls = states;
+                    equal(states, controls, 'shared theme control states');
+                  }
+                  const appearance = snapshot(doc);
+                  if (!directBaseline) directBaseline = appearance;
+                  if (!native && !baseline) baseline = appearance;
+                  equal(appearance, directBaseline, prefix + path + '/' + width + '/' + theme + '/native=' + native);
+                  if (!native && path.includes('unknown')) {
+                    equal([...doc.querySelectorAll('.site-head a, .footer a[data-app-link]')].map(link => new URL(link.href).pathname), [prefix, prefix, prefix + 'guide/', prefix + 'guide/'], '404 shell rebase');
+                  }
+                  if (path === 'guide/' && frame.contentWindow.getComputedStyle(doc.querySelector('.prose section')).borderTopWidth !== '1px') throw new Error('Guide content separator lost');
+                }
+              }
+              frame.setAttribute('sandbox', 'allow-same-origin allow-scripts');
+              await load(prefix);
+              const header = frame.contentDocument.querySelector('header');
+              const footer = frame.contentDocument.querySelector('footer');
+              const themeControl = frame.contentDocument.querySelector('[data-theme-control]');
+              const hiddenToggle = frame.contentDocument.querySelector('#hidden-toggle');
+              hiddenToggle.click();
+              const hiddenState = [hiddenToggle.textContent, hiddenToggle.getAttribute('aria-pressed'), frame.contentDocument.querySelector('#link-count').textContent];
+              if (hiddenState[1] !== 'true') throw new Error('Hidden toggle did not activate');
+              themeControl.click();
+              const toggled = theme === 'light' ? 'dark' : 'light';
+              if (frame.contentDocument.documentElement.dataset.theme !== toggled || themeControl.textContent !== 'Theme: ' + toggled || localStorage.getItem('shortlink-theme') !== toggled) throw new Error('Theme button did not change theme');
+              checkPalette(frame.contentDocument, toggled);
+              equal([hiddenToggle.textContent, hiddenToggle.getAttribute('aria-pressed'), frame.contentDocument.querySelector('#link-count').textContent], hiddenState, 'theme does not change hidden state');
+              themeControl.click();
+              themeControl.blur();
+              for (const path of ['guide/', 'tools/', '']) {
+                const doc = frame.contentDocument;
+                const link = doc.createElement('a');
+                link.href = prefix + path;
+                link.dataset.appLink = '';
+                doc.querySelector('main').append(link);
+                link.click();
+                const expected = path === 'guide/' ? 'guide' : 'links';
+                for (let tries = 0; (frame.contentWindow.location.pathname !== prefix + path || doc.querySelector('main').dataset.appPage !== expected) && tries < 100; tries++) await wait();
+                if (frame.contentWindow.location.pathname !== prefix + path || doc.querySelector('main').dataset.appPage !== expected) throw new Error('App transition failed: ' + path);
+                if (doc.querySelector('header') !== header || doc.querySelector('footer') !== footer || doc.querySelector('[data-theme-control]') !== themeControl) throw new Error('Shell replaced');
+                if (doc.documentElement.dataset.theme !== theme) throw new Error('Theme lost on transition');
+                await wait();
+                shellGeometry(doc);
+                equal(controlStates(doc), controls, 'app control states');
+                equal(snapshot(doc), baseline, 'app ' + path + '/' + width + '/' + theme);
+              }
+            }
+          }
+        }
+        for (const prefix of ['/', '/project/']) {
+          frame.removeAttribute('sandbox');
+          for (const [path, target] of [[prefix === '/' ? 'local/' : 'localProject/', '#about'], ['about/', '#about'], ['how-it-works/', '#how-it-works']]) {
+            await load(prefix + path + '?native=1');
+            for (let tries = 0; (frame.contentWindow.location.pathname !== prefix + 'guide/' || frame.contentWindow.location.hash !== target) && tries < 100; tries++) await wait();
+            if (frame.contentWindow.location.pathname !== prefix + 'guide/' || frame.contentWindow.location.hash !== target) throw new Error('Native forwarding failed: ' + prefix + path);
+            await load(prefix + path + '?fallback=1&native=1');
+            const doc = frame.contentDocument;
+            if (doc.querySelector('header, footer')) throw new Error('Minimal fallback has chrome');
+            const main = doc.querySelector('main'), link = main.querySelector('a');
+            const rect = main.getBoundingClientRect(), text = link.getBoundingClientRect();
+            if (rect.width <= 0 || text.width <= 0 || text.left < rect.left || text.right > rect.right || frame.contentWindow.getComputedStyle(main).paddingTop !== '32px') throw new Error('Minimal fallback layout broken');
+            if (new URL(link.href).pathname !== prefix + 'guide/' || new URL(link.href).hash !== target) throw new Error('Minimal fallback target broken');
+          }
+        }
+        }
+        document.body.dataset.shellCheck = 'passed';
+      } catch (error) { document.body.dataset.shellCheck = error.message; }
+    })();
+  </script></body></html>`);
+  for (const system of ['light', 'dark']) {
+    const html = runChrome(chrome, f.cwd, origin + '/shell-check.html?system=' + system, system === 'dark' ? ['--force-dark-mode'] : []);
+    assert.match(html, /data-shell-check="passed"/, html);
+    assert.ok(html.includes(`data-system-check="${system}"`), 'system ' + system + ' actually executed');
+  }
 });
 
 test('script launchers are opt-in, quote URLs, forward arguments and statuses, and clean up', async (t) => {
@@ -1119,7 +1419,7 @@ test('script launchers are opt-in, quote URLs, forward arguments and statuses, a
   assert.match(home, /class="download" href="\.\/tools\/Nested\.sh"[^>]* download>Download<\/a><a class="visit"/);
   assert.match(await f.read('tools/index.html'), /class="download" href="\.\/Nested\.sh"[^>]* download>Download<\/a><a class="visit"/);
   assert.doesNotMatch(home, /class="download" href="\.\/disabled\.sh"/);
-  assert.match(home, /<span class="count-number" aria-hidden="true">3<\/span><span class="count-label"> links<\/span>/);
+  assert.match(home, /<span class="count-number">3<\/span><span class="count-label"> links<\/span>/);
   assert.match(home, /class="code" href="\.\/disabled\/">disabled<\/a>/);
   assert.match(await f.read('assets/site.css'), /--script:#c6a36a/);
   assert.match(await f.read('assets/site.css'), /\.download\{/);
@@ -1209,22 +1509,27 @@ test('404 resolves root and nested paths under user and project sites', async (t
   };
   const f = await fixture(t, map);
   assert.equal(f.build().status, 0);
-  const [script] = scripts(await f.read('404.html'));
+  const script = behaviorScript(await f.read('404.html'), 'recovery');
   for (const prefix of ['/', '/project/']) {
     const visit = async (path, offline = false) => {
       const elements = { home: {}, head: {}, msg: {} };
+      const shellLinks = [
+        { dataset: {}, classList: { contains: () => true } },
+        ...['links', 'guide'].map(nav => ({ dataset: { nav } })),
+        { dataset: {}, classList: { contains: () => false } },
+      ];
       const requests = [];
       let destination;
       await runInNewContext(script, {
         location: { pathname: prefix + path, replace: (url) => { destination = url; } },
-        document: { getElementById: (id) => elements[id] },
+        document: { getElementById: (id) => elements[id], querySelectorAll: () => shellLinks },
         fetch: async (url) => {
           requests.push(url);
           if (offline) throw new Error('offline');
           return url === prefix + 'links.json' ? { ok: true, json: async () => map } : { ok: false };
         },
       });
-      return { elements, requests, destination };
+      return { elements, requests, destination, shellLinks };
     };
     for (const [path, expected] of [
       ['TOOLS/git/', map.tools.Git], ['tools/EDITORS/code', map.tools.editors.Code.url],
@@ -1233,16 +1538,65 @@ test('404 resolves root and nested paths under user and project sites', async (t
       ...['Mixed', 'mixed', 'MIXED/'].map((code) => [code, map.Mixed.url]),
       ['plain', map.plain], ['PLAIN/', map.plain],
     ]) {
-      const { elements, requests, destination } = await visit(path);
+      const { elements, requests, destination, shellLinks } = await visit(path);
       assert.equal(destination, expected);
       assert.equal(elements.home.href, prefix);
       assert.equal(requests.at(-1), prefix + 'links.json');
+      assert.deepEqual(shellLinks.map(link => link.href), [prefix, prefix, prefix + 'guide/', prefix + 'guide/']);
     }
     for (const [path, offline] of [['tools/missing/', false], ['unknown/', false], ['unknown/', true]]) {
       const { elements, destination } = await visit(path, offline);
       assert.equal(destination, undefined);
       assert.equal(elements.head.textContent, 'Link not found');
       assert.equal(elements.home.href, prefix);
+    }
+    const offline = await visit('tools/missing/', true);
+    assert.equal(offline.elements.home.href, prefix + 'tools/');
+    assert.ok(offline.shellLinks.every(link => link.href === undefined), 'no invented base without a map');
+  }
+});
+
+test('404 stops at the first readable ancestor map, even when the entry is missing', async (t) => {
+  const f = await fixture(t, { tools: { git: 'https://example.com/' } });
+  assert.equal(f.build().status, 0);
+  const script = behaviorScript(await f.read('404.html'), 'recovery');
+  for (const prefix of ['/', '/project/']) {
+    const requests = [];
+    const elements = { home: {}, head: {}, msg: {} };
+    await runInNewContext(script, {
+      location: { pathname: prefix + 'tools/missing/', replace() { assert.fail('no matching entry'); } },
+      document: { getElementById: id => elements[id], querySelectorAll: () => [] },
+      fetch: async url => {
+        requests.push(url);
+        return { ok: true, json: async () => ({}) };
+      },
+    });
+    assert.deepEqual(requests, [prefix + 'tools/links.json']);
+    assert.equal(elements.home.href, prefix + 'tools/');
+    assert.equal(elements.head.textContent, 'Link not found');
+  }
+});
+
+test('404 forwards matching URLs despite malformed tags without probing a parent map', async (t) => {
+  const f = await fixture(t, {});
+  assert.equal(f.build().status, 0);
+  const script = behaviorScript(await f.read('404.html'), 'recovery');
+  for (const prefix of ['/', '/project/']) {
+    for (const tags of ['invalid', [null], [42]]) {
+      const requests = [];
+      const elements = { home: {}, head: {}, msg: {} };
+      let destination;
+      await runInNewContext(script, {
+        location: { pathname: prefix + 'tools/mixed/', replace(url) { destination = url; } },
+        document: { getElementById: id => elements[id], querySelectorAll: () => [] },
+        fetch: async url => {
+          requests.push(url);
+          return { ok: true, json: async () => ({ Mixed: { url: 'https://example.com/valid', tags } }) };
+        },
+      });
+      assert.equal(destination, 'https://example.com/valid');
+      assert.deepEqual(requests, [prefix + 'tools/links.json']);
+      assert.equal(elements.home.href, prefix + 'tools/');
     }
   }
 });
