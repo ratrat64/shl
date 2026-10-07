@@ -4,7 +4,10 @@
 import { readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { loadLinks } from './links.mjs';
-import { styles, themeScript, searchScript, copyScript, navigationScript, redirectPage, scriptLauncher, indexPage, directoryPage, guidePage, oldInfoPage, notFoundPage } from './pages.mjs';
+import { styles } from './styles.mjs';
+import { themeScript, searchScript, copyScript, navigationScript } from './browser.mjs';
+import { indexPage, directoryPage } from './directory.mjs';
+import { redirectPage, scriptLauncher, guidePage, oldInfoPage, notFoundPage } from './pages.mjs';
 
 const OUT = 'dist';
 let raw, source, links, directories;
