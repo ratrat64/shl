@@ -32,6 +32,7 @@ export const linkStates = (value) => {
         .map((tag) => tag.trim().toLowerCase())
     : [];
   return {
+    script: tags.includes("script"),
     hidden: tags.includes("hidden"),
     broken: tags.includes("broken"),
     disabled: tags.includes("disabled"),
@@ -42,7 +43,6 @@ export const linkStates = (value) => {
 export const linkFields = (value) => ({
   url: linkUrl(value),
   title: typeof value === "string" ? "" : (value.title ?? ""),
-  script: value?.script === true,
   ...linkStates(value),
   tags: (value?.tags ?? []).map((tag) => tag.trim()),
 });
@@ -182,13 +182,10 @@ export async function loadLinks() {
       ) {
         problems.push(`"${name}" — title must be a string`);
       }
-      if (
-        typeof value === "object" &&
-        value &&
-        "script" in value &&
-        typeof value.script !== "boolean"
-      ) {
-        problems.push(`"${name}" — script must be a boolean`);
+      if (typeof value === "object" && value && "script" in value) {
+        problems.push(
+          `"${name}" — The script property is no longer supported; remove it. Only for script: true, append script to tags unless a trimmed case-insensitive equivalent already exists; preserve all other tags, fields and order. False must not remove an independently configured script tag.`,
+        );
       }
       if (typeof value === "object" && value && "hidden" in value) {
         problems.push(
@@ -206,7 +203,7 @@ export async function loadLinks() {
       }
       const urlError = validateUrl(url, name);
       if (urlError) problems.push(urlError);
-      if (value?.script === true) launchers.push(code);
+      if (linkStates(value).script) launchers.push(code);
       if (problems.length === before)
         links.push({ code: name, ...linkFields(value) });
     }

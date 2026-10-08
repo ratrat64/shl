@@ -195,16 +195,14 @@ test("YAML sources generate the same site and public JSON map as JSON", async (t
     Run: {
       url: "https://example.com/setup.sh",
       title: "Setup #1",
-      script: true,
-      tags: ["setup", "shell", "hidden"],
+      tags: ["setup", "shell", "hidden", "script"],
     },
   };
   const yaml = `gh: https://github.com/
 Run:
   url: https://example.com/setup.sh
   title: 'Setup #1'
-  script: true
-  tags: [setup, shell, hidden]
+  tags: [setup, shell, hidden, script]
 `;
   const json = await fixture(t, links);
   assert.equal(json.build().status, 0);
@@ -264,7 +262,7 @@ test("missing, conflicting, malformed, or invalid YAML input preserves the prior
     ],
     [
       "Run:\n  url: https://example.com/\n  script: yes\n",
-      /script must be a boolean/,
+      /script property is no longer supported; remove it\. Only for script: true, append script to tags unless a trimmed case-insensitive equivalent already exists; preserve all other tags, fields and order\. False must not remove an independently configured script tag\./,
     ],
     [
       "Run:\n  url: https://example.com/\n  hidden: yes\n",
@@ -1108,8 +1106,7 @@ test("hidden links and hidden-only folders are hidden by default but keep their 
     shown: { url: "https://example.com/shown" },
     secret: {
       url: "https://example.com/secret",
-      tags: ["hidden"],
-      script: true,
+      tags: ["hidden", "script"],
     },
     tools: {
       public: "https://example.com/public",
@@ -1619,13 +1616,11 @@ test("directory highlights match, full tags stay inline, and destinations reveal
   const f = await fixture(t, {
     example: {
       url: "https://example.com/setup.sh",
-      script: true,
-      tags: ["documentation", "a-very-long-tag-for-disclosure"],
+      tags: ["documentation", "a-very-long-tag-for-disclosure", "script"],
     },
     "long-script-code": {
       url: "https://example.com/setup.sh",
-      script: true,
-      tags: ["shell"],
+      tags: ["shell", "script"],
     },
     plain: { url: "https://example.com/plain", tags: ["reference"] },
     folder: {
@@ -1635,7 +1630,7 @@ test("directory highlights match, full tags stay inline, and destinations reveal
     ["long-code-".repeat(12)]: "https://example.com/plain",
     ["long-script-".repeat(12)]: {
       url: "https://example.com/setup.sh",
-      script: true,
+      tags: ["script"],
     },
   });
   assert.equal(f.build().status, 0);
@@ -1731,8 +1726,7 @@ test("inline tag disclosures target the correct link when codes repeat in differ
     guides: {
       docs: {
         url: "https://example.com/guides",
-        tags: ["guides"],
-        script: true,
+        tags: ["guides", "script"],
       },
     },
     untagged: "https://example.com/plain",
@@ -2596,9 +2590,9 @@ test("script launchers are opt-in, quote URLs, forward arguments and statuses, a
   const url =
     "https://example.com/setup.sh?q='\";printf injected;#$(printf expanded)&x=`printf backticks`\\path\nnext";
   const f = await fixture(t, {
-    Run: { url, script: true, tags: ["shell", "hidden"] },
-    tools: { Nested: { url, script: true } },
-    disabled: { url, script: false },
+    Run: { url, tags: ["shell", "hidden", "script"] },
+    tools: { Nested: { url, tags: ["script"] } },
+    disabled: { url, tags: ["disabled"] },
     plain: url,
   });
   const build = f.build();
@@ -2615,10 +2609,10 @@ test("script launchers are opt-in, quote URLs, forward arguments and statuses, a
     home,
     /class="download" href="\.\/Run\.sh"[^>]* download>Download<\/a><a class="visit" href="https:\/\/example\.com\/setup\.sh/,
   );
-  assert.match(home, /#shell #hidden"[^>]*><div class="link-row script-row">/);
+  assert.match(home, /data-search="[^"]*#shell #hidden #script"/);
   assert.match(
     home,
-    /<button class="tags"[^>]*>#shell · #hidden<\/button><a class="destination"/,
+    /<button class="tags"[^>]*>#shell · #hidden · #script<\/button><a class="destination"/,
   );
   assert.match(
     home,
@@ -2692,6 +2686,45 @@ process.exit(Number(process.env.CURL_STATUS));
 });
 
 test("invalid input fails before replacing an existing build", async (t) => {
+  const legacyScriptCases = [true, false, null, "true", 1, [], {}].map(
+    (script) => ({
+      code: { url: "https://example.com", script },
+    }),
+  );
+  const legacyHiddenCases = [true, false, null, "true", 1, [], {}].map(
+    (hidden) => ({
+      code: { url: "https://example.com", hidden },
+    }),
+  );
+  const invalidTagCases = [null, "tag", 1, {}, [null], [1], [""], ["  "]].map(
+    (tags) => ({
+      code: { url: "https://example.com", tags },
+    }),
+  );
+  const collisionCases = [
+    {
+      code: { url: "https://example.com", hidden: true },
+      CODE: "https://example.org",
+    },
+    {
+      code: { url: "https://example.com", hidden: true, tags: ["script"] },
+      "CODE.SH": "https://example.org",
+    },
+    {
+      code: { url: "https://example.com", tags: ["script"] },
+      "code.sh": "https://example.org",
+    },
+    {
+      "CODE.SH": "https://example.org",
+      code: { url: "https://example.com", tags: ["script"] },
+    },
+    {
+      tools: {
+        run: { url: "https://example.com", tags: ["script"] },
+        "RUN.SH": { git: "https://example.org" },
+      },
+    },
+  ];
   const cases = [
     null,
     [],
@@ -2718,37 +2751,10 @@ test("invalid input fails before replacing an existing build", async (t) => {
     { tools: { git: "https://example.com", "GIT.SH": {} } },
     { tools: {} },
     { tools: { git: { title: "missing URL" } } },
-    ...[null, "true", 1, [], {}].map((script) => ({
-      code: { url: "https://example.com", script },
-    })),
-    ...[true, false, null, "true", 1, [], {}].map((hidden) => ({
-      code: { url: "https://example.com", hidden },
-    })),
-    ...[null, "tag", 1, {}, [null], [1], [""], ["  "]].map((tags) => ({
-      code: { url: "https://example.com", tags },
-    })),
-    {
-      code: { url: "https://example.com", hidden: true },
-      CODE: "https://example.org",
-    },
-    {
-      code: { url: "https://example.com", hidden: true, script: true },
-      "CODE.SH": "https://example.org",
-    },
-    {
-      code: { url: "https://example.com", script: true },
-      "code.sh": "https://example.org",
-    },
-    {
-      "CODE.SH": "https://example.org",
-      code: { url: "https://example.com", script: true },
-    },
-    {
-      tools: {
-        run: { url: "https://example.com", script: true },
-        "RUN.SH": { git: "https://example.org" },
-      },
-    },
+    ...legacyScriptCases,
+    ...legacyHiddenCases,
+    ...invalidTagCases,
+    ...collisionCases,
   ];
   const f = await fixture(t, {});
   await mkdir(join(f.cwd, "dist"));
@@ -2758,6 +2764,11 @@ test("invalid input fails before replacing an existing build", async (t) => {
     const result = f.build();
     assert.equal(result.status, 1, JSON.stringify(value));
     assert.match(result.stderr, /Build stopped/);
+    if (value?.code && typeof value.code === "object" && "script" in value.code)
+      assert.match(
+        result.stderr,
+        /"code" — The script property is no longer supported; remove it\. Only for script: true, append script to tags unless a trimmed case-insensitive equivalent already exists; preserve all other tags, fields and order\. False must not remove an independently configured script tag\./,
+      );
     if (value?.code && typeof value.code === "object" && "hidden" in value.code)
       assert.match(
         result.stderr,
@@ -2780,12 +2791,11 @@ test("404 resolves root and nested paths under user and project sites", async (t
         Secret: { url: "https://example.com/secret", tags: ["hidden"] },
       },
     },
-    Mixed: { url: "https://example.com/", script: true, tags: ["hidden"] },
+    Mixed: { url: "https://example.com/", tags: ["hidden", "script"] },
     Stopped: {
       Deep: {
         url: "https://example.com/disabled",
-        tags: [" Hidden ", " DISABLED ", "broken"],
-        script: true,
+        tags: [" Hidden ", " DISABLED ", "broken", "script"],
       },
     },
     plain: "https://example.org/",
@@ -2937,10 +2947,10 @@ const stateMap = (script = true) =>
       {
         url: `https://example.com/a/very/long/destination/path/that/requires/middle/truncation/state${mask}.sh?q=</script>&x='"`,
         title: `State ${mask}`,
-        script,
         tags: [
           "docs",
           "release notes",
+          ...(script ? ["script"] : []),
           ...[" Hidden ", " BROKEN ", " Disabled "].filter(
             (_, bit) => mask & (1 << bit),
           ),
@@ -3050,7 +3060,7 @@ test("all eight states share interpretation, raw JSON/YAML publication, counts a
 
 test("legacy hidden is always rejected, disabled validation retains output, and rebuilds replace stale state artifacts", async (t) => {
   const f = await fixture(t, {
-    Run: { url: "https://example.com/setup.sh", script: true },
+    Run: { url: "https://example.com/setup.sh", tags: ["script"] },
   });
   assert.equal(f.build().status, 0);
   const enabled = await f.read("Run/index.html"),
@@ -3085,7 +3095,7 @@ test("legacy hidden is always rejected, disabled validation retains output, and 
   for (const map of [
     { Run: { url: "javascript:alert(1)", tags: ["disabled"] } },
     {
-      Run: { url: "https://example.com/", tags: ["disabled"], script: true },
+      Run: { url: "https://example.com/", tags: ["disabled", "script"] },
       "RUN.SH": "https://example.com/",
     },
   ]) {
@@ -3093,17 +3103,18 @@ test("legacy hidden is always rejected, disabled validation retains output, and 
     assert.equal(f.build().status, 1);
     assert.equal(await f.read("Run.sh"), launcher);
   }
-  for (const tags of [["disabled"], []]) {
+  for (const tags of [["disabled", "script"], ["script"]]) {
     await writeFile(
       join(f.cwd, "links.json"),
       JSON.stringify({
-        Run: { url: "https://example.com/setup.sh", script: true, tags },
+        Run: { url: "https://example.com/setup.sh", tags },
       }),
     );
     assert.equal(f.build().status, 0);
     const html = await f.read("Run/index.html"),
       script = await f.read("Run.sh");
-    if (tags.length) {
+    const isDisabled = tags.includes("disabled");
+    if (isDisabled) {
       assert.doesNotMatch(html, /http-equiv="refresh"|data-behavior="forward"/);
       assert.doesNotMatch(script, /curl|mktemp|trap|bash "\$script"/);
     } else {
@@ -3122,8 +3133,7 @@ test("disabled Bash launchers exit 1 with exact stderr and invoke no downloader,
     folder: {
       Run: {
         url: "https://example.com/setup.sh",
-        script: true,
-        tags: ["hidden", "broken", "DISABLED"],
+        tags: ["hidden", "broken", "DISABLED", "script"],
       },
     },
   });
@@ -3164,7 +3174,7 @@ test("disabled Bash launchers exit 1 with exact stderr and invoke no downloader,
 test("disabled copy-only controls keep full values, rejection feedback, timer reset and stale-copy cleanup", async (t) => {
   const url = "https://example.com/setup.sh?x=</script>&quote='\"";
   const f = await fixture(t, {
-    Run: { url, tags: ["hidden", "broken", "disabled"], script: true },
+    Run: { url, tags: ["hidden", "broken", "disabled", "script"] },
   });
   assert.equal(f.build().status, 0);
   const status = { textContent: "" },
@@ -3291,8 +3301,7 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
         },
         Disabled: {
           url: "https://example.com/disabled",
-          script: true,
-          tags: ["hidden", "disabled"],
+          tags: ["hidden", "disabled", "script"],
         },
         Unmatched: {
           url: "https://example.com/other",
