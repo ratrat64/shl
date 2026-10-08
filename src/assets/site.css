@@ -427,6 +427,9 @@ button.destination:has(.destination-end:empty) .destination-start {
   text-decoration: underline;
   color: var(--accent);
 }
+.broken-row:not(.disabled-row) .destination:hover {
+  color: var(--broken);
+}
 @media (hover: hover) and (pointer: fine) {
   .destination {
     opacity: 0;

@@ -3396,6 +3396,15 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
             check(win.getComputedStyle(r).backgroundColor === rowWash, 'Row hover palette');
             check(win.getComputedStyle(visit).backgroundColor === paint(mask & 4 ? 'var(--wash)' : 'color-mix(in srgb, var(' + tone + ') ' + (brokenEnabled ? 12 : 18) + '%, var(--bg))'), 'Open hover palette');
             if (brokenEnabled) check(contrast(blend(rgb(win.getComputedStyle(visit).color), bg, Number(style.opacity)), blend(rgb(win.getComputedStyle(visit).backgroundColor), bg, Number(style.opacity))) >= 4.5, 'Dimmed broken Open hover contrast: ' + theme + '/' + mask);
+            const hoveredDestination = r.querySelector('.destination'), restingColor = win.getComputedStyle(hoveredDestination).color;
+            check(JSON.stringify(rgb(restingColor)) === JSON.stringify(rgb(win.getComputedStyle(doc.documentElement).getPropertyValue('--muted'))), 'Destination resting palette');
+            hoveredDestination.classList.add('verify-hover');
+            check(JSON.stringify(rgb(win.getComputedStyle(hoveredDestination).color)) === JSON.stringify(rgb(win.getComputedStyle(doc.documentElement).getPropertyValue(tone))), 'Destination hover palette');
+            for (const fragment of hoveredDestination.querySelectorAll('.destination-start, .destination-end')) check(win.getComputedStyle(fragment).color === win.getComputedStyle(hoveredDestination).color, 'Visible destination hover palette');
+            check(win.getComputedStyle(hoveredDestination).textDecorationLine === 'underline', 'Destination hover underline');
+            if (brokenEnabled) check(contrast(blend(rgb(win.getComputedStyle(hoveredDestination).color), bg, Number(style.opacity)), blend(rgb(rowWash), bg, Number(style.opacity))) >= 4.5, 'Dimmed broken destination hover contrast');
+            hoveredDestination.classList.remove('verify-hover');
+            check(win.getComputedStyle(hoveredDestination).color === restingColor, 'Destination hover palette restoration');
             r.classList.remove('verify-hover'); visit.classList.remove('verify-hover');
             for (const element of [code, r.querySelector('.tags'), r.querySelector('.destination')]) {
               for (const background of [bg, rgb(rowWash)]) check(contrast(blend(rgb(win.getComputedStyle(element).color), bg, Number(style.opacity)), blend(background, bg, Number(style.opacity))) >= 4.5, 'Dimmed contrast failed: ' + theme + '/' + mask + '/' + element.className);

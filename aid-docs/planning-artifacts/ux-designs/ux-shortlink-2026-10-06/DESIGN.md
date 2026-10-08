@@ -98,6 +98,8 @@ Column consistency applies when interactive tools are shown. An empty site has n
 
 A code copies its full short URL on click; enabled script codes use amber and have Download without a SCRIPT label. Destinations copy their full URL; Open follows enabled destinations. Disabled code native links reach the explanation; disabled destinations are copy-only buttons with full accessible/selectable text and no external href. Open/Download stay visible as disabled buttons with muted wash and no actionable href. Folder names link to their browseable pages while disclosure expands the list. Titles appear on hover and remain searchable. Destinations display their ends without wrapping, retaining full copy/accessibility values.
 
+Broken enabled destination text uses the short code's orange-red palette on hover, retaining its underline and copy behavior.
+
 Only in hover-capable, fine-pointer mode with no coarse input available, destination text is visually hidden with opacity until row hover or focus-within. Its layout space and full accessible value remain reserved, so revealing it never shifts content. Any available coarse pointer, including hybrid touch/mouse devices, forces destinations visible; touch and non-hover modes always show them too. Long URLs remain on one line with the existing middle truncation; copying retains the full value. Every row variant, tagged or untagged, standard or script, reserves at least 4rem for the destination (3rem below 500px). Open and Download remain visible.
 
 Copy feedback appears as a small, flat floating panel near the viewport edge and never displaces directory content.
