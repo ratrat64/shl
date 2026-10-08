@@ -4,7 +4,7 @@ A URL shortener that runs entirely on GitHub Pages. A JSON or YAML link map is
 the source of truth; a build step turns each entry into a static folder with an
 instant redirect, and GitHub Actions deploys it on every push to `main`.
 
-The generated site includes a browsable directory and a guide with About, How to use,
+The generated site includes a browsable directory and a guide with Features, How to use,
 and How it works sections. The former `/about/` and `/how-it-works/` URLs forward
 to those sections. It follows the system light/dark preference; visitors
 can override it with the Theme button, saved in their browser.
