@@ -26,6 +26,7 @@ Follow-up: disabled short codes must retain their resting appearance on hover, w
 - Retained hidden-row opacity over a neutral parent backdrop so translucent disabled rows cannot pick up the page's green tint. Hover projection now edits selectors in place to preserve production cascade ordering; contrast checks use each control's fill and the compositing backdrop, including selection spans and popovers.
 - Verification: Bun 1.4.2; `bun ci`, `bun run format`, required-browser full suite (30 passed), `bun build.mjs` (68 links), `bun run format:check`, and `git diff --check` succeeded. Mechanical UI detector returned no findings.
 - Follow-up: explicitly retain `text-decoration: none` on disabled short codes; the rendered state matrix asserts it both at rest and on hover.
+- Main integration: preserved the 4px directory gaps and enabled broken-link palette checks. Resolved browser-test conflicts using in-place hover projection and row-scoped palette probes so assertions honor disabled neutral tokens alongside broken colors. Required-browser suite (30 passed), build (68 links), and formatting checks passed after integration.
 
 ## Review Triage Log
 

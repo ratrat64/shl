@@ -1625,6 +1625,7 @@ test("directory highlights match, full tags stay inline, and destinations reveal
     plain: { url: "https://example.com/plain", tags: ["reference"] },
     folder: {
       nested: { url: "https://example.com/a/very/long/path/setup.sh" },
+      second: "https://example.com/second",
     },
     ["long-folder-".repeat(12)]: { plain: "https://example.com/folder" },
     ["long-code-".repeat(12)]: "https://example.com/plain",
@@ -1643,6 +1644,7 @@ test("directory highlights match, full tags stay inline, and destinations reveal
         const doc = frame.contentDocument;
         doc.documentElement.style.scrollBehavior = 'auto';
         const win = frame.contentWindow;
+        for (const details of doc.querySelectorAll('details')) details.open = true;
         const rules = [...doc.styleSheets].flatMap(sheet => [...sheet.cssRules]);
         const pointerRule = rules.find(rule => rule.conditionText === '(hover: hover) and (pointer: fine)');
         const coarseRule = rules.find(rule => rule.conditionText === '(any-pointer: coarse)');
@@ -1661,6 +1663,17 @@ test("directory highlights match, full tags stay inline, and destinations reveal
           await new Promise(resolve => setTimeout(resolve, 30));
           for (const theme of ['light', 'dark']) {
             doc.documentElement.dataset.theme = theme;
+            if (doc.documentElement.scrollWidth > doc.documentElement.clientWidth) throw new Error('Directory overflows the viewport');
+            for (const list of doc.querySelectorAll('.links')) {
+              const items = [...list.children].filter(item => !item.hidden);
+              for (const item of items) {
+                if (item.getBoundingClientRect().right > list.getBoundingClientRect().right + 1) throw new Error('Directory entry overflows its list');
+              }
+              for (let i = 1; i < items.length; i++) {
+                const gap = items[i].getBoundingClientRect().top - items[i - 1].getBoundingClientRect().bottom;
+                if (gap !== 4) throw new Error('Adjacent directory highlights need a 4px gap: ' + gap);
+              }
+            }
             const summary = doc.querySelector('summary');
             for (const row of doc.querySelectorAll('.link-row')) {
               const style = win.getComputedStyle(row);
@@ -3334,7 +3347,7 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
       const check = (condition, message) => { if (!condition) throw new Error(message); };
       const disabledUrl = ${scriptString(stateMap().State7.url)};
       const configured = ${scriptString({ ...stateMap(), ...stateMap(false) })};
-      const rgb = color => { color = color.trim(); if (color.startsWith('#')) { let hex = color.slice(1); if (hex.length === 3) hex = [...hex].map(c => c+c).join(''); return hex.match(/../g).map(c => parseInt(c, 16)); } return color.match(/[\\d.]+/g).slice(0, 3).map(v => Number(v) * (color.startsWith('color(srgb') ? 255 : 1)); };
+      const rgb = color => { color = color.trim(); if (color.startsWith('#')) { let hex = color.slice(1); if (hex.length === 3) hex = [...hex].map(c => c+c).join(''); return hex.match(/../g).map(c => parseInt(c, 16)); } const values = color.match(/[\\d.]+/g).slice(0, 3).map(Number); return color.startsWith('color(srgb ') ? values.map(v => v * 255) : values; };
       const blend = (front, back, opacity) => front.map((v, i) => v * opacity + back[i] * (1-opacity));
       const grayscale = (win, element, pseudo) => {
         const style = win.getComputedStyle(element, pseudo);
@@ -3374,7 +3387,9 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
           const pointerMedia = pointerRule.media.mediaText, coarseMedia = coarseRule.media.mediaText;
           const hoverRules = [...rules, ...pointerRule.cssRules].filter(rule => rule.selectorText?.includes(':hover')).map(rule => [rule, rule.selectorText]);
           for (const [rule, selector] of hoverRules) rule.selectorText = selector.replaceAll(':hover', ':is(:hover, .verify-hover)');
-          const bg = rgb(win.getComputedStyle(doc.body).backgroundColor), wash = rgb(win.getComputedStyle(doc.documentElement).getPropertyValue('--wash'));
+          const probe = doc.createElement('div'); probe.style.display = 'none';
+          const paint = (value, scope) => { scope.append(probe); probe.style.background = value; const color = win.getComputedStyle(probe).backgroundColor; probe.remove(); return color; };
+          const bg = rgb(win.getComputedStyle(doc.body).backgroundColor);
           for (const script of [true, false]) for (let mask = 0; mask < 8; mask++) {
             const r = row(doc, (script ? '' : 'Plain') + 'State' + mask), style = win.getComputedStyle(r), code = r.querySelector('.code');
             check(r.getBoundingClientRect().height === 50, 'State row changed height');
@@ -3382,10 +3397,32 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
             const expected = win.getComputedStyle(doc.documentElement).getPropertyValue(mask & 4 ? '--disabled' : mask & 2 ? '--broken' : script ? '--script' : '--accent');
             check(!!r.querySelector('.download') === script, 'Non-script Download control');
             check(JSON.stringify(rgb(win.getComputedStyle(code).color)) === JSON.stringify(rgb(expected)), 'State precedence');
+            const brokenEnabled = (mask & 2) && !(mask & 4), visit = r.querySelector('.visit');
+            const rowWash = brokenEnabled ? paint('color-mix(in srgb, var(--broken) 6%, var(--bg))', r) : paint('var(--wash)', r);
+            const tone = brokenEnabled ? '--broken' : '--accent';
+            check(JSON.stringify(rgb(win.getComputedStyle(visit).color)) === JSON.stringify(rgb(style.getPropertyValue(mask & 4 ? '--muted' : tone))), 'Open state palette');
+            check(win.getComputedStyle(visit).borderTopColor === paint('color-mix(in srgb, var(' + tone + ') 25%, var(--bg))', r), 'Open border palette');
+            check(win.getComputedStyle(visit).backgroundColor === paint(mask & 4 ? 'var(--wash)' : 'color-mix(in srgb, var(' + tone + ') 10%, var(--bg))', r), 'Open fill palette');
+            r.classList.add('verify-hover'); visit.classList.add('verify-hover');
+            check(win.getComputedStyle(r).backgroundColor === rowWash, 'Row hover palette');
+            check(win.getComputedStyle(visit).backgroundColor === paint(mask & 4 ? 'var(--wash)' : 'color-mix(in srgb, var(' + tone + ') ' + (brokenEnabled ? 12 : 18) + '%, var(--bg))', r), 'Open hover palette');
+            if (brokenEnabled) check(contrast(blend(rgb(win.getComputedStyle(visit).color), bg, Number(style.opacity)), blend(rgb(win.getComputedStyle(visit).backgroundColor), bg, Number(style.opacity))) >= 4.5, 'Dimmed broken Open hover contrast: ' + theme + '/' + mask);
+            const hoveredDestination = r.querySelector('.destination'), restingColor = win.getComputedStyle(hoveredDestination).color;
+            check(JSON.stringify(rgb(restingColor)) === JSON.stringify(rgb(style.getPropertyValue('--muted'))), 'Destination resting palette');
+            hoveredDestination.classList.add('verify-hover');
+            check(JSON.stringify(rgb(win.getComputedStyle(hoveredDestination).color)) === JSON.stringify(rgb(style.getPropertyValue(tone))), 'Destination hover palette');
+            for (const fragment of hoveredDestination.querySelectorAll('.destination-start, .destination-end')) check(win.getComputedStyle(fragment).color === win.getComputedStyle(hoveredDestination).color, 'Visible destination hover palette');
+            check(win.getComputedStyle(hoveredDestination).textDecorationLine === 'underline', 'Destination hover underline');
+            if (brokenEnabled) check(contrast(blend(rgb(win.getComputedStyle(hoveredDestination).color), bg, Number(style.opacity)), blend(rgb(rowWash), bg, Number(style.opacity))) >= 4.5, 'Dimmed broken destination hover contrast');
+            hoveredDestination.classList.remove('verify-hover');
+            check(win.getComputedStyle(hoveredDestination).color === restingColor, 'Destination hover palette restoration');
+            r.classList.remove('verify-hover'); visit.classList.remove('verify-hover');
             for (const element of [code, r.querySelector('.tags'), r.querySelector('.destination')]) {
-              for (const background of [bg, wash]) check(contrast(blend(rgb(win.getComputedStyle(element).color), background, Number(style.opacity)), background) >= 4.5, 'Dimmed contrast failed: ' + theme + '/' + mask + '/' + element.className);
+              for (const background of [bg, rgb(rowWash)]) check(contrast(blend(rgb(win.getComputedStyle(element).color), bg, Number(style.opacity)), blend(background, bg, Number(style.opacity))) >= 4.5, 'Dimmed contrast failed: ' + theme + '/' + mask + '/' + element.className);
             }
             code.focus(); check(win.getComputedStyle(r).opacity === '1', 'Focus opacity');
+            check(win.getComputedStyle(r).backgroundColor === rowWash, 'Row focus palette');
+            check(contrast(rgb(win.getComputedStyle(visit).color), rgb(win.getComputedStyle(visit).backgroundColor)) >= 4.5, 'Open contrast');
             check(win.getComputedStyle(code).outlineWidth === '2px', 'Focus outline'); code.blur();
             const dest = r.querySelector('.destination');
             check(dest.getBoundingClientRect().width >= (width < 500 ? 48 : 64), 'Destination reserve');

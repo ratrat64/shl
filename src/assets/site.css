@@ -283,6 +283,9 @@ p {
   margin: 0 0 0.5rem;
 }
 .links {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.25rem;
   list-style: none;
   padding: 0;
   margin: 0;
@@ -384,6 +387,16 @@ summary a:hover {
 .broken-row .code {
   color: var(--broken);
 }
+.broken-row:not(.disabled-row) {
+  --wash: color-mix(in srgb, var(--broken) 6%, var(--bg));
+}
+.broken-row:not(.disabled-row) .visit {
+  --button-tone: var(--broken);
+  color: var(--broken);
+}
+.broken-row:not(.disabled-row) .visit:hover {
+  background: color-mix(in srgb, var(--broken) 12%, var(--bg));
+}
 .disabled-row .code {
   color: var(--disabled);
   text-decoration: none;
@@ -442,6 +455,9 @@ button.destination:has(.destination-end:empty) .destination-start {
 .destination:hover {
   text-decoration: underline;
   color: var(--accent);
+}
+.broken-row:not(.disabled-row) .destination:hover {
+  color: var(--broken);
 }
 @media (hover: hover) and (pointer: fine) {
   .destination {
