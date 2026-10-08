@@ -142,7 +142,7 @@ the 404 handler. Hiding controls discoverability, not secrecy.
 
 ## Running Bash scripts
 
-Set `script: true` in YAML (or `"script": true` in JSON) to generate an
+Add `script` to `tags` in YAML (or include `"script"` in the `tags` array in JSON) to generate an
 additional `<path>.sh` launcher alongside its browser page, including in
 nested directories. The checked-in `links.yaml` includes:
 
@@ -151,7 +151,7 @@ setup:
   ohmyposh:
     stable:
       url: https://raw.githubusercontent.com/ratrat64/homelab-public/9a32b5a83044bbbb0f7b01a7b76bb5e929950b80/scripts/ubuntu/oh-my-posh/setup.sh
-      script: true
+      tags: [shell, setup, script]
 ```
 
 After deployment, use the `.sh` URL for remote execution:
@@ -175,10 +175,8 @@ returned by the launcher. Disabled launchers instead print
 1, without creating a payload or processing arguments. These guarantees apply to
 the currently deployed artifacts, not retained older launchers or deployments.
 
-The `script` field must be a boolean; omitting it or setting it to `false` produces
-no launcher. Enabled entries get browser redirects; disabled entries get explanation
-pages, and `script: true` adds an inert launcher for them. A generated `<code>.sh` must not collide with another
-short code or directory in the same folder, regardless of casing.
+The legacy `script` property is rejected; use `tags: [..., "script"]` instead.
+A generated `<code>.sh` must not collide with another short code or directory in the same folder, regardless of casing.
 
 ## Pull request checks
 

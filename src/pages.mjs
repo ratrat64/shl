@@ -154,7 +154,7 @@ docs:
           nothing; <code>#broken #disabled</code> is one literal tag, not two.
         </p>
         <p>
-          Set <code>script</code> to <code>true</code> for a
+          Add <code>script</code> to <code>tags</code> for a
           <code>&lt;path&gt;.sh</code> launcher. Use exact casing, no trailing
           slash, and only scripts you trust. See the
           <a href="https://github.com/ratrat64/shl#running-bash-scripts"
@@ -176,13 +176,15 @@ docs:
         </ul>
         <p>
           State names match exactly, ignoring case and surrounding whitespace.
-          The old <code>hidden</code> property is rejected.
+          The old <code>hidden</code> and <code>script</code> properties are
+          rejected.
         </p>
         <p>
           Show hidden links reveals hidden entries. <code>#hidden</code>,
           <code>#broken</code> and <code>#disabled</code> also reveal matching
           hidden links, even in all-hidden folders. Clearing search restores the
-          toggle-selected view.
+          toggle-selected view. <code>#script</code> is ordinary exact-tag
+          search and respects Show hidden links.
         </p>
         <p>
           Search, copying and Show hidden links need JavaScript. Without it,

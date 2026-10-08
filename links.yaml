@@ -17,7 +17,6 @@ dev.tools:
     VS_Code:
       url: https://code.visualstudio.com/
       title: Visual Studio Code
-      script: false
       tags: [editor, development]
     Neovim: https://neovim.io/
     emacs: https://www.gnu.org/software/emacs/
@@ -51,9 +50,7 @@ setup:
   ohmyposh:
     latest:
       url: https://raw.githubusercontent.com/ratrat64/homelab-public/refs/heads/main/scripts/ubuntu/oh-my-posh/setup.sh
-      script: true
-      tags: [hidden]
+      tags: [hidden, script]
     stable:
       url: https://raw.githubusercontent.com/ratrat64/homelab-public/9a32b5a83044bbbb0f7b01a7b76bb5e929950b80/scripts/ubuntu/oh-my-posh/setup.sh
-      script: true
-      tags: [shell, setup]
+      tags: [shell, setup, script]
