@@ -1,315 +1,119 @@
 # shl
 
-A URL shortener that runs entirely on GitHub Pages. A JSON or YAML link map is
-the source of truth; a build step turns each entry into a static folder with an
-instant redirect or disabled explanation, and GitHub Actions deploys it on every push to `main`.
+A URL shortener hosted entirely on GitHub Pages. Keep links in YAML or JSON;
+merging changes to `main` publishes your updated site. No application server or
+database to maintain.
 
-The generated site includes a browsable directory and a guide with Features, How to use,
-and How it works sections. The former `/about/` and `/how-it-works/` URLs forward
-to those sections. It follows the system light/dark preference; visitors
-can override it with the Theme button, saved in their browser.
-Search on the homepage and each directory page filters the listed links by code,
-title, destination, or tag (including nested links). Plain text is one broad
-substring; `#tag` matches a whole tag exactly (case-insensitive), including spaces
-such as `#release notes`. A bare `#` matches nothing; `#broken #disabled` is one
-literal tag label. Exact `#hidden`, `#broken`, and `#disabled` searches temporarily
-include matching hidden leaves and their ancestors without changing the toggle.
-Clearing restores the toggle-selected pool. Search stays available in all-hidden
-directories. Show hidden links includes
-hidden entries in listings and search; the button is disabled where none exist.
-The single link count on each page updates with search and the hidden-links toggle.
-Click a short code to copy its full short URL, or a destination to copy its full URL;
-use **Open** beside the destination to visit it. Disabled links retain both copy
-actions, but their destination is copy-only with selectable text and no external
-href; Open and Download are visibly unavailable. Without JavaScript, enabled links
-remain navigable and hidden links stay hidden.
-On hover-capable, fine-pointer devices with no coarse input available, destination
-text appears when the row is hovered or focus is within it, with space reserved
-to prevent layout shifts. Any available coarse pointer, including hybrid
-touch/mouse devices, forces it visible; touch and non-hover devices always show it
-too. Long URLs stay on one line, shortened visually in the middle; accessible text
-and copying retain the full URL.
+## Features
 
-## Setup
+- **Stable short URLs** — change a destination without changing the link you share.
+- **Browsable folders** — organize links in nested directories.
+- **Search and copy** — search codes, titles, destinations, or tags; select a code
+  or destination to copy its URL, or use **Open** to visit it.
+- **Link controls** — hide, flag, or disable links with tags.
+- **Bash shortcuts** — generate script launchers or download destination scripts.
+- **Light and dark themes** — follow the system preference or save your own choice.
+- **Git-based publishing** — review link changes in pull requests and deploy with
+  GitHub Actions. Supports project-site paths and custom domains.
+
+## Quick start
 
 1. Create a GitHub repository with these files and a `main` branch. A public
-   repository works with GitHub Pages on GitHub Free.
-2. Settings → Pages → **Source: GitHub Actions**.
-3. Edit your link file with your links on a branch and open a pull request to `main`.
-   Once checks pass, merge it. The deployment workflow checks, builds, and deploys.
-   Wait for **Actions → Deploy shl** to finish.
+   repository supports GitHub Pages on GitHub Free.
+2. In **Settings → Pages**, set **Source** to **GitHub Actions**.
+3. Replace the examples in `links.yaml` with your links using the format below.
+   Commit on a branch and open a pull request to `main`.
+4. Once checks pass, merge and wait for **Actions → Deploy shl** to finish.
 
-Your links live at `https://<user>.github.io/<repo>/<code>`; the path follows
-your repository name (for example, `/shl/` if you name it `shl`). Want bare
-`go.example.com/<code>`? Add a root `CNAME` file containing only `go.example.com`
-(no scheme or path); the build copies it into `dist/`. Point that subdomain's DNS
-CNAME record at `<user>.github.io`, set the custom domain in Settings → Pages,
-and enable HTTPS once GitHub provisions the certificate. For an apex domain,
-follow [GitHub's DNS instructions](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site).
+Your short URLs will look like `https://<user>.github.io/<repo>/gh/`.
+For `go.example.com/gh/`, follow the [custom-domain instructions](docs/reference.md#custom-domains).
 
-## Adding a link
+## Managing links
 
-Edit `links.yaml` on a branch and submit a pull request:
+Edit `links.yaml`, including through GitHub's web editor, and publish via a pull
+request:
 
 ```yaml
 gh: https://github.com/
-docs:
+pages-docs:
   url: https://docs.github.com/en/pages
   title: GitHub Pages docs
   tags: [documentation, github]
-automation:
-  url: https://example.com/setup.sh
-  tags: [hidden]
-```
-
-Short form is just `code: https://example.com/`. Long form adds an optional string `title` shown
-on the redirect fallback page and a `tags` array of nonblank strings.
-Full tag labels appear on one line beside each short code without ellipsis or
-increasing row height; crowded rows scroll horizontally. Select the labels for
-an optional convenient popover showing all tags. Use plain text for broad search
-or `#tag` for an exact whole label. JSON entries use the same `"tags": ["documentation", "github"]` format.
-Add `hidden` to `tags`
-to omit a link from directory listings, counts, and search by default. Visitors can
-use Show hidden links to reveal it. Its redirect and optional script launcher still
-work unless also disabled. Exact trimmed, case-insensitive `broken` marks an
-orange-red warning without blocking actions. `disabled` makes links grey and
-overrides broken/script emphasis; hidden opacity applies independently. A disabled
-short URL shows **Link disabled** instead of forwarding, and its launcher exits 1
-without downloading or executing. The destination remains public; disabling does
-not prevent access outside shl. Tags such as `hiddenish` and literal `#hidden` are
-descriptive, not states. The legacy `hidden` property is rejected for every value;
-when migrating, append `hidden` for true without duplicating an equivalent tag,
-preserve other tags/fields, and remove the property for both true and false.
-False must not remove an independently configured hidden tag.
-You can edit the file in GitHub's web editor;
-choose to create a branch and pull request. The links become live after the merge
-to `main` finishes deploying.
-
-Nest objects to create directories in JSON or YAML:
-
-```yaml
 tools:
   git: https://git-scm.com/
-  editors:
-    code:
-      url: https://code.visualstudio.com/
-      title: VS Code
+  setup:
+    url: https://example.com/setup.sh
+    tags: [shell, script]
 ```
 
-This creates browseable `/tools/` and `/tools/editors/` pages and redirect URLs
-`/tools/git/` and `/tools/editors/code/`. The homepage has expandable directories;
-each directory page also lists links and subdirectories. With JavaScript, folder
-links, breadcrumbs, brand, and header/footer Links and Guide navigation work
-without reloading, keeping the header, footer, and theme mounted. Guide section
-anchors also navigate without reloading; Back and Forward restore content and
-saved scroll positions (the most recently saved position per URL, shared by
-repeated visits to that URL). Search, hidden toggles, and expanded folders reset on
-page transitions.
-Direct URLs, refreshes, and browsing without JavaScript still use the generated
-pages. Existing top-level links keep their URLs. Directory names are their display
-labels, and a directory must contain at least one entry. A path cannot be both a
-directory and a redirect.
-The checked-in `links.yaml` includes flat and nested examples, optional titles,
-`script: true` and `script: false`, and codes using dots, underscores and hyphens.
-Directories without visible descendants are hidden in parent listings by default,
-but their URLs still open. Show hidden links reveals those directories and their
-links. If every link is hidden, the directory initially displays an empty state
-and the toggle; with JavaScript disabled, hidden entries stay out of view.
+A link can be a URL string or an object with `url`, optional `title`, and `tags`.
+Nest entries to create folders: this example adds `/tools/`, `/tools/git/`, and
+`/tools/setup/`. Edit a destination to retarget a link; delete its entry to remove
+it after the next deployment.
 
-Each path segment starts with an ASCII letter or number, followed by letters,
-numbers, `.`, `_`, or `-`. `index`, `404`, `assets`, `links`, `about`, `guide`,
-`how-it-works`, and generated filenames (such as `index.html`) are reserved in
-any casing. Siblings cannot differ only by case. Destinations must be absolute HTTP or HTTPS
-URLs. Edit a destination to retarget a link; delete its entry to remove it on the
-next deployment.
+| Tag | Effect |
+| --- | --- |
+| `hidden` | Omit from default listings and search; Show hidden links reveals it. The short URL still works. |
+| `broken` | Show a warning without blocking actions. |
+| `disabled` | Stop forwarding and script execution; Open and Download are unavailable, but both URLs remain copyable. |
+| `script` | Generate a `<path>.sh` Bash launcher and show Download. |
 
-To use JSON instead, rename `links.yaml` to `links.json` and write the same
-link entries as JSON:
+Tags can be combined; special tags match exactly, ignoring case and surrounding
+whitespace. Other tags are descriptive. Search plain text broadly or use `#tag`
+for an exact tag. `#hidden`, `#broken`, and `#disabled` also reveal matching hidden
+links temporarily.
 
-```json
-{
-  "gh": "https://github.com/",
-  "docs": { "url": "https://docs.github.com/en/pages", "title": "GitHub Pages docs" },
-  "automation": { "url": "https://example.com/setup.sh", "tags": ["hidden"] }
-}
-```
-
-Keep **exactly one** of `links.json`, `links.yaml`, and `links.yml` in the root.
-The build rejects missing or multiple sources. Both formats use the same link
-validation; the generated site always publishes a `links.json` for browser routing.
-Hidden links and destinations remain in that public file and can be recovered by
-the 404 handler. Hiding controls discoverability, not secrecy.
+Use absolute HTTP(S) destinations. Codes start with an ASCII letter or number and
+contain only letters, numbers, `.`, `_`, or `-`; reserved names and case-insensitive
+collisions are rejected. Keep exactly one root link file: `links.yaml`, `links.yml`,
+or `links.json`. See [formats and validation](docs/reference.md#link-formats-and-validation).
 
 ## Running Bash scripts
 
-Add `script` to `tags` in YAML (or include `"script"` in the `tags` array in JSON) to generate an
-additional `<path>.sh` launcher alongside its browser page, including in
-nested directories. The checked-in `links.yaml` includes:
-
-```yaml
-setup:
-  ohmyposh:
-    stable:
-      url: https://raw.githubusercontent.com/ratrat64/homelab-public/9a32b5a83044bbbb0f7b01a7b76bb5e929950b80/scripts/ubuntu/oh-my-posh/setup.sh
-      tags: [shell, setup, script]
-```
-
-After deployment, use the `.sh` URL for remote execution:
+Replace `https://example.com/setup.sh` above with a real Bash script you trust,
+then deploy and use its launcher URL:
 
 ```bash
-curl -fsSL https://your-user.github.io/shl/setup/ohmyposh/stable.sh | bash
+set -o pipefail
+curl -fsSL https://your-user.github.io/your-repo/tools/setup.sh | bash
 
-# Arguments are forwarded to the destination script:
-curl -fsSL https://your-user.github.io/shl/setup/ohmyposh/stable.sh | bash -s -- --verbose
+# Forward arguments to the destination script:
+curl -fsSL https://your-user.github.io/your-repo/tools/setup.sh | bash -s -- --verbose
 ```
 
-Use the full link path's exact casing, with `.sh` and **no trailing slash**. The browser
-URL ending in `/<path>/` returns HTML, which `curl -L` cannot follow.
-This example is the nested launcher at `/setup/ohmyposh/stable.sh`.
+Replace `your-user` and `your-repo` with your GitHub user and repository names before
+running. Use exact path casing, `.sh`, and **no trailing slash**. Only run scripts
+you trust. Launchers require Bash, curl, mktemp, and rm; they download fully before
+execution, forward arguments and exit status, and clean up the temporary file.
 
-The directory's **Download** button fetches the current destination script on
-click and saves its exact bytes, without executing it or saving the launcher.
-It requires JavaScript and a readable response (cross-origin hosts must allow
-CORS). Network, HTTP, CORS, or body-read failures show a download error and save
-no file. The filename uses the destination URL basename, with unsafe filename
-characters replaced; missing or unusable names fall back to `<code>.sh`.
+The directory's **Download** button saves the current destination script without
+executing it. It requires JavaScript and a host that allows browser access through
+CORS. See [script behavior](docs/reference.md#bash-launchers-and-downloads).
 
-Enabled launchers require Bash, curl, mktemp, and rm. Each run downloads the current
-destination into a temporary file, executes it only after a successful download,
-and removes it on exit. Download failures and the script's exit status are
-returned by the launcher. Disabled launchers instead print
-`This link is disabled. No script was downloaded or executed.` to stderr and exit
-1, without creating a payload or processing arguments. These guarantees apply to
-the currently deployed artifacts, not retained older launchers or deployments.
+## Local development
 
-The legacy `script` property is rejected; use `tags: [..., "script"]` instead.
-A generated `<code>.sh` must not collide with another short code or directory in the same folder, regardless of casing.
-
-## Pull request checks
-
-Every pull request targeting `main` runs **Check pull request**, using Bun 1.4.2
-on Ubuntu. The **PR validation** job runs `bun ci`, `bun run format`, `bun test ./test/build.test.mjs`,
-then `bun build.mjs`: tests cover regression cases, and the build validates the proposed
-link file. New commits rerun checks and cancel older runs for the same PR.
-PR checks have read-only repository permissions and do not deploy the site.
-For PRs changing only `AGENTS.md`, the required job succeeds without running
-Bun tests or a build; mixed changes still run both.
-
-For your own repository, configure an active branch ruleset under **Settings →
-Rules → Rulesets**, targeting `main`. Require a pull request and the **PR validation**
-status check from GitHub Actions, with the branch up to date before merging.
-No approving review is required by this baseline; add one if your team needs it.
-Run the workflow on an initial PR if the check is not yet available in the picker.
-Merging to `main` triggers the existing production deployment.
-
-## Run locally
-
-Install [Bun 1.4.2](https://bun.com/docs/installation) and check with
-`bun --version`. From the repository root, run (tests also require Bash):
+Install [Bun 1.4.2](https://bun.com/docs/installation), then run from the repository root:
 
 ```bash
 bun ci
 bun run dev
 ```
 
-Open the URL printed by `http-server` (usually `http://localhost:8080/`). The
-preview server supports dotted directory names such as `/dev.tools/`. Restart
-`bun run dev` after editing the link map to rebuild the site.
-To run the regression checks: `bun run test`. To build
-without starting the preview server: `bun build.mjs`.
+Open the printed preview URL (usually `http://localhost:8080/`). Restart the command
+after editing links to rebuild. Use `bun run test` for regression checks (Bash is
+required), `bun build.mjs` to build, and `bun run format` to format application files.
+See [contributor guidance](docs/development.md) for browser checks, PR rules, and source ownership.
 
-Run `bun run format` to apply pinned Prettier formatting locally, or
-`bun run format:check` to check it without writing. Both CI workflows apply
-formatting with `--write` before tests/build. Formatting covers application
-build/source/test files, workflows, package metadata, and the root link map;
-generated output, vendor files, and planning documents are excluded. HTML stays
-in `.mjs` templates; `/* HTML */` comments enable Prettier's embedded HTML formatter
-without a runtime tag. Preserve output escaping and whitespace inside code samples.
+## Important limits
 
-To return to Node.js 24 if the Bun workflow fails, revert the Bun migration
-commit to restore the npm lockfile and Node-based CI commands together.
+- **All destinations are public**, including hidden and disabled links. Hiding
+  controls discovery; disabling stops shl actions, not external access.
+- Redirects happen in the browser, not through HTTP 301/302 responses. `curl -L`
+  does not follow them; use `.sh` URLs for launchers.
+- Validation checks URL syntax, not destination reachability.
+- Search, copying, hidden-link controls, and Download require JavaScript. Enabled
+  visible links remain navigable without it.
+- No anonymous link submission or built-in click tracking.
 
-A successful build replaces `dist/` completely; edit the templates in
-`src/pages.mjs` (Guide, redirects, legacy forwarding, and 404), shared layout in
-`src/layout.mjs`, directory components in `src/directory.mjs`, styles in
-`src/assets/site.css`, browser behaviors and content mounting in `src/assets/*.js`,
-input validation in `src/links.mjs`, and output generation in
-`src/build.mjs`, not the generated files. Validation fails before the old
-output is removed. URL syntax is checked, but destination reachability is not.
-
-`src/layout.mjs` owns the document foundation used by every HTML page. Links,
-nested directories, Guide, and 404 compose its shared borderless shell;
-destination and legacy forwards, and disabled explanations, use its minimal document without chrome and
-share forwarding logic in `src/pages.mjs`. The 404 and minimal documents embed
-the same styles and storage-tolerant theme script, so nested or unknown request
-paths cannot break their foundations. Recovery rebases shell links after the
-first readable ancestor map; unavailable maps retain the relative fallback.
-`src/links.mjs` owns validated leaf interpretation and the directory tree used
-for rendering and counts. Shared tokens and control styles have one owner in
-`src/assets/site.css`; `src/styles.mjs` and `src/browser.mjs` load the same CSS and
-theme script relative to their modules for embedding. The build copies native
-assets to `dist/assets/`; content selectors must not change shell appearance. See
-[architecture AD-7–AD-9](aid-docs/planning-artifacts/architecture/architecture-shortlink-2026-10-04/ARCHITECTURE-SPINE.md).
-
-For a focused check: `bun test --test-name-pattern="404" ./test/build.test.mjs`.
-The checks execute generated JavaScript in Bun with simulated browser APIs,
-and Bash launchers with a stubbed downloader.
-With installed Chrome (`google-chrome`, or set `CHROME_BIN`), the suite also
-compares shell geometry and computed styles on Links, folders, Guide, and 404
-at 390px and 1440px in light/dark themes, under root and project prefixes.
-It covers direct loads, script-disabled native documents, and shell-preserving
-app transitions, plus rendered tag disclosures. Chrome checks report a skip
-when the browser is unavailable; a skipped check is not rendered verification.
-CI requires Chrome via `SHL_REQUIRE_BROWSER=1`. To run the same required-browser
-check locally: `SHL_REQUIRE_BROWSER=1 bun test --timeout 30000 ./test/build.test.mjs`.
-Set `CHROME_BIN` to the browser executable if it is not named `google-chrome`.
-After deploying, smoke-test a known code, a wrong-case code (with and without a
-trailing slash), and an unknown code in a browser. Repeat under a project prefix
-when changing routing; local preview servers may serve 404 pages differently
-from GitHub Pages.
-
-For app navigation, run `bun run dev` and open `/guide/#about` directly. In the
-browser console, save `window.savedHeader = document.querySelector('header')`.
-Change Theme, then use Links, folders, breadcrumbs, and the footer Guide link;
-confirm `savedHeader === document.querySelector('header')`, the theme, page title,
-active navigation, and keyboard focus after each transition. Click the current
-navigation link and Guide section links, then use Back/Forward: content, fragments,
-and saved scroll should match, with history restoration jumping instantly.
-Check search, Show hidden links, and code/destination copy after returning from
-Guide; each interaction should run once, and controls should reset after leaving
-and returning. Repeat with browser JavaScript disabled to check native links.
-Repeat on a deployed project-prefix URL such as `/<repo>/guide/#about`.
-
-## How it works
-
-- `dist/<path>/index.html` — a directory page, a disabled explanation, or an enabled redirect with canonical
-  link, meta refresh, and `location.replace`. These are browser redirects, not HTTP
-  301/302 responses; `curl -L` does not follow them. A clickable fallback is included.
-- `dist/<path>.sh` — an opt-in Bash launcher for links with `"script": true`.
-- `dist/links.json` — the public link map generated from either input format.
-- `dist/404.html` — GitHub Pages serves this for anything unmatched. It reads
-  `links.json` client-side and catches wrong-case codes before giving up.
-- `dist/index.html` — a directory with expandable nested groups, sorted by name,
-  showing short codes with space reserved beside them for destinations. Destinations
-  appear on row hover or focus-within on hover-capable, fine-pointer devices with no
-  coarse input available; any coarse pointer (including hybrid touch/mouse devices),
-  touch or non-hover mode keeps them visible. Long URLs stay on one line, shortened
-  visually in the middle, with full accessible and copy values.
-  Show hidden links reveals hidden entries and hidden-only groups on the homepage and eligible directory pages.
-  Hover a code for its optional title; titles remain searchable. Select a code to copy its
-  short link, select a destination to copy its full URL, or use Open to visit the destination.
-  Folder names still open directory pages. It updates on each deployment.
-
-Routing supports both user-site roots and project-site prefixes. Wrong-case
-requests rely on Pages serving `404.html`; JavaScript fetches the public link map
-and matches the full relative path case-insensitively. No base-URL environment
-variable is required.
-
-## Limits
-
-All published destinations, including hidden and disabled links, remain public in
-`links.json` and directory text. Enabled redirects and launchers also include their
-destinations; disabled explanations and inert launchers do not.
-The homepage lists visible links by default. There is no backend, database,
-anonymous link submission, or built-in click tracking. Managing links is a
-repository edit followed by a deployment.
+For more detail, see the [reference](docs/reference.md) and
+[development guide](docs/development.md). The published site also includes a Guide.
