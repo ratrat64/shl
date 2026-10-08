@@ -1568,6 +1568,17 @@ test("destination downloads preserve bytes, handle failures, and cancel outgoing
       target: { closest: () => target },
       preventDefault() {},
     });
+  const feedbackTimer = () => {
+    const feedback = [...timers].filter(([, timer]) => timer.delay === 5000);
+    assert.equal(feedback.length, 1, "one feedback deadline");
+    return feedback[0];
+  };
+  const expireFeedback = () => {
+    const [id, timer] = feedbackTimer();
+    timers.delete(id);
+    timer.callback();
+    assert.equal(status.textContent, "");
+  };
   await click();
   assert.equal(requests[0].url, button.dataset.downloadUrl);
   assert.deepEqual(new Uint8Array(await saved[0].blob.arrayBuffer()), bytes);
@@ -1575,6 +1586,7 @@ test("destination downloads preserve bytes, handle failures, and cancel outgoing
   assert.equal(attached, 0);
   assert.equal(button.disabled, false);
   assert.equal(status.textContent, "Script download started.");
+  expireFeedback();
   for (const [id, timer] of timers)
     if (timer.delay === 1000) {
       timers.delete(id);
@@ -1584,6 +1596,7 @@ test("destination downloads preserve bytes, handle failures, and cancel outgoing
   await click({ disabled: true });
   await click(null); // Open and copy targets do not match the download hook.
   assert.equal(requests.length, 1);
+  let partialBodyReads = 0;
   for (const fail of [
     async () => {
       throw new TypeError("CORS blocked");
@@ -1592,6 +1605,14 @@ test("destination downloads preserve bytes, handle failures, and cancel outgoing
       ok: false,
       blob() {
         assert.fail("HTTP failure body must not be saved");
+      },
+    }),
+    async () => ({
+      ok: true,
+      status: 206,
+      blob() {
+        partialBodyReads++;
+        return blob;
       },
     }),
     async () => ({
@@ -1614,6 +1635,24 @@ test("destination downloads preserve bytes, handle failures, and cancel outgoing
     assert.equal(saved.length, 1);
     assert.equal(objects.size, 0);
     assert.equal(button.disabled, false);
+    assert.equal(
+      partialBodyReads,
+      0,
+      "partial response rejected before body read",
+    );
+    const [previousDeadline] = feedbackTimer();
+    const subsequent = click();
+    assert.equal(
+      timers.has(previousDeadline),
+      false,
+      "next download cancels feedback deadline",
+    );
+    assert.equal(status.textContent, "");
+    await subsequent;
+    assert.notEqual(feedbackTimer()[0], previousDeadline);
+    assert.match(status.textContent, /Could not download.*CORS/);
+    assert.equal(saved.length, 1);
+    expireFeedback();
   }
   for (const stage of ["fetch", "body", "failure"]) {
     let settle;

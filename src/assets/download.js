@@ -30,7 +30,7 @@ globalThis.initDownload = () => {
       const response = await fetch(button.dataset.downloadUrl, {
         signal: controller.signal,
       });
-      if (!response.ok || response.type === "opaque")
+      if (!response.ok || response.status === 206 || response.type === "opaque")
         throw new Error("Unreadable response");
       if (!active) return;
       const blob = await response.blob();
