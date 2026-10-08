@@ -75,6 +75,22 @@ context:
 
 ## Review Triage Log
 
+| Finding | Verdict and evidence | Disposition |
+| --- | --- | --- |
+| Blind-1: selectable disabled URL duplicated/split | medium: hidden accessible text plus flex fragments made native selection differ from the configured URL. Disabled markup now uses its full aria-label and inline-block visible fragments; actual Chrome selection strings equal configured URLs. | Patched |
+| Blind-2: legacy-property guidance could hide false entries or replace tags | medium: blanket tags replacement guidance omitted false/preservation semantics. Diagnostic now says remove the property, append only for true and preserve tags; rejection checks pass. | Patched |
+| Blind-3: PRODUCT claimed destinations in disabled artifacts | low: retained publication paragraph contradicted intentionally destination-free explanation/launcher output. Public map/directory versus enabled artifacts are now distinguished. | Patched |
+| Blind-4: README said script:false always emits a redirect | low: launcher opt-out is independent of disabled HTML behavior. Text now distinguishes explanations from forwarding. | Patched |
+| Blind-5: deployed routing gate incomplete | medium: verified code and local Pages approximation do not prove hosted feature behavior. No feature staging exists; explicit unchecked post-publication gate remains. | Pending deployment, not claimed complete |
+| Blind-6: rendered matrix lacked ordinary-state variants | medium: every matrix leaf originally had script:true. All eight non-script variants now assert teal defaults, state precedence and absent Download. | Patched |
+| Blind-7: native code-link path was not activated | medium: direct explanation loading did not exercise listing hrefs. Native nested disabled code activation now reaches canonical explanation under both prefixes. | Patched |
+| Blind-8: new button lacked genuine keyboard proof | medium: synthetic clicks/focus did not prove Enter/Space activation. Separate native CDP verification used trusted key events and the real clipboard; both keys copied the independent configured URL without navigation, and disabled actions could not activate. | Verified |
+| Blind-9: button pointer variants lacked checks | medium: new element type initially had only width/selection assertions. Rendered checks now exercise fine idle/hover/focus, coarse/hybrid/non-hover visibility and stable geometry. | Patched |
+| Blind-10: state-query disclosures lacked restoration assertions | medium: traversal changed ancestor opening without checking clear/switch behavior. Both visitor-open and initially closed ancestors now retain their proper states after queries clear. | Patched |
+| Verification-1: clipboard expectation trusted generated attribute | medium: comparing copied output to the same data attribute could hide truncation. Rendered expectation now independently embeds the original stateMap URL through scriptString; full special-character URL is checked. | Patched |
+
+Edge-case review returned no findings. All layers completed before triage; frozen intent remained unchanged.
+
 ## Design Notes
 
 No intent gaps. Migration is reversible; merging triggers deployment. Footprint: existing modules/tests/live docs plus this record, no new API. Disabled destinations use copy buttons with selectable text and no external href; Open/Download use disabled controls. Serialize shared interpretation into recovery; extract a neutral module only if dependency direction requires it.
@@ -95,3 +111,6 @@ No intent gaps. Migration is reversible; merging triggers deployment. Footprint:
 - Executed Chrome state matrix at 390/1440px, light/dark, root/project prefixes, script-enabled/native documents and app transitions: exact/spaced/literal/bare-tag search, all-hidden ancestors/matching siblings/count/clear/toggle behavior, native disabled controls and direct explanation without fallback stripping, canonical disabled recovery, preserved shell/theme and lifecycle reset, 50px row geometry, destination reserves, opacity/focus and at least 4.5:1 computed state/tag/destination contrast on background and wash. Existing shell/Guide/404/native/forwarding and tag-popover gates also passed.
 - Impeccable detector ran once over changed UI targets and returned `[]` (no findings).
 - Remaining gate: deployed Pages smoke requires a deployment containing this feature (and disabled fixtures). This branch does not configure a staging site or alter production publication; status is in-review, not done. Current-artifact disabling cannot revoke older retained launchers or external destination access, as specified.
+- After review patches, parent verification reran format:check, required-Chrome full suite (**30 pass, 0 fail**), root build (**26 links**) and diff checks successfully. Inline destination fragments provide exact native selection without changing middle truncation or 50px row geometry. Diagnostics and publication docs were corrected; matrix now includes ordinary/script variants, native nested code activation, pointer states and disclosure restoration.
+- Genuine keyboard verification: `bun /tmp/opencode/verify-disabled-keyboard.mjs` passed with Chrome 155 CDP Input.dispatchKeyEvent keyDown/keyUp, focus emulation and clipboard permissions. Enter/Space generated trusted native activation, replaced a sentinel real clipboard value with an independent full configured URL, reported Destination copied. and did not navigate. Disabled Open/Download refused focus, were skipped by native Tab, and native keyboard/pointer attempts produced no activation/download. No repository edits or new dependency were needed for this verification.
+- Latest main added only separate automation-planning documentation (PR #65); merging it into this task required no application changes. This feature still contains no automation implementation.
