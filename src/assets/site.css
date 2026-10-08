@@ -9,6 +9,8 @@
   --line: #7a8580;
   --accent: #006b60;
   --script: #895400;
+  --broken: #a33d20;
+  --disabled: #59645f;
   --wash: #e8eeeb;
 }
 @media (prefers-color-scheme: dark) {
@@ -22,6 +24,8 @@
     --line: #63736b;
     --accent: #64b6a4;
     --script: #c6a36a;
+    --broken: #ee967b;
+    --disabled: #96a59d;
     --wash: #111b16;
   }
 }
@@ -35,6 +39,8 @@
   --line: #63736b;
   --accent: #64b6a4;
   --script: #c6a36a;
+  --broken: #ee967b;
+  --disabled: #96a59d;
   --wash: #111b16;
 }
 
@@ -160,7 +166,9 @@ button {
     var(--bg)
   );
 }
-.theme-toggle:disabled {
+.theme-toggle:disabled,
+.visit:disabled,
+.download:disabled {
   background: var(--wash);
   color: var(--muted);
   cursor: default;
@@ -366,6 +374,32 @@ summary a:hover {
 }
 .script-link {
   color: var(--script);
+}
+.broken-row .code {
+  color: var(--broken);
+}
+.disabled-row .code {
+  color: var(--disabled);
+}
+button.destination {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  user-select: text;
+}
+/* Inline fragments select as one URL, without flex-item line breaks. */
+button.destination .destination-start,
+button.destination .destination-end {
+  display: inline-block;
+  vertical-align: top;
+}
+button.destination .destination-start {
+  max-width: 45%;
+}
+button.destination:has(.destination-end:empty) .destination-start {
+  max-width: 100%;
 }
 .destination {
   position: relative;
