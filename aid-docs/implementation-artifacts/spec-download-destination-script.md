@@ -2,7 +2,7 @@
 title: 'Download the destination script instead of its bootstrap launcher'
 type: 'bugfix'
 created: '2026-10-08'
-status: 'in-review'
+status: 'done'
 baseline_commit: '2311441401c24951b19626ce39f07c6a693370cc'
 route: 'dispatch'
 review_loop_iteration: 0
@@ -78,3 +78,19 @@ context: []
 - VM checks cover exact binary bytes, names, HTTP/network/opaque/body-read failures, disabled actions, stale fetch/body/failure completion, abort signals, listener removal, timers, and object URL cleanup.
 - Chrome checks use real cross-origin readable and CORS-blocked responses through expanded home, app-navigated folders, and native folder loads at root/project prefixes. The test intercepts the Blob download anchor to inspect its filename and exact bytes; it does not assert an operating-system save dialog or filesystem download.
 - Existing rendered light/dark desktop/mobile shell, disabled-state, minimal-document, routing, copy, and CLI launcher regressions passed. Latest main was incorporated before editing.
+- Final post-review verification: Bun 1.4.2 install, format/write and read-only formatting checks, all 33 required-browser tests, build (68 links), and whitespace checks passed after rejecting HTTP 206 and adding feedback-expiry assertions.
+
+## Review Triage Log
+
+- Blind 1, low, rejected: a reserved short code can produce a reserved Windows fallback name; browsers apply filesystem filename normalization. The documented deterministic `<code>.sh` fallback is preserved, and changing the naming contract is unnecessary for the typical script links.
+- Blind 2, medium, patched: HTTP 206 was accepted by `response.ok`; reject it before reading/saving and exercise the partial-response branch in the VM test.
+- Blind 3, low, rejected: a stalled destination can leave its button pending until departure. An additional deadline policy is not required by the selected fetch-on-click behavior; adding cancellation/deadline state is disproportionate to this edge case.
+- Blind 4, low, rejected: pending downloads disable only the active row's button and clear previous feedback; native focus/navigation remains available. Adding progress/busy UI is optional polish rather than a broken download contract.
+- Blind 5, low, rejected: without JavaScript the Download button has no action. README, Guide, and the experience explicitly state JavaScript is required; native destination browsing and Open remain available. Additional availability UI is optional polish.
+- Blind 6, low, rejected: parallel row downloads share generic feedback, but each saves independently and buttons prevent duplicate requests for the same row. No partial payload or incorrect destination save results; per-request feedback adds a new presentation policy.
+- Blind 7, maybe-false, rejected: hidden-to-visible status announcements depend on assistive technology; browser/VM checks establish status text but do not establish a missed announcement. Existing copy feedback already uses hidden empty regions. Assistive-technology execution would settle this low-impact concern.
+- Blind 8, low, rejected: no pagehide controller exists, but successful in-app transitions explicitly abort and suppress outgoing work, and native departures use browser document lifecycle. A demonstrated stale save after back-forward-cache restoration would justify a separate lifecycle extension.
+- Blind 9, low, rejected: Chrome captures Blob filename/bytes before native saving, as explicitly recorded in verification. Native anchor downloading is platform behavior; OS save-dialog/filesystem automation is additional coverage rather than proof of a current code defect.
+- Edge 1, low, rejected: same reserved-fallback filename observation as Blind 1; browser filesystem normalization limits its practical effect.
+- Edge 2, low, rejected: same stalled-request observation as Blind 3; existing navigation cancellation is covered and no bounded completion requirement was selected.
+- Verification 1, medium, patched: execute five-second success/failure feedback callbacks and assert clearing, and verify a subsequent download replaces the feedback deadline.
