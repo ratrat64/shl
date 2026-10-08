@@ -161,6 +161,13 @@ docs:
             >script commands</a
           >.
         </p>
+        <p>
+          Download saves the current destination script, not the Bash launcher,
+          without executing it. It needs JavaScript and a destination host that
+          allows CORS. Failed requests show a download error and save no file.
+          The filename comes from the destination URL, falling back to
+          <code>&lt;code&gt;.sh</code> when no usable basename exists.
+        </p>
         <p>Add state names to a link object's <code>tags</code>:</p>
         <ul>
           <li>

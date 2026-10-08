@@ -61,6 +61,10 @@ async function browserServer(t, cwd) {
     const server = Bun.serve({ port: 0, async fetch(request) {
       const url = new URL(request.url);
       const path = decodeURIComponent(url.pathname).replace(/^\\/project(?=\\/)/, '');
+      if (path === '/download-payload.sh')
+        return new Response(new Uint8Array([35, 33, 0, 255, 13, 10, 128]), {
+          headers: url.searchParams.has('cors') ? { 'Access-Control-Allow-Origin': '*' } : {},
+        });
       const file = Bun.file(${JSON.stringify(join(cwd, "dist"))} + path + (path.endsWith('/') ? 'index.html' : ''));
       const headers = url.searchParams.has('native') ? { 'Content-Security-Policy': "script-src 'none'" } : {};
       if (await file.exists()) {
@@ -129,6 +133,7 @@ test("native assets are copied module-relatively and embedded documents preserve
     "theme.js",
     "search.js",
     "copy.js",
+    "download.js",
     "navigation.js",
   ]) {
     const source = await readFile(
@@ -592,6 +597,7 @@ for (const prefix of ["/", "/project/"])
         });
         elements["#search-status"] = { textContent: "", hidden: true };
         elements["#copy-status"] = { textContent: "" };
+        elements["#download-status"] = { textContent: "" };
         elements["#link-count"] = { textContent: "" };
         elements["#hidden-toggle"] = control({
           disabled: /id="hidden-toggle"[^>]*disabled/.test(content),
@@ -778,6 +784,7 @@ for (const prefix of ["/", "/project/"])
       "assets/theme.js",
       "assets/search.js",
       "assets/copy.js",
+      "assets/download.js",
       "assets/navigation.js",
     ]);
     assert.equal(themeButton.textContent, "Theme: dark");
@@ -828,7 +835,7 @@ for (const prefix of ["/", "/project/"])
     );
     assert.equal(
       document.currentMain.elements[".links"].handlers.get("click").length,
-      1,
+      2,
     );
     window.scrollY = 250;
     assert.equal(await click(folder("/tools/editors/")), true);
@@ -858,7 +865,7 @@ for (const prefix of ["/", "/project/"])
     const controls = document.currentMain.elements;
     assert.equal(controls["#link-search"].handlers.get("input").length, 1);
     assert.equal(controls["#hidden-toggle"].handlers.get("click").length, 1);
-    assert.equal(controls[".links"].handlers.get("click").length, 1);
+    assert.equal(controls[".links"].handlers.get("click").length, 2);
     controls["#hidden-toggle"].handlers.get("click")[0]();
     assert.equal(controls["#hidden-toggle"]["aria-pressed"], "true");
     assert.equal(controls["#link-count"].textContent, "1 link");
@@ -967,7 +974,7 @@ for (const prefix of ["/", "/project/"])
     assert.equal(await click(makeLink(base + "hidden/")), true);
     assert.equal(
       document.currentMain.elements[".links"].handlers.get("click").length,
-      1,
+      2,
     );
 
     const tick = () => new Promise((resolve) => setImmediate(resolve));
@@ -1467,6 +1474,336 @@ test("directory clicks copy full short or long URLs while Open follows the desti
   runInNewContext(script + "\ninitCopy();", {
     document: { querySelector: () => null },
   });
+});
+
+test("destination downloads preserve bytes, handle failures, and cancel outgoing work and resources", async (t) => {
+  const f = await fixture(t, {
+    tools: {
+      Run: {
+        url: "https://scripts.example/setup%20script.sh?version=2",
+        tags: ["script"],
+      },
+    },
+  });
+  assert.equal(f.build().status, 0);
+  const script = await f.read("assets/download.js");
+  const bytes = new Uint8Array([0, 255, 13, 10, 128, 35, 33]);
+  const blob = new Blob([bytes]);
+  const timers = new Map(),
+    objects = new Map(),
+    saved = [],
+    requests = [];
+  let next = 0,
+    respond = async () => ({ ok: true, blob: async () => blob });
+  const status = { textContent: "" };
+  const list = {
+    addEventListener(_, callback) {
+      this.click = callback;
+    },
+    removeEventListener(_, callback) {
+      assert.equal(callback, this.click);
+      this.click = null;
+    },
+  };
+  let attached = 0;
+  const context = {
+    document: {
+      querySelector: (selector) =>
+        ({ ".links": list, "#download-status": status })[selector],
+      body: {
+        append() {
+          attached++;
+        },
+      },
+      createElement(name) {
+        assert.equal(name, "a");
+        return {
+          click() {
+            saved.push({
+              filename: this.download,
+              blob: objects.get(this.href),
+            });
+          },
+          remove() {
+            attached--;
+          },
+        };
+      },
+    },
+    AbortController,
+    URL: {
+      createObjectURL(value) {
+        const url = `blob:${++next}`;
+        objects.set(url, value);
+        return url;
+      },
+      revokeObjectURL(url) {
+        assert.ok(objects.delete(url), "URL released once");
+      },
+    },
+    fetch: (url, options) => {
+      requests.push({ url, signal: options.signal });
+      return respond(options.signal);
+    },
+    setTimeout(callback, delay) {
+      const id = ++next;
+      timers.set(id, { callback, delay });
+      return id;
+    },
+    clearTimeout(id) {
+      timers.delete(id);
+    },
+  };
+  runInNewContext(script + "\ninitDownload();", context);
+  const button = {
+    dataset: {
+      downloadUrl: "https://scripts.example/setup%20script.sh?version=2",
+      downloadName: "setup script.sh",
+    },
+    disabled: false,
+  };
+  const click = (target = button) =>
+    list.click({
+      button: 0,
+      target: { closest: () => target },
+      preventDefault() {},
+    });
+  const feedbackTimer = () => {
+    const feedback = [...timers].filter(([, timer]) => timer.delay === 5000);
+    assert.equal(feedback.length, 1, "one feedback deadline");
+    return feedback[0];
+  };
+  const expireFeedback = () => {
+    const [id, timer] = feedbackTimer();
+    timers.delete(id);
+    timer.callback();
+    assert.equal(status.textContent, "");
+  };
+  await click();
+  assert.equal(requests[0].url, button.dataset.downloadUrl);
+  assert.deepEqual(new Uint8Array(await saved[0].blob.arrayBuffer()), bytes);
+  assert.equal(saved[0].filename, "setup script.sh");
+  assert.equal(attached, 0);
+  assert.equal(button.disabled, false);
+  assert.equal(status.textContent, "Script download started.");
+  expireFeedback();
+  for (const [id, timer] of timers)
+    if (timer.delay === 1000) {
+      timers.delete(id);
+      timer.callback();
+    }
+  assert.equal(objects.size, 0);
+  await click({ disabled: true });
+  await click(null); // Open and copy targets do not match the download hook.
+  assert.equal(requests.length, 1);
+  let partialBodyReads = 0;
+  for (const fail of [
+    async () => {
+      throw new TypeError("CORS blocked");
+    },
+    async () => ({
+      ok: false,
+      blob() {
+        assert.fail("HTTP failure body must not be saved");
+      },
+    }),
+    async () => ({
+      ok: true,
+      status: 206,
+      blob() {
+        partialBodyReads++;
+        return blob;
+      },
+    }),
+    async () => ({
+      ok: true,
+      type: "opaque",
+      blob() {
+        assert.fail("Opaque body must not be saved");
+      },
+    }),
+    async () => ({
+      ok: true,
+      blob: async () => {
+        throw new Error("partial body");
+      },
+    }),
+  ]) {
+    respond = fail;
+    await click();
+    assert.match(status.textContent, /Could not download.*CORS/);
+    assert.equal(saved.length, 1);
+    assert.equal(objects.size, 0);
+    assert.equal(button.disabled, false);
+    assert.equal(
+      partialBodyReads,
+      0,
+      "partial response rejected before body read",
+    );
+    const [previousDeadline] = feedbackTimer();
+    const subsequent = click();
+    assert.equal(
+      timers.has(previousDeadline),
+      false,
+      "next download cancels feedback deadline",
+    );
+    assert.equal(status.textContent, "");
+    await subsequent;
+    assert.notEqual(feedbackTimer()[0], previousDeadline);
+    assert.match(status.textContent, /Could not download.*CORS/);
+    assert.equal(saved.length, 1);
+    expireFeedback();
+  }
+  for (const stage of ["fetch", "body", "failure"]) {
+    let settle;
+    const held = new Promise((resolve, reject) => {
+      settle = stage === "failure" ? reject : resolve;
+    });
+    respond = () => (stage === "body" ? { ok: true, blob: () => held } : held);
+    const work = click();
+    await Promise.resolve();
+    assert.equal(button.disabled, true);
+    context.cleanupDownload();
+    assert.equal(requests.at(-1).signal.aborted, true);
+    settle(
+      stage === "failure"
+        ? new Error("late failure")
+        : stage === "body"
+          ? blob
+          : { ok: true, blob: async () => blob },
+    );
+    await work;
+    assert.equal(saved.length, 1);
+    assert.equal(status.textContent, "");
+    assert.equal(timers.size, 0);
+    assert.equal(list.click, null);
+    context.initDownload();
+  }
+  respond = async () => ({ ok: true, blob: async () => blob });
+  await click();
+  assert.equal(objects.size, 1);
+  context.cleanupDownload();
+  assert.equal(objects.size, 0);
+  assert.equal(timers.size, 0);
+});
+
+test("Chrome destination downloads save readable CORS bytes and report blocked responses across directory navigation", async (t) => {
+  const chrome = availableChrome(t);
+  if (!chrome) return;
+  const f = await fixture(t, {});
+  const origin = await browserServer(t, f.cwd);
+  const destination =
+    origin.replace("localhost", "127.0.0.1") + "/download-payload.sh";
+  await writeFile(
+    join(f.cwd, "links.json"),
+    JSON.stringify({
+      tools: {
+        Run: { url: destination + "?cors=1", tags: ["script"] },
+        Blocked: { url: destination, tags: ["script"] },
+        Off: { url: destination + "?cors=1", tags: ["script", "disabled"] },
+      },
+    }),
+  );
+  assert.equal(f.build().status, 0);
+  await writeFile(
+    join(f.cwd, "dist", "download-check.html"),
+    `<!doctype html><html><body><script>
+    (async () => {
+      const check = (value, message) => { if (!value) throw new Error(message); };
+      const wait = async (predicate) => {
+        for (let i = 0; i < 200; i++) { if (predicate()) return; await new Promise(r => setTimeout(r, 10)); }
+        throw new Error('Timed out');
+      };
+      for (const prefix of ['/', '/project/']) {
+        const frame = document.createElement('iframe'); document.body.append(frame);
+        frame.src = prefix;
+        await new Promise(resolve => frame.onload = resolve);
+        const win = frame.contentWindow, doc = frame.contentDocument;
+        const saved = [], copied = [];
+        Object.defineProperty(win.navigator, 'clipboard', { configurable: true, value: { writeText: async text => copied.push(text) } });
+        const nativeClick = win.HTMLAnchorElement.prototype.click;
+        const captureDownload = function () {
+          if (!this.href.startsWith('blob:')) return nativeClick.call(this);
+          saved.push({ name: this.download, bytes: win.fetch(this.href).then(r => r.arrayBuffer()) });
+        };
+        win.HTMLAnchorElement.prototype.click = captureDownload;
+        for (const mode of ['expanded', 'navigated', 'native']) {
+          if (mode === 'navigated') {
+            doc.querySelector('summary a').click();
+            await wait(() => win.location.pathname === prefix + 'tools/');
+          }
+          if (mode === 'native') {
+            frame.src = prefix + 'tools/';
+            await new Promise(resolve => frame.onload = resolve);
+            const nativeWin = frame.contentWindow;
+            nativeWin.HTMLAnchorElement.prototype.click = captureDownload;
+            Object.defineProperty(nativeWin.navigator, 'clipboard', { configurable: true, value: { writeText: async text => copied.push(text) } });
+          }
+          const currentDoc = frame.contentDocument;
+          const row = code => [...currentDoc.querySelectorAll('.link-row')].find(r => r.querySelector('.code').textContent === code);
+          const off = row('Off').querySelector('.download');
+          check(off.disabled && !off.hasAttribute('href') && !off.hasAttribute('data-download-url'), 'Disabled download actionable');
+          off.click();
+          const before = saved.length;
+          row('Run').querySelector('.download').click();
+          await wait(() => saved.length > before);
+          check(saved.at(-1).name === 'download-payload.sh', 'Wrong filename');
+          const bytes = new Uint8Array(await saved.at(-1).bytes);
+          check(JSON.stringify([...bytes]) === '[35,33,0,255,13,10,128]', 'Destination bytes changed');
+          check(currentDoc.querySelector('#download-status').textContent === 'Script download started.', 'Success feedback missing');
+          row('Run').querySelector('.destination').click();
+          await wait(() => currentDoc.querySelector('#copy-status').textContent === 'Destination copied.');
+          const copyBox = currentDoc.querySelector('#copy-status').getBoundingClientRect();
+          const downloadBox = currentDoc.querySelector('#download-status').getBoundingClientRect();
+          check(copyBox.bottom <= downloadBox.top, 'Copy and download feedback overlap');
+          check(copied.at(-1) === ${JSON.stringify(destination + "?cors=1")}, 'Copy altered by Download');
+          check(row('Run').querySelector('.visit').href === ${JSON.stringify(destination + "?cors=1")}, 'Open target altered');
+          row('Blocked').querySelector('.download').click();
+          await wait(() => currentDoc.querySelector('#download-status').textContent.includes('Could not download'));
+          check(saved.length === before + 1, 'Blocked response saved a payload');
+          check(!currentDoc.querySelector('a[href^="blob:"]'), 'Temporary anchor retained');
+        }
+        frame.remove();
+      }
+      document.body.dataset.downloadCheck = 'passed';
+    })().catch(error => { document.body.dataset.downloadCheck = error.message; });
+  </script></body></html>`,
+  );
+  const html = runChrome(chrome, f.cwd, origin + "/download-check.html");
+  assert.match(html, /data-download-check="passed"/, html);
+});
+
+test("destination download filenames are safe and shared by nested listings", async (t) => {
+  const names = [
+    [
+      "https://example.com/setup%20script.sh?q=other.sh#fragment",
+      "setup script.sh",
+    ],
+    ["https://example.com/", "Run.sh"],
+    ["https://example.com/folder/", "Run.sh"],
+    ["https://example.com/%E0%A4", "Run.sh"],
+    ["https://example.com/%2E%2E%20", "Run.sh"],
+    ["https://example.com/CON.sh", "Run.sh"],
+    ["https://example.com/" + "a".repeat(300), "Run.sh"],
+    ["https://example.com/" + "😀".repeat(70), "Run.sh"],
+    ["https://example.com/a%2Fb%5Cc%00%3F.sh", "a_b_c__.sh"],
+  ];
+  for (const [url, filename] of names) {
+    const f = await fixture(t, {
+      tools: {
+        Run: { url, tags: ["script"] },
+        Off: { url, tags: ["script", "disabled"] },
+      },
+    });
+    assert.equal(f.build().status, 0);
+    for (const page of ["index.html", "tools/index.html"]) {
+      const html = await f.read(page);
+      assert.ok(html.includes(`data-download-name="${filename}"`), url);
+      assert.match(html, /class="download" disabled/);
+      assert.doesNotMatch(html, /class="download" href=/);
+      assert.match(html, /download-status[^>]*role="status"/);
+    }
+  }
 });
 
 test("search filters nested links on the homepage and directory pages", async (t) => {
@@ -2620,7 +2957,7 @@ test("script launchers are opt-in, quote URLs, forward arguments and statuses, a
   assert.doesNotMatch(home, /class="script-label"/);
   assert.match(
     home,
-    /class="download" href="\.\/Run\.sh"[^>]* download>Download<\/a><a class="visit" href="https:\/\/example\.com\/setup\.sh/,
+    /class="download" data-download-url="https:\/\/example\.com\/setup\.sh[^>]*data-download-name="setup.sh"[^>]*>Download<\/button><a class="visit" href="https:\/\/example\.com\/setup\.sh/,
   );
   assert.match(home, /data-search="[^"]*#shell #hidden #script"/);
   assert.match(
@@ -2629,11 +2966,11 @@ test("script launchers are opt-in, quote URLs, forward arguments and statuses, a
   );
   assert.match(
     home,
-    /class="download" href="\.\/tools\/Nested\.sh"[^>]* download>Download<\/a><a class="visit"/,
+    /class="download" data-download-url="[^"]+" data-download-name="setup.sh" aria-label="Download script for Nested">Download<\/button><a class="visit"/,
   );
   assert.match(
     await f.read("tools/index.html"),
-    /class="download" href="\.\/Nested\.sh"[^>]* download>Download<\/a><a class="visit"/,
+    /class="download" data-download-url="[^"]+" data-download-name="setup.sh" aria-label="Download script for Nested">Download<\/button><a class="visit"/,
   );
   assert.doesNotMatch(home, /class="download" href="\.\/disabled\.sh"/);
   assert.match(
@@ -3065,7 +3402,10 @@ test("all eight states share interpretation, raw JSON/YAML publication, counts a
       } else {
         assert.match(html, /http-equiv="refresh"/);
         assert.match(row[3], /<a class="visit" href=/);
-        assert.match(row[3], /<a class="download" href=/);
+        assert.match(
+          row[3],
+          /<button type="button" class="download" data-download-url=/,
+        );
       }
     }
   }
