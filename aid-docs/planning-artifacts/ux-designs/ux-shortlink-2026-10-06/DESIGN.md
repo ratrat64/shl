@@ -86,7 +86,7 @@ Follow AD-7–AD-9 in the [architecture spine](../../architecture/architecture-s
 
 ### Navigation
 
-The header brand reads `/shl/`: `shl` uses ink, the leading slash uses teal action, and the trailing slash uses amber script. The header has only Links and Guide navigation. Current links are underlined. Buttons have subdued edges mixed from 25% of their action color and the page background; keep the visible keyboard focus outline. Theme, hidden-toggle and Open controls have a subtle teal background; Download uses amber. Mix 10% of the action color into the page background, increasing to 18% on hover. Disabled controls retain the muted wash.
+The header brand reads `/shl/`: `shl` uses ink, the leading slash uses teal action, and the trailing slash uses amber script. The header has only Links and Guide navigation. Current links are underlined. Buttons have subdued edges mixed from 25% of their action color and the page background; keep the visible keyboard focus outline. Theme, hidden-toggle and Open controls have a subtle teal background; broken enabled rows use orange-red for Open text, edges, and fills. Download uses amber. Mix 10% of the action color into the page background, increasing to 18% on hover; broken Open uses 12% on hover to preserve hidden-row text contrast. Disabled controls retain the muted wash.
 
 ### Directory tools
 
@@ -98,6 +98,8 @@ Column consistency applies when interactive tools are shown. An empty site has n
 
 A code copies its full short URL on click; enabled script codes use amber and have Download without a SCRIPT label. Destinations copy their full URL; Open follows enabled destinations. Disabled code native links reach the explanation; disabled destinations are copy-only buttons with full accessible/selectable text and no external href. Open/Download stay visible as disabled buttons with muted wash and no actionable href. Folder names link to their browseable pages while disclosure expands the list. Titles appear on hover and remain searchable. Destinations display their ends without wrapping, retaining full copy/accessibility values.
 
+Broken enabled destination text uses the short code's orange-red palette on hover, retaining its underline and copy behavior.
+
 Only in hover-capable, fine-pointer mode with no coarse input available, destination text is visually hidden with opacity until row hover or focus-within. Its layout space and full accessible value remain reserved, so revealing it never shifts content. Any available coarse pointer, including hybrid touch/mouse devices, forces destinations visible; touch and non-hover modes always show them too. Long URLs remain on one line with the existing middle truncation; copying retains the full value. Every row variant, tagged or untagged, standard or script, reserves at least 4rem for the destination (3rem below 500px). Open and Download remain visible.
 
 Copy feedback appears as a small, flat floating panel near the viewport edge and never displaces directory content.
@@ -106,7 +108,7 @@ Tags sit inline between the code and destination in muted text at the existing m
 
 Folder summaries stay on one line and scroll horizontally for long names, preserving the full name and disclosure marker without ellipsis or wrapping. Their height remains 50px; scrollbar chrome must not increase it.
 
-Link rows and folder summaries share a 50px minimum height (3.125rem), 10px vertical and 12px horizontal padding (.625rem .75rem), and a 4px radius. Both use the theme wash on hover and focus-within, preserving visible focus outlines; folder wash applies only to the summary, never its descendant list. Revealed hidden links retain their regular/broken/disabled colors and weights with row/tag opacity 80% dark and 94% light. Hidden-only summaries dim independently without dimming descendants again. Keyboard focus restores full opacity. Keep full state tags; do not add duplicate hidden or SCRIPT labels.
+Link rows and folder summaries share a 50px minimum height (3.125rem), 10px vertical and 12px horizontal padding (.625rem .75rem), and a 4px radius. Both use the theme wash on hover and focus-within; broken enabled rows instead use a 6% orange-red mix with the page background, preserving dimmed metadata contrast. Preserve visible focus outlines; folder wash applies only to the summary, never its descendant list. Revealed hidden links retain their regular/broken/disabled colors and weights with row/tag opacity 80% dark and 94% light. Hidden-only summaries dim independently without dimming descendants again. Keyboard focus restores full opacity. Keep full state tags; do not add duplicate hidden or SCRIPT labels.
 
 ## Do's and Don'ts
 

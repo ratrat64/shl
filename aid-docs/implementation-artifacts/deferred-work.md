@@ -17,3 +17,7 @@
 - source_spec: `spec-modular-ui.md`
   summary: Give script-disabled 404 a coherent final heading instead of the existing checking state.
   evidence: Existing 404 markup defaults to Checking that link and One moment; without JavaScript only the noscript explanation clarifies that recovery cannot run. This pre-existing state was preserved by the shared-shell refactor.
+
+- source_spec: `aid-docs/implementation-artifacts/spec-broken-link-palette.md`
+  summary: Preserve 4.5:1 contrast for standard hidden Open buttons on light-theme hover.
+  evidence: The unchanged teal 18% hover fill, #006b60 text, #f6f7f5 page, and 94% parent opacity produce approximately 4.11:1 contrast; applying the new dimmed hover assertion to unchanged variants failed. Warning controls now use a scoped 12% hover fill, while the existing standard palette needs its own correction.
