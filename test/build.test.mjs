@@ -3334,7 +3334,7 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
       const check = (condition, message) => { if (!condition) throw new Error(message); };
       const disabledUrl = ${scriptString(stateMap().State7.url)};
       const configured = ${scriptString({ ...stateMap(), ...stateMap(false) })};
-      const rgb = color => { color = color.trim(); if (color.startsWith('#')) { let hex = color.slice(1); if (hex.length === 3) hex = [...hex].map(c => c+c).join(''); return hex.match(/../g).map(c => parseInt(c, 16)); } return color.match(/[\\d.]+/g).slice(0, 3).map(Number); };
+      const rgb = color => { color = color.trim(); if (color.startsWith('#')) { let hex = color.slice(1); if (hex.length === 3) hex = [...hex].map(c => c+c).join(''); return hex.match(/../g).map(c => parseInt(c, 16)); } const values = color.match(/[\\d.]+/g).slice(0, 3).map(Number); return color.startsWith('color(srgb ') ? values.map(v => v * 255) : values; };
       const blend = (front, back, opacity) => front.map((v, i) => v * opacity + back[i] * (1-opacity));
       const luminance = color => color.map(v => { v /= 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }).reduce((sum, v, i) => sum + v * [.2126, .7152, .0722][i], 0);
       const contrast = (a, b) => { const x = luminance(a), y = luminance(b); return (Math.max(x,y)+.05)/(Math.min(x,y)+.05); };
@@ -3361,9 +3361,11 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
           const coarseRule = rules.find(rule => rule.conditionText === '(any-pointer: coarse)');
           const pointerMedia = pointerRule.media.mediaText, coarseMedia = coarseRule.media.mediaText;
           const hover = doc.createElement('style');
-          hover.textContent = [...pointerRule.cssRules].filter(rule => rule.selectorText?.includes(':hover')).map(rule => rule.selectorText.replaceAll(':hover', '.verify-hover') + '{' + rule.style.cssText + '}').join('');
+          hover.textContent = [...rules, ...pointerRule.cssRules].filter(rule => rule.selectorText?.includes(':hover') || rule.selectorText?.includes(':disabled')).map(rule => rule.selectorText.replaceAll(':hover', '.verify-hover') + '{' + rule.style.cssText + '}').join('');
           doc.head.append(hover);
-          const bg = rgb(win.getComputedStyle(doc.body).backgroundColor), wash = rgb(win.getComputedStyle(doc.documentElement).getPropertyValue('--wash'));
+          const probe = doc.createElement('div'); doc.body.append(probe);
+          const paint = value => { probe.style.background = value; return win.getComputedStyle(probe).backgroundColor; };
+          const bg = rgb(win.getComputedStyle(doc.body).backgroundColor);
           for (const script of [true, false]) for (let mask = 0; mask < 8; mask++) {
             const r = row(doc, (script ? '' : 'Plain') + 'State' + mask), style = win.getComputedStyle(r), code = r.querySelector('.code');
             check(r.getBoundingClientRect().height === 50, 'State row changed height');
@@ -3371,10 +3373,23 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
             const expected = win.getComputedStyle(doc.documentElement).getPropertyValue(mask & 4 ? '--disabled' : mask & 2 ? '--broken' : script ? '--script' : '--accent');
             check(!!r.querySelector('.download') === script, 'Non-script Download control');
             check(JSON.stringify(rgb(win.getComputedStyle(code).color)) === JSON.stringify(rgb(expected)), 'State precedence');
+            const brokenEnabled = (mask & 2) && !(mask & 4), visit = r.querySelector('.visit');
+            const rowWash = brokenEnabled ? paint('color-mix(in srgb, var(--broken) 6%, var(--bg))') : paint('var(--wash)');
+            const tone = brokenEnabled ? '--broken' : '--accent';
+            check(JSON.stringify(rgb(win.getComputedStyle(visit).color)) === JSON.stringify(rgb(win.getComputedStyle(doc.documentElement).getPropertyValue(mask & 4 ? '--muted' : tone))), 'Open state palette');
+            check(win.getComputedStyle(visit).borderTopColor === paint('color-mix(in srgb, var(' + tone + ') 25%, var(--bg))'), 'Open border palette');
+            check(win.getComputedStyle(visit).backgroundColor === paint(mask & 4 ? 'var(--wash)' : 'color-mix(in srgb, var(' + tone + ') 10%, var(--bg))'), 'Open fill palette');
+            r.classList.add('verify-hover'); visit.classList.add('verify-hover');
+            check(win.getComputedStyle(r).backgroundColor === rowWash, 'Row hover palette');
+            check(win.getComputedStyle(visit).backgroundColor === paint(mask & 4 ? 'var(--wash)' : 'color-mix(in srgb, var(' + tone + ') ' + (brokenEnabled ? 12 : 18) + '%, var(--bg))'), 'Open hover palette');
+            if (brokenEnabled) check(contrast(blend(rgb(win.getComputedStyle(visit).color), bg, Number(style.opacity)), blend(rgb(win.getComputedStyle(visit).backgroundColor), bg, Number(style.opacity))) >= 4.5, 'Dimmed broken Open hover contrast: ' + theme + '/' + mask);
+            r.classList.remove('verify-hover'); visit.classList.remove('verify-hover');
             for (const element of [code, r.querySelector('.tags'), r.querySelector('.destination')]) {
-              for (const background of [bg, wash]) check(contrast(blend(rgb(win.getComputedStyle(element).color), background, Number(style.opacity)), background) >= 4.5, 'Dimmed contrast failed: ' + theme + '/' + mask + '/' + element.className);
+              for (const background of [bg, rgb(rowWash)]) check(contrast(blend(rgb(win.getComputedStyle(element).color), bg, Number(style.opacity)), blend(background, bg, Number(style.opacity))) >= 4.5, 'Dimmed contrast failed: ' + theme + '/' + mask + '/' + element.className);
             }
             code.focus(); check(win.getComputedStyle(r).opacity === '1', 'Focus opacity');
+            check(win.getComputedStyle(r).backgroundColor === rowWash, 'Row focus palette');
+            check(contrast(rgb(win.getComputedStyle(visit).color), rgb(win.getComputedStyle(visit).backgroundColor)) >= 4.5, 'Open contrast');
             check(win.getComputedStyle(code).outlineWidth === '2px', 'Focus outline'); code.blur();
             const dest = r.querySelector('.destination');
             check(dest.getBoundingClientRect().width >= (width < 500 ? 48 : 64), 'Destination reserve');
@@ -3405,7 +3420,7 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
               }
             }
           }
-          hover.remove();
+          hover.remove(); probe.remove();
           if (!native) {
             query(doc, '  #DOCS  '); check(count(doc) === 16, 'Exact docs');
             query(doc, '#release notes'); check(count(doc) === 17, 'Spaced tag');

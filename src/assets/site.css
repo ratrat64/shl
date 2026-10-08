@@ -378,6 +378,16 @@ summary a:hover {
 .broken-row .code {
   color: var(--broken);
 }
+.broken-row:not(.disabled-row) {
+  --wash: color-mix(in srgb, var(--broken) 6%, var(--bg));
+}
+.broken-row:not(.disabled-row) .visit {
+  --button-tone: var(--broken);
+  color: var(--broken);
+}
+.broken-row:not(.disabled-row) .visit:hover {
+  background: color-mix(in srgb, var(--broken) 12%, var(--bg));
+}
 .disabled-row .code {
   color: var(--disabled);
 }
