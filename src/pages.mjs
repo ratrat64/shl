@@ -5,11 +5,17 @@ import {
   page as shell,
   NAV_ITEMS,
 } from "./layout.mjs";
-import { isDirectory, linkUrl } from "./links.mjs";
+import { isDirectory, linkUrl, linkStates } from "./links.mjs";
 
 const shellString = (value) => "'" + value.replace(/'/g, "'\\''") + "'";
 
-export const scriptLauncher = ({ url }) => `#!/usr/bin/env bash
+export const scriptLauncher = ({ url, disabled }) =>
+  disabled
+    ? `#!/usr/bin/env bash
+printf '%s\\n' 'This link is disabled. No script was downloaded or executed.' >&2
+exit 1
+`
+    : `#!/usr/bin/env bash
 set -euo pipefail
 script=$(mktemp)
 trap 'rm -f "$script"' EXIT
@@ -29,13 +35,29 @@ const forwardingPage = (title, url, content) =>
     scripts: `<script data-behavior="forward">location.replace(${scriptString(url)});</script>`,
   });
 
-export const redirectPage = ({ url, title }) =>
-  forwardingPage(
-    "Redirecting",
-    url,
-    /* HTML */ `<p>Taking you to ${esc(title || url)}</p>
-      <p><a href="${esc(url)}">Continue now</a></p>`,
-  );
+export const redirectPage = ({ url, title, disabled }) =>
+  disabled
+    ? documentPage({
+        title: "Link disabled",
+        embedded: true,
+        body: /* HTML */ `<main class="wrap minimal-document">
+          <h1>Link disabled</h1>
+          <p>
+            This short link has been disabled. shl will not forward you to its
+            destination.
+          </p>
+          <p>
+            The destination remains public. Disabling this link does not prevent
+            access outside shl.
+          </p>
+        </main>`,
+      })
+    : forwardingPage(
+        "Redirecting",
+        url,
+        /* HTML */ `<p>Taking you to ${esc(title || url)}</p>
+          <p><a href="${esc(url)}">Continue now</a></p>`,
+      );
 
 export const guidePage = (source) =>
   shell(
@@ -99,8 +121,10 @@ docs:
           Add <code>tags: [documentation, github]</code> to a link object to
           show full inline topic labels beside its code on one line. Crowded
           rows scroll horizontally; selecting labels optionally opens a
-          convenient popover with all tags. Search by tag name or by its
-          displayed <code>#tag</code> label, including in nested directories.
+          convenient popover with all tags. Plain text search is one broad
+          substring. Use <code>#tag</code> for an exact whole tag, including
+          spaces: <code>#release notes</code>. A bare <code>#</code> matches
+          nothing; <code>#broken #disabled</code> is one literal tag label.
         </p>
         <p>
           On hover-capable fine-pointer devices without coarse input,
@@ -111,19 +135,33 @@ docs:
           Open to visit it.
         </p>
         <p>
-          Set <code>hidden: true</code> on a link object to omit it from
+          Add <code>tags: [hidden]</code> on a link object to omit it from
           directory listings, counts, and search by default. Use Show hidden
           links on a directory page to reveal hidden entries. Its redirect and
-          optional launcher still work, and the destination remains public in
-          <code>links.json</code>. Hiding controls discoverability, not secrecy.
+          optional launcher still work unless also disabled, and the destination
+          remains public in <code>links.json</code>. Hiding controls
+          discoverability, not secrecy. Exact <code>#hidden</code>,
+          <code>#broken</code> and <code>#disabled</code> searches temporarily
+          reveal matching hidden links, even in all-hidden folders, without
+          changing the toggle. Clearing restores the toggle-selected listing.
+        </p>
+        <p>
+          Exact trimmed, case-insensitive <code>broken</code> tags mark an
+          orange-red warning without blocking actions. <code>disabled</code>
+          tags make links grey and stop shl forwarding and execution: the short
+          URL shows an explanation, Open and Download are unavailable, and the
+          launcher exits 1 without downloading or executing. Both URL copy
+          actions remain available. Destinations remain public; disabling does
+          not prevent access outside shl. The legacy hidden property is
+          rejected.
         </p>
       </section>
       <section id="how-it-works">
         <h2>How it works</h2>
         <p>
           The build validates codes, collisions, and URL syntax before replacing
-          output. Each link gets a redirect page with JavaScript, meta refresh,
-          and a clickable fallback. Directories get browsable pages.
+          output. Each enabled link gets a redirect page with JavaScript, meta
+          refresh, and a clickable fallback. Directories get browsable pages.
         </p>
         <p>
           GitHub Actions deploys the files after merges to <code>main</code>.
@@ -174,6 +212,7 @@ export const notFoundPage = () =>
 (async () => {
   const isDirectory = ${isDirectory.toString()};
   const linkUrl = ${linkUrl.toString()};
+  const linkStates = ${linkStates.toString()};
   const parts = location.pathname.split('/').filter(Boolean);
   const seg = parts.at(-1) || '';
   const home = document.getElementById('home');
@@ -202,7 +241,7 @@ export const notFoundPage = () =>
         location.replace(base + canonical.join('/') + '/');
         return;
       }
-      if (entry) { location.replace(linkUrl(entry)); return; }
+      if (entry) { location.replace(linkStates(entry).disabled ? base + canonical.join('/') + '/' : linkUrl(entry)); return; }
       break;
     } catch (e) { /* try next */ }
   }

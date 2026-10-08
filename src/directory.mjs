@@ -13,6 +13,8 @@ const renderLinkRow = ({
   script,
   tags,
   hidden,
+  broken,
+  disabled,
   prefix,
   href,
 }) => {
@@ -25,9 +27,17 @@ const renderLinkRow = ({
     `${code} ${script ? "script " : ""}${url} ${tags.join(" ")} ${labels.join(" ")}`.trim();
   const tagText = labels.join(" · ");
   const tagId = `tags-${prefix}${code}`;
+  const destinationContent = `<span class="sr-only">${esc(url)}</span><span class="destination-start" aria-hidden="true">${esc(url.slice(0, cut))}</span><span class="destination-end" aria-hidden="true">${esc(url.slice(cut))}</span>`;
+  const destination = disabled
+    ? `<button type="button" class="destination" data-copy-url="${esc(url)}" aria-label="Copy destination: ${esc(url)}" title="${esc(url)}">${destinationContent}</button>`
+    : `<a class="destination" href="${esc(url)}" aria-label="Copy destination: ${esc(url)}"${title ? "" : ` title="${esc(url)}"`}>${destinationContent}</a>`;
+  const action = (kind, label, target, accessible) =>
+    disabled
+      ? `<button type="button" class="${kind}" disabled aria-label="${esc(accessible)}">${label}</button>`
+      : `<a class="${kind}" href="${esc(target)}" aria-label="${esc(accessible)}"${kind === "download" ? " download" : ""}>${label}</a>`;
   return /* HTML */ `
-       <li${hidden ? ' data-hidden="true" hidden' : ""}${title ? ` data-title="${esc(title)}"` : ""} data-search="${esc(searchText)}"><div class="link-row${script ? " script-row" : ""}"${title ? ` title="${esc(title)}"` : ""}><a class="code${script ? " script-link" : ""}" href="${esc(href)}"${title ? ` title="${esc(title)}"` : ""}>${esc(code)}</a>
-             ${tags.length ? `<button class="tags" type="button" popovertarget="${esc(tagId)}" title="${esc(tagText)}" aria-label="${esc(tagText)}. Show all tags for ${esc(code)}">${esc(tagText)}</button>` : ""}<a class="destination" href="${esc(url)}" aria-label="Copy destination: ${esc(url)}"${title ? "" : ` title="${esc(url)}"`}><span class="sr-only">${esc(url)}</span><span class="destination-start" aria-hidden="true">${esc(url.slice(0, cut))}</span><span class="destination-end" aria-hidden="true">${esc(url.slice(cut))}</span></a>${script ? `<a class="download" href="${esc(`./${prefix}${code}.sh`)}" aria-label="Download script for ${esc(code)}" download>Download</a>` : ""}<a class="visit" href="${esc(url)}" aria-label="Open destination for ${esc(code)}">Open</a></div>${tags.length ? `<div class="tag-panel" id="${esc(tagId)}" popover tabindex="0" role="region" aria-label="Tags for ${esc(code)}">${esc(tagText)}</div>` : ""}</li>`;
+       <li${hidden ? ' data-hidden="true" hidden' : ""}${title ? ` data-title="${esc(title)}"` : ""} data-tags="${esc(JSON.stringify(tags.map((tag) => tag.toLowerCase())))}" data-search="${esc(searchText)}"><div class="link-row${script ? " script-row" : ""}${broken ? " broken-row" : ""}${disabled ? " disabled-row" : ""}"${title ? ` title="${esc(title)}"` : ""}><a class="code${script ? " script-link" : ""}" href="${esc(href)}"${title ? ` title="${esc(title)}"` : ""}>${esc(code)}</a>
+             ${tags.length ? `<button class="tags" type="button" popovertarget="${esc(tagId)}" title="${esc(tagText)}" aria-label="${esc(tagText)}. Show all tags for ${esc(code)}">${esc(tagText)}</button>` : ""}${destination}${script ? action("download", "Download", `./${prefix}${code}.sh`, `Download script for ${code}`) : ""}${action("visit", "Open", url, `Open destination for ${code}`)}</div>${tags.length ? `<div class="tag-panel" id="${esc(tagId)}" popover tabindex="0" role="region" aria-label="Tags for ${esc(code)}">${esc(tagText)}</div>` : ""}</li>`;
 };
 
 const listing = (nodes) =>

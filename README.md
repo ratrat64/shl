@@ -9,11 +9,19 @@ and How it works sections. The former `/about/` and `/how-it-works/` URLs forwar
 to those sections. It follows the system light/dark preference; visitors
 can override it with the Theme button, saved in their browser.
 Search on the homepage and each directory page filters the listed links by code,
-title, destination, or tag (including nested links). Show hidden links includes
+title, destination, or tag (including nested links). Plain text is one broad
+substring; `#tag` matches a whole tag exactly (case-insensitive), including spaces
+such as `#release notes`. A bare `#` matches nothing; `#broken #disabled` is one
+literal tag label. Exact `#hidden`, `#broken`, and `#disabled` searches temporarily
+include matching hidden leaves and their ancestors without changing the toggle.
+Clearing restores the toggle-selected pool. Search stays available in all-hidden
+directories. Show hidden links includes
 hidden entries in listings and search; the button is disabled where none exist.
 The single link count on each page updates with search and the hidden-links toggle.
 Click a short code to copy its full short URL, or a destination to copy its full URL;
-use **Open** beside the destination to visit it. Without JavaScript, the links
+use **Open** beside the destination to visit it. Disabled links retain both copy
+actions, but their destination is copy-only with selectable text and no external
+href; Open and Download are visibly unavailable. Without JavaScript, enabled links
 remain navigable and hidden links stay hidden.
 On hover-capable, fine-pointer devices with no coarse input available, destination
 text appears when the row is hovered or focus is within it, with space reserved
@@ -51,20 +59,29 @@ docs:
   tags: [documentation, github]
 automation:
   url: https://example.com/setup.sh
-  hidden: true
+  tags: [hidden]
 ```
 
 Short form is just `code: https://example.com/`. Long form adds an optional string `title` shown
-on the redirect fallback page, a `tags` array of nonblank strings, or a boolean `hidden` (default `false`).
+on the redirect fallback page and a `tags` array of nonblank strings.
 Full tag labels appear on one line beside each short code without ellipsis or
 increasing row height; crowded rows scroll horizontally. Select the labels for
-an optional convenient popover showing all tags. Type a tag (with or
-without its `#` prefix) in Search links to filter matching links
-(case-insensitive, including nested links). JSON entries use the same `"tags": ["documentation", "github"]` format.
-Set `hidden: true`
+an optional convenient popover showing all tags. Use plain text for broad search
+or `#tag` for an exact whole label. JSON entries use the same `"tags": ["documentation", "github"]` format.
+Add `hidden` to `tags`
 to omit a link from directory listings, counts, and search by default. Visitors can
 use Show hidden links to reveal it. Its redirect and optional script launcher still
-work. You can edit the file in GitHub's web editor;
+work unless also disabled. Exact trimmed, case-insensitive `broken` marks an
+orange-red warning without blocking actions. `disabled` makes links grey and
+overrides broken/script emphasis; hidden opacity applies independently. A disabled
+short URL shows **Link disabled** instead of forwarding, and its launcher exits 1
+without downloading or executing. The destination remains public; disabling does
+not prevent access outside shl. Tags such as `hiddenish` and literal `#hidden` are
+descriptive, not states. The legacy `hidden` property is rejected for every value;
+when migrating, append `hidden` for true without duplicating an equivalent tag,
+preserve other tags/fields, and remove the property for both true and false.
+False must not remove an independently configured hidden tag.
+You can edit the file in GitHub's web editor;
 choose to create a branch and pull request. The links become live after the merge
 to `main` finishes deploying.
 
@@ -113,7 +130,7 @@ link entries as JSON:
 {
   "gh": "https://github.com/",
   "docs": { "url": "https://docs.github.com/en/pages", "title": "GitHub Pages docs" },
-  "automation": { "url": "https://example.com/setup.sh", "hidden": true }
+  "automation": { "url": "https://example.com/setup.sh", "tags": ["hidden"] }
 }
 ```
 
@@ -153,7 +170,10 @@ This example is the nested launcher at `/setup/ohmyposh/stable.sh`.
 Launchers require Bash, curl, mktemp, and rm. Each run downloads the current
 destination into a temporary file, executes it only after a successful download,
 and removes it on exit. Download failures and the script's exit status are
-returned by the launcher.
+returned by the launcher. Disabled launchers instead print
+`This link is disabled. No script was downloaded or executed.` to stderr and exit
+1, without creating a payload or processing arguments. These guarantees apply to
+the currently deployed artifacts, not retained older launchers or deployments.
 
 The `script` field must be a boolean; omitting it or setting it to `false` produces
 only the browser redirect. A generated `<code>.sh` must not collide with another
@@ -213,7 +233,7 @@ output is removed. URL syntax is checked, but destination reachability is not.
 
 `src/layout.mjs` owns the document foundation used by every HTML page. Links,
 nested directories, Guide, and 404 compose its shared borderless shell;
-destination and legacy forwards use its minimal document without chrome and
+destination and legacy forwards, and disabled explanations, use its minimal document without chrome and
 share forwarding logic in `src/pages.mjs`. The 404 and minimal documents embed
 the same styles and storage-tolerant theme script, so nested or unknown request
 paths cannot break their foundations. Recovery rebases shell links after the
@@ -256,7 +276,7 @@ Repeat on a deployed project-prefix URL such as `/<repo>/guide/#about`.
 
 ## How it works
 
-- `dist/<path>/index.html` — either a directory page or a redirect with canonical
+- `dist/<path>/index.html` — a directory page, a disabled explanation, or an enabled redirect with canonical
   link, meta refresh, and `location.replace`. These are browser redirects, not HTTP
   301/302 responses; `curl -L` does not follow them. A clickable fallback is included.
 - `dist/<path>.sh` — an opt-in Bash launcher for links with `"script": true`.

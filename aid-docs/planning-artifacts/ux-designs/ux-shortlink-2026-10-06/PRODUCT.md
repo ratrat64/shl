@@ -2,7 +2,7 @@
 
 <!-- impeccable:product-schema 1 -->
 
-Updated: 2026-10-07
+Updated: 2026-10-08
 
 ## Platform
 
@@ -26,7 +26,7 @@ One JSON or YAML link map is the source of truth. The build validates it and gen
 
 ## Capabilities and Constraints
 
-- Link entries accept an absolute HTTP(S) destination, an optional title, an optional `script: true` flag for a `.sh` launcher, an optional boolean `hidden` flag to omit a link from directory listings, counts, and search by default, and optional tags displayed inline beside codes and included in search. Full tag labels stay on one line without ellipsis; crowded rows scroll horizontally, and selecting labels optionally opens a convenient native popover. Visitors can reveal hidden links with the directory toggle.
+- Link entries accept an absolute HTTP(S) destination, optional title, optional `script: true` for a `.sh` launcher, and tags displayed inline and searchable. Exact trimmed case-insensitive hidden/broken/disabled tags derive leaf states; the legacy hidden property is rejected. Hidden omits links from ordinary listings/counts/search until toggled. Broken is an orange-red warning; disabled grey takes precedence and stops shl forwarding/execution while retaining both URL copies and public destinations. Open/Download are unavailable; disabled short URLs explain and launchers exit 1 without download/execution. Full labels stay on one line without ellipsis; crowded rows scroll horizontally, and selecting labels opens a native popover. Plain search is one broad substring; `#tag` is an exact whole leaf tag, spaces included. Exact state queries temporarily reveal matching hidden leaves and ancestors without changing the toggle, even in all-hidden directories; clearing restores the selected pool.
 - Destinations appear on row hover or focus-within only in hover-capable, fine-pointer mode with no coarse input available, with their layout space reserved. Any available coarse pointer, including hybrid touch/mouse devices, forces destinations visible; touch and non-hover modes always show them too. Long URLs stay on one line with middle truncation, preserving the full accessible and copy value.
 - Published links and destinations, including hidden links, remain public in `links.json`, redirect pages, and optional launchers. Hiding controls discoverability, not secrecy. There is no backend, database, anonymous submission, click tracking, or HTTP 301/302 redirect.
 - Short codes are case-insensitively unique and follow the documented reserved-name rules. Destination syntax is validated, not reachability.

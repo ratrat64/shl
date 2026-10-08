@@ -24,12 +24,26 @@ export const isDirectory = (value) =>
 export const linkUrl = (value) =>
   typeof value === "string" ? value : value?.url;
 
+// Pure and serialized into recovery; malformed fetched metadata adds no states.
+export const linkStates = (value) => {
+  const tags = Array.isArray(value?.tags)
+    ? value.tags
+        .filter((tag) => typeof tag === "string")
+        .map((tag) => tag.trim().toLowerCase())
+    : [];
+  return {
+    hidden: tags.includes("hidden"),
+    broken: tags.includes("broken"),
+    disabled: tags.includes("disabled"),
+  };
+};
+
 // Consumers call this only after validating the original fields below.
 export const linkFields = (value) => ({
   url: linkUrl(value),
   title: typeof value === "string" ? "" : (value.title ?? ""),
   script: value?.script === true,
-  hidden: value?.hidden === true,
+  ...linkStates(value),
   tags: (value?.tags ?? []).map((tag) => tag.trim()),
 });
 
@@ -176,13 +190,10 @@ export async function loadLinks() {
       ) {
         problems.push(`"${name}" — script must be a boolean`);
       }
-      if (
-        typeof value === "object" &&
-        value &&
-        "hidden" in value &&
-        typeof value.hidden !== "boolean"
-      ) {
-        problems.push(`"${name}" — hidden must be a boolean`);
+      if (typeof value === "object" && value && "hidden" in value) {
+        problems.push(
+          `"${name}" — The hidden property is no longer supported; use tags: [hidden].`,
+        );
       }
       if (
         typeof value === "object" &&
