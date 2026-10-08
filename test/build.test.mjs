@@ -3349,8 +3349,20 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
       const configured = ${scriptString({ ...stateMap(), ...stateMap(false) })};
       const rgb = color => { color = color.trim(); if (color.startsWith('#')) { let hex = color.slice(1); if (hex.length === 3) hex = [...hex].map(c => c+c).join(''); return hex.match(/../g).map(c => parseInt(c, 16)); } const values = color.match(/[\\d.]+/g).slice(0, 3).map(Number); return color.startsWith('color(srgb ') ? values.map(v => v * 255) : values; };
       const blend = (front, back, opacity) => front.map((v, i) => v * opacity + back[i] * (1-opacity));
+      const grayscale = (win, element, pseudo) => {
+        const style = win.getComputedStyle(element, pseudo);
+        for (const property of ['color', 'backgroundColor', 'borderTopColor', 'outlineColor']) {
+          const channels = rgb(style[property]);
+          check(Math.abs(channels[0] - channels[1]) < .001 && Math.abs(channels[1] - channels[2]) < .001, 'Disabled color: ' + element.className + '/' + property + '/' + style[property]);
+        }
+      };
       const luminance = color => color.map(v => { v /= 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }).reduce((sum, v, i) => sum + v * [.2126, .7152, .0722][i], 0);
       const contrast = (a, b) => { const x = luminance(a), y = luminance(b); return (Math.max(x,y)+.05)/(Math.min(x,y)+.05); };
+      const readable = (win, element, background, backdrop, opacity = 1, pseudo) => {
+        const style = win.getComputedStyle(element, pseudo);
+        const fill = style.backgroundColor === 'rgba(0, 0, 0, 0)' ? background : rgb(style.backgroundColor);
+        check(contrast(blend(rgb(style.color), backdrop, opacity), blend(fill, backdrop, opacity)) >= 4.5, 'Disabled contrast: ' + element.className + '/' + (pseudo || 'text'));
+      };
       const query = (doc, value) => { const input = doc.querySelector('#link-search'); input.value = value; input.dispatchEvent(new frame.contentWindow.Event('input')); };
       const count = doc => Number(doc.querySelector('.count-number').textContent);
       const row = (doc, code) => [...doc.querySelectorAll('.link-row')].find(row => row.querySelector('.code').textContent === code);
@@ -3373,11 +3385,10 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
           const pointerRule = rules.find(rule => rule.conditionText === '(hover: hover) and (pointer: fine)');
           const coarseRule = rules.find(rule => rule.conditionText === '(any-pointer: coarse)');
           const pointerMedia = pointerRule.media.mediaText, coarseMedia = coarseRule.media.mediaText;
-          const hover = doc.createElement('style');
-          hover.textContent = [...rules, ...pointerRule.cssRules].filter(rule => rule.selectorText?.includes(':hover') || rule.selectorText?.includes(':disabled')).map(rule => rule.selectorText.replaceAll(':hover', '.verify-hover') + '{' + rule.style.cssText + '}').join('');
-          doc.head.append(hover);
-          const probe = doc.createElement('div'); doc.body.append(probe);
-          const paint = value => { probe.style.background = value; return win.getComputedStyle(probe).backgroundColor; };
+          const hoverRules = [...rules, ...pointerRule.cssRules].filter(rule => rule.selectorText?.includes(':hover')).map(rule => [rule, rule.selectorText]);
+          for (const [rule, selector] of hoverRules) rule.selectorText = selector.replaceAll(':hover', ':is(:hover, .verify-hover)');
+          const probe = doc.createElement('div'); probe.style.display = 'none';
+          const paint = (value, scope) => { scope.append(probe); probe.style.background = value; const color = win.getComputedStyle(probe).backgroundColor; probe.remove(); return color; };
           const bg = rgb(win.getComputedStyle(doc.body).backgroundColor);
           for (const script of [true, false]) for (let mask = 0; mask < 8; mask++) {
             const r = row(doc, (script ? '' : 'Plain') + 'State' + mask), style = win.getComputedStyle(r), code = r.querySelector('.code');
@@ -3387,19 +3398,19 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
             check(!!r.querySelector('.download') === script, 'Non-script Download control');
             check(JSON.stringify(rgb(win.getComputedStyle(code).color)) === JSON.stringify(rgb(expected)), 'State precedence');
             const brokenEnabled = (mask & 2) && !(mask & 4), visit = r.querySelector('.visit');
-            const rowWash = brokenEnabled ? paint('color-mix(in srgb, var(--broken) 6%, var(--bg))') : paint('var(--wash)');
+            const rowWash = brokenEnabled ? paint('color-mix(in srgb, var(--broken) 6%, var(--bg))', r) : paint('var(--wash)', r);
             const tone = brokenEnabled ? '--broken' : '--accent';
-            check(JSON.stringify(rgb(win.getComputedStyle(visit).color)) === JSON.stringify(rgb(win.getComputedStyle(doc.documentElement).getPropertyValue(mask & 4 ? '--muted' : tone))), 'Open state palette');
-            check(win.getComputedStyle(visit).borderTopColor === paint('color-mix(in srgb, var(' + tone + ') 25%, var(--bg))'), 'Open border palette');
-            check(win.getComputedStyle(visit).backgroundColor === paint(mask & 4 ? 'var(--wash)' : 'color-mix(in srgb, var(' + tone + ') 10%, var(--bg))'), 'Open fill palette');
+            check(JSON.stringify(rgb(win.getComputedStyle(visit).color)) === JSON.stringify(rgb(style.getPropertyValue(mask & 4 ? '--muted' : tone))), 'Open state palette');
+            check(win.getComputedStyle(visit).borderTopColor === paint('color-mix(in srgb, var(' + tone + ') 25%, var(--bg))', r), 'Open border palette');
+            check(win.getComputedStyle(visit).backgroundColor === paint(mask & 4 ? 'var(--wash)' : 'color-mix(in srgb, var(' + tone + ') 10%, var(--bg))', r), 'Open fill palette');
             r.classList.add('verify-hover'); visit.classList.add('verify-hover');
             check(win.getComputedStyle(r).backgroundColor === rowWash, 'Row hover palette');
-            check(win.getComputedStyle(visit).backgroundColor === paint(mask & 4 ? 'var(--wash)' : 'color-mix(in srgb, var(' + tone + ') ' + (brokenEnabled ? 12 : 18) + '%, var(--bg))'), 'Open hover palette');
+            check(win.getComputedStyle(visit).backgroundColor === paint(mask & 4 ? 'var(--wash)' : 'color-mix(in srgb, var(' + tone + ') ' + (brokenEnabled ? 12 : 18) + '%, var(--bg))', r), 'Open hover palette');
             if (brokenEnabled) check(contrast(blend(rgb(win.getComputedStyle(visit).color), bg, Number(style.opacity)), blend(rgb(win.getComputedStyle(visit).backgroundColor), bg, Number(style.opacity))) >= 4.5, 'Dimmed broken Open hover contrast: ' + theme + '/' + mask);
             const hoveredDestination = r.querySelector('.destination'), restingColor = win.getComputedStyle(hoveredDestination).color;
-            check(JSON.stringify(rgb(restingColor)) === JSON.stringify(rgb(win.getComputedStyle(doc.documentElement).getPropertyValue('--muted'))), 'Destination resting palette');
+            check(JSON.stringify(rgb(restingColor)) === JSON.stringify(rgb(style.getPropertyValue('--muted'))), 'Destination resting palette');
             hoveredDestination.classList.add('verify-hover');
-            check(JSON.stringify(rgb(win.getComputedStyle(hoveredDestination).color)) === JSON.stringify(rgb(win.getComputedStyle(doc.documentElement).getPropertyValue(tone))), 'Destination hover palette');
+            check(JSON.stringify(rgb(win.getComputedStyle(hoveredDestination).color)) === JSON.stringify(rgb(style.getPropertyValue(tone))), 'Destination hover palette');
             for (const fragment of hoveredDestination.querySelectorAll('.destination-start, .destination-end')) check(win.getComputedStyle(fragment).color === win.getComputedStyle(hoveredDestination).color, 'Visible destination hover palette');
             check(win.getComputedStyle(hoveredDestination).textDecorationLine === 'underline', 'Destination hover underline');
             if (brokenEnabled) check(contrast(blend(rgb(win.getComputedStyle(hoveredDestination).color), bg, Number(style.opacity)), blend(rgb(rowWash), bg, Number(style.opacity))) >= 4.5, 'Dimmed broken destination hover contrast');
@@ -3416,6 +3427,24 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
             const dest = r.querySelector('.destination');
             check(dest.getBoundingClientRect().width >= (width < 500 ? 48 : 64), 'Destination reserve');
             if (mask & 4) {
+              const elements = [r, ...r.querySelectorAll('a, button')];
+              const backdrop = rgb(win.getComputedStyle(r.parentElement).backgroundColor);
+              check(backdrop[0] === backdrop[1] && backdrop[1] === backdrop[2], 'Disabled compositing backdrop colored');
+              for (const hovered of [false, true]) {
+                for (const element of elements) element.classList.toggle('verify-hover', hovered);
+                for (const element of elements) grayscale(win, element);
+                check(win.getComputedStyle(code).textDecorationLine === 'none', 'Disabled short code changed on hover');
+                const background = rgb(win.getComputedStyle(r).backgroundColor);
+                for (const element of elements.slice(1)) readable(win, element, background, backdrop, Number(style.opacity));
+                for (const action of r.querySelectorAll('.visit, .download')) check(JSON.stringify(rgb(win.getComputedStyle(action).backgroundColor)) === JSON.stringify(rgb(win.getComputedStyle(r).getPropertyValue('--wash'))), 'Disabled hover changed action wash');
+              }
+              for (const element of elements) element.classList.remove('verify-hover');
+              for (const element of [code, dest, r.querySelector('.tags')]) {
+                element.focus(); grayscale(win, element); grayscale(win, r); grayscale(win, element, '::selection'); readable(win, element, backdrop, backdrop, 1, '::selection'); element.blur();
+              }
+              for (const span of dest.querySelectorAll('span')) { grayscale(win, span, '::selection'); readable(win, span, backdrop, backdrop, 1, '::selection'); }
+              const panel = r.nextElementSibling;
+              panel.showPopover(); grayscale(win, panel); readable(win, panel, backdrop, backdrop); grayscale(win, panel, '::selection'); readable(win, panel, backdrop, backdrop, 1, '::selection'); panel.focus(); grayscale(win, panel); panel.hidePopover(); panel.blur();
               check(dest.tagName === 'BUTTON' && !dest.hasAttribute('href') && win.getComputedStyle(dest).userSelect === 'text', 'Disabled destination navigates or not selectable');
               check(dest.getAttribute('aria-label') === 'Copy destination: ' + configured[code.textContent].url, 'Disabled accessible full value');
               const height = r.getBoundingClientRect().height, destWidth = dest.getBoundingClientRect().width;
@@ -3442,7 +3471,7 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
               }
             }
           }
-          hover.remove(); probe.remove();
+          for (const [rule, selector] of hoverRules) rule.selectorText = selector;
           if (!native) {
             query(doc, '  #DOCS  '); check(count(doc) === 16, 'Exact docs');
             query(doc, '#release notes'); check(count(doc) === 17, 'Spaced tag');

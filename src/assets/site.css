@@ -10,7 +10,9 @@
   --accent: #006b60;
   --script: #895400;
   --broken: #a33d20;
-  --disabled: #59645f;
+  --disabled: #606060;
+  --disabled-bg: #f7f7f7;
+  --disabled-wash: #ebebeb;
   --wash: #e8eeeb;
 }
 @media (prefers-color-scheme: dark) {
@@ -25,7 +27,9 @@
     --accent: #64b6a4;
     --script: #c6a36a;
     --broken: #ee967b;
-    --disabled: #96a59d;
+    --disabled: #a3a3a3;
+    --disabled-bg: #000;
+    --disabled-wash: #181818;
     --wash: #111b16;
   }
 }
@@ -40,7 +44,9 @@
   --accent: #64b6a4;
   --script: #c6a36a;
   --broken: #ee967b;
-  --disabled: #96a59d;
+  --disabled: #a3a3a3;
+  --disabled-bg: #000;
+  --disabled-wash: #181818;
   --wash: #111b16;
 }
 
@@ -393,6 +399,29 @@ summary a:hover {
 }
 .disabled-row .code {
   color: var(--disabled);
+  text-decoration: none;
+}
+.links li:has(> .disabled-row) {
+  background: var(--disabled-bg);
+  border-radius: 4px;
+}
+.disabled-row,
+.disabled-row + .tag-panel {
+  --accent: var(--disabled);
+  --script: var(--disabled);
+  --muted: var(--disabled);
+  --ink: var(--disabled);
+  --line: var(--disabled);
+  --bg: var(--disabled-bg);
+  --panel: var(--disabled-bg);
+  --wash: var(--disabled-wash);
+  background: var(--bg);
+  color: var(--disabled);
+}
+.disabled-row ::selection,
+.disabled-row + .tag-panel::selection {
+  background: var(--disabled);
+  color: var(--disabled-bg);
 }
 button.destination {
   display: block;
