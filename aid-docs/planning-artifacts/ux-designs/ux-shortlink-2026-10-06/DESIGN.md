@@ -10,8 +10,8 @@ colors:
   script-dark: "#c6a36a"
   broken-light: "#a33d20"
   broken-dark: "#ee967b"
-  disabled-light: "#59645f"
-  disabled-dark: "#96a59d"
+  disabled-light: "#606060"
+  disabled-dark: "#a3a3a3"
   paper-light: "#f6f7f5"
   surface-light: "#fff"
   ink-light: "#252b29"
@@ -57,6 +57,8 @@ A compact index puts codes, destinations, and search above everything else. Slee
 Teal is reserved for standard links and focus; amber marks enabled-script entries, with Download as a second cue instead of a SCRIPT label. Broken codes use orange-red; disabled codes use grey, overriding broken/script emphasis. Full tags are non-color cues without duplicate badges, and hidden opacity applies independently. Dark mode uses a pure black page (#000), softly green-tinted panels and softened light ink; light mode uses an off-white page and white panels. Verify state text at least 4.5:1, including dimmed combinations on background/wash, and visible focus in executed rendered checks. Respect system light/dark preference and retain the visitor's saved theme override.
 
 The frontmatter roles map to shared CSS tokens in `src/assets/site.css`: paper → `--bg`, surface → `--panel`, ink → `--ink`, secondary → `--muted`, rule → `--line`, action → `--accent`, script → `--script`, broken → `--broken`, disabled → `--disabled`, and wash → `--wash`, with light/dark variants above. `src/styles.mjs` loads the same CSS for embedded documents.
+
+Disabled link rows and their tag popovers use only neutral grayscale: text and focus use disabled ink, resting surfaces use #f7f7f7 light / #000 dark, and hover/focus wash uses #ebebeb light / #181818 dark. Destinations, tags, selection, and unavailable Open/Download fills and borders remain grayscale in every interaction state, overriding the usual teal/amber and green-tinted neutral roles.
 
 ## Typography
 

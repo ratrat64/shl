@@ -52,6 +52,8 @@ Exact trimmed case-insensitive hidden/broken/disabled tags derive states without
 
 Disabled code still copies the short URL; native activation reaches its explanation. Disabled destination is a copy-only button with full accessible/selectable text, never an external href or navigation fallback, including without JavaScript. Both copies retain polite success/failure feedback, five-second clearing, timer reset, and stale-copy cancellation. Open and script Download stay visibly unavailable as programmatically disabled controls with no actionable href, including modified/keyboard activation. Tags and directory navigation remain usable.
 
+The whole disabled row and its tag popover remain neutral grayscale in both themes: code, destination, tags, Open/Download text, borders, surfaces, hover/focus wash, keyboard outlines, and text selection. Hidden opacity remains independent; disabled styling overrides all colored emphasis.
+
 Disabled explanations select the shared minimal document/theme/styles without chrome. Title and heading are Link disabled. Exact paragraphs: “This short link has been disabled. shl will not forward you to its destination.” and “The destination remains public. Disabling this link does not prevent access outside shl.” No refresh, forwarding script, destination canonical link, or Continue fallback. Wrong-case recovery uses the same interpretation and canonical-cased short URL under root/project prefixes. Safe disabled launchers print the specified stderr explanation and exit 1 without download/payload/execution/argument handling. Disabling does not prevent external access or affect retained older artifacts.
 
 ## Interaction Primitives
