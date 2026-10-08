@@ -31,13 +31,28 @@ const renderLinkRow = ({
   const destination = disabled
     ? `<button type="button" class="destination" data-copy-url="${esc(url)}" aria-label="Copy destination: ${esc(url)}" title="${esc(url)}"><span class="destination-start" aria-hidden="true">${esc(url.slice(0, cut))}</span><span class="destination-end" aria-hidden="true">${esc(url.slice(cut))}</span></button>`
     : `<a class="destination" href="${esc(url)}" aria-label="Copy destination: ${esc(url)}"${title ? "" : ` title="${esc(url)}"`}>${destinationContent}</a>`;
+  let filename;
+  try {
+    filename = decodeURIComponent(new URL(url).pathname.split("/").at(-1))
+      .replace(/[<>:"/\\|?*\u0000-\u001f\u007f]/g, "_")
+      .trim()
+      .replace(/[. ]+$/, "");
+  } catch {}
+  if (
+    !filename ||
+    Buffer.byteLength(filename, "utf8") > 240 ||
+    /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(filename)
+  )
+    filename = `${code}.sh`;
   const action = (kind, label, target, accessible) =>
     disabled
       ? `<button type="button" class="${kind}" disabled aria-label="${esc(accessible)}">${label}</button>`
-      : `<a class="${kind}" href="${esc(target)}" aria-label="${esc(accessible)}"${kind === "download" ? " download" : ""}>${label}</a>`;
+      : kind === "download"
+        ? `<button type="button" class="download" data-download-url="${esc(url)}" data-download-name="${esc(filename)}" aria-label="${esc(accessible)}">${label}</button>`
+        : `<a class="${kind}" href="${esc(target)}" aria-label="${esc(accessible)}">${label}</a>`;
   return /* HTML */ `
        <li${hidden ? ' data-hidden="true" hidden' : ""}${title ? ` data-title="${esc(title)}"` : ""} data-tags="${esc(JSON.stringify(tags.map((tag) => tag.toLowerCase())))}" data-search="${esc(searchText)}"><div class="link-row${script ? " script-row" : ""}${broken ? " broken-row" : ""}${disabled ? " disabled-row" : ""}"${title ? ` title="${esc(title)}"` : ""}><a class="code${script ? " script-link" : ""}" href="${esc(href)}"${title ? ` title="${esc(title)}"` : ""}>${esc(code)}</a>
-             ${tags.length ? `<button class="tags" type="button" popovertarget="${esc(tagId)}" title="${esc(tagText)}" aria-label="${esc(tagText)}. Show all tags for ${esc(code)}">${esc(tagText)}</button>` : ""}${destination}${script ? action("download", "Download", `./${prefix}${code}.sh`, `Download script for ${code}`) : ""}${action("visit", "Open", url, `Open destination for ${code}`)}</div>${tags.length ? `<div class="tag-panel" id="${esc(tagId)}" popover tabindex="0" role="region" aria-label="Tags for ${esc(code)}">${esc(tagText)}</div>` : ""}</li>`;
+              ${tags.length ? `<button class="tags" type="button" popovertarget="${esc(tagId)}" title="${esc(tagText)}" aria-label="${esc(tagText)}. Show all tags for ${esc(code)}">${esc(tagText)}</button>` : ""}${destination}${script ? action("download", "Download", url, `Download script for ${code}`) : ""}${action("visit", "Open", url, `Open destination for ${code}`)}</div>${tags.length ? `<div class="tag-panel" id="${esc(tagId)}" popover tabindex="0" role="region" aria-label="Tags for ${esc(code)}">${esc(tagText)}</div>` : ""}</li>`;
 };
 
 const listing = (nodes) =>
@@ -87,7 +102,7 @@ const directoryContents = (
     ${breadcrumbs || '<div class="breadcrumbs" aria-hidden="true"></div>'}
     ${
       total
-        ? `<p id="search-status" class="search-status" role="status" hidden></p><p id="copy-status" class="search-status" role="status" aria-live="polite"></p>
+        ? `<p id="search-status" class="search-status" role="status" hidden></p><div class="search-status action-feedback"><p id="copy-status" role="status" aria-live="polite"></p><p id="download-status" role="status" aria-live="polite"></p></div>
      ${visible ? "" : '<p id="empty-directory">No links listed here.</p>'}
        <div${visible ? "" : " hidden"}>${listing(nodes)}</div>`
         : `<p>${emptyMessage}</p>`

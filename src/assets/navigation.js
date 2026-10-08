@@ -11,6 +11,7 @@
   const mount = () => {
     globalThis.initSearch();
     globalThis.initCopy();
+    globalThis.initDownload();
   };
   rebase(document.querySelector("main"), location.href);
   mount();
@@ -80,6 +81,7 @@
       for (const script of main.querySelectorAll("script")) script.remove();
       scroll.set(displayed, window.scrollY);
       globalThis.cleanupCopy?.();
+      globalThis.cleanupDownload?.();
       document.querySelector("main").replaceWith(main);
       document.title = title.textContent;
       for (const link of document.querySelectorAll("[data-nav]")) {

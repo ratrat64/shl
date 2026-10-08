@@ -536,10 +536,14 @@ button.destination:has(.destination-end:empty) .destination-start {
     margin: 0.5rem 0;
   }
 }
-#copy-status:empty {
+.action-feedback:not(:has(p:not(:empty))),
+.action-feedback p:empty {
   display: none;
 }
-#copy-status:not(:empty) {
+.action-feedback p {
+  margin: 0;
+}
+.action-feedback:has(p:not(:empty)) {
   position: fixed;
   bottom: 1rem;
   right: 1rem;

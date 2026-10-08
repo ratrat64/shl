@@ -167,6 +167,13 @@ Use the full link path's exact casing, with `.sh` and **no trailing slash**. The
 URL ending in `/<path>/` returns HTML, which `curl -L` cannot follow.
 This example is the nested launcher at `/setup/ohmyposh/stable.sh`.
 
+The directory's **Download** button fetches the current destination script on
+click and saves its exact bytes, without executing it or saving the launcher.
+It requires JavaScript and a readable response (cross-origin hosts must allow
+CORS). Network, HTTP, CORS, or body-read failures show a download error and save
+no file. The filename uses the destination URL basename, with unsafe filename
+characters replaced; missing or unusable names fall back to `<code>.sh`.
+
 Enabled launchers require Bash, curl, mktemp, and rm. Each run downloads the current
 destination into a temporary file, executes it only after a successful download,
 and removes it on exit. Download failures and the script's exit status are

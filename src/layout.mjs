@@ -88,7 +88,7 @@ export const page = (
     embedded,
     head: embedded
       ? ""
-      : ["search", "copy", "navigation"]
+      : ["search", "copy", "download", "navigation"]
           .map(
             (name) =>
               `<script src="${esc(depth)}assets/${name}.js" defer></script>`,

@@ -77,7 +77,7 @@ Use the centered directory width in DESIGN.md on desktop; at narrow widths wrap 
 1. Rat opens the homepage looking for an automation script, without remembering its short path.
 2. Rat types `#shell` into search; the same prominent count narrows to the matching links, and the relevant nested folders expand.
 3. Rat sees `setup/ohmyposh/stable` and the Download action; hovering or focusing the row shows its destination, which is always visible on touch.
-4. **Climax:** Rat uses Download to get the `.sh` launcher for the intended setup resource, confident the directory has surfaced the right entry.
+4. **Climax:** Rat uses Download to fetch and save the current destination script's exact bytes without executing it. The filename uses a safe destination URL basename, falling back to `<code>.sh` when unusable. This needs JavaScript and a readable response; cross-origin hosts must allow CORS. Network, HTTP, CORS, and body-read failures announce a download error and save no file or launcher. Leaving the directory aborts pending work and suppresses stale saves and feedback; temporary browser resources are released.
 
 If the search has no match, the count reads "0 links" and the no-match message appears; clearing search restores the visible directory.
 
@@ -85,5 +85,5 @@ If the search has no match, the count reads "0 links" and the no-match message a
 
 1. Rat searches for `ohmyposh` but needs the hidden `latest` entry rather than `stable`.
 2. Rat turns on Show hidden links in the grouped controls; the current search and the single count update to include the hidden entry.
-3. **Climax:** Rat sees both entries with Download actions, the hidden alternative visibly subdued, and can choose the intended launcher without losing the query.
+3. **Climax:** Rat sees both entries with Download actions, the hidden alternative visibly subdued, and can choose the intended destination script without losing the query.
 4. Rat turns off the toggle to return to the visible-only view. Without JavaScript, Rat can still browse and open the visible `stable` entry through the folder pages.
