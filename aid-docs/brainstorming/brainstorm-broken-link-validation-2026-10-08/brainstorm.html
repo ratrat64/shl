@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="An autonomous exploration of broken-link evidence, recovery, and version-controlled publishing for shl. 110 candidates, eleven technique passes, and one proposed direction.">
+  <title>The Evidence Switchboard · shl brainstorming keepsake</title>
+  <style>
+    :root { color-scheme: light; --paper:#f4f0e6; --ink:#202b32; --muted:#505c63; --rule:#b7b7ad; --blue:#174d70; --green:#245c42; --red:#8b352c; --amber:#745017; --wash:#e8e3d7; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink); font:1rem/1.65 system-ui,sans-serif; }
+    a { color:var(--blue); text-underline-offset:.2em; overflow-wrap:anywhere; }
+    a:focus-visible, summary:focus-visible { outline:3px solid var(--blue); outline-offset:5px; }
+    .skip { position:absolute; left:1rem; top:-5rem; background:white; padding:.5rem; }
+    .skip:focus { top:1rem; }
+    header, main, footer { max-width:1160px; margin:auto; padding:2rem clamp(1rem,4vw,3rem); }
+    header { padding-top:4rem; }
+    .eyebrow, .label, .number, code, .id { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }
+    .eyebrow, .label { text-transform:uppercase; letter-spacing:.12em; font-size:.75rem; font-weight:700; }
+    h1,h2,h3,p { margin-top:0; }
+    h1 { font-family:Georgia,serif; font-size:clamp(3rem,8vw,6.5rem); line-height:.98; letter-spacing:-.05em; max-width:900px; margin-bottom:1.5rem; }
+    h2 { font-family:Georgia,serif; font-size:clamp(1.8rem,4vw,2.6rem); line-height:1.15; margin-bottom:1rem; }
+    h3 { font-size:1.05rem; line-height:1.4; }
+    .dek { max-width:750px; font-size:1.2rem; }
+    .meta { display:flex; flex-wrap:wrap; gap:.7rem 2rem; border-top:2px solid var(--ink); padding-top:1rem; color:var(--muted); }
+    nav { display:flex; flex-wrap:wrap; gap:.6rem 1.5rem; margin-top:1.5rem; }
+    section { padding:2.5rem 0; border-top:1px solid var(--rule); scroll-margin-top:1rem; }
+    .grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1.2rem; }
+    .two { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .panel { padding:1.4rem; border:1px solid var(--rule); }
+    .fixed { border-top:5px solid var(--ink); }
+    .proposal { border-top:5px solid var(--blue); }
+    .open { border-top:5px solid var(--amber); }
+    .panel p:last-child, .panel ul:last-child { margin-bottom:0; }
+    ul,ol { padding-left:1.4rem; }
+    .pass { position:relative; }
+    .passhead { display:grid; grid-template-columns:4rem 1fr; gap:1rem; align-items:start; }
+    .number { font-size:2.5rem; color:var(--muted); line-height:1.2; }
+    .passhead p { color:var(--muted); }
+    figure { margin:1.5rem 0; }
+    figcaption { color:var(--muted); font-size:.9rem; margin-top:.7rem; }
+    .rail { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1px; background:var(--rule); border:1px solid var(--rule); list-style:none; padding:0; }
+    .rail li { background:var(--paper); padding:1rem; }
+    .rail strong { display:block; }
+    .contract { padding:1.5rem; background:var(--wash); border-left:5px solid var(--blue); font:1rem/1.8 ui-monospace,monospace; overflow-wrap:anywhere; }
+    .state { border-left:4px solid var(--green); }
+    .state.broken { border-color:var(--red); }
+    .state.unknown { border-color:var(--amber); }
+    .state strong { font-size:1.3rem; display:block; }
+    .meters { display:flex; flex-wrap:wrap; gap:.8rem; }
+    .meters div { flex:1 1 120px; background:var(--wash); padding:1rem; }
+    .meters b { display:block; font-size:1.7rem; font-family:Georgia,serif; }
+    .paths { display:grid; gap:.7rem; }
+    .path { display:grid; grid-template-columns:1fr auto 1fr; gap:1rem; border-bottom:1px solid var(--rule); padding:.7rem 0; }
+    .path strong { color:var(--blue); }
+    .ledger { border:1px solid var(--rule); padding:1rem; }
+    .ledger p { display:flex; gap:1rem; border-bottom:1px dashed var(--rule); padding:.6rem 0; margin:0; }
+    .ledger b { min-width:6rem; }
+    .pipeline { counter-reset:stage; list-style:none; padding:0; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; }
+    .pipeline li { padding:1rem; border:1px solid var(--rule); border-top:4px solid var(--blue); }
+    .pipeline li::before { counter-increment:stage; content:counter(stage,decimal-leading-zero); display:block; font:1.3rem ui-monospace,monospace; color:var(--blue); }
+    .pipeline strong { display:block; margin:.4rem 0; }
+    .gate { background:var(--wash); padding:1.2rem; border-left:5px solid var(--red); }
+    .inversions { display:grid; grid-template-columns:1fr 1fr; gap:0 1.5rem; }
+    .inversions p { padding:.8rem 0; border-bottom:1px solid var(--rule); }
+    .inversions del { color:var(--red); display:block; }
+    details { margin-top:1.5rem; border-top:1px solid var(--rule); border-bottom:1px solid var(--rule); }
+    summary { cursor:pointer; padding:1rem .4rem; font-weight:650; }
+    details[open] summary { background:var(--wash); }
+    .ideas { list-style:none; padding:0; margin:0; display:grid; grid-template-columns:1fr 1fr; }
+    .ideas li { padding:.8rem 1rem; border-top:1px solid var(--rule); font-size:.91rem; }
+    .id { display:block; color:var(--blue); font-size:.75rem; font-weight:700; margin-bottom:.25rem; }
+    .bundle { padding:1.2rem; border:1px solid var(--rule); }
+    .bundle .letter { font:3rem/1 Georgia,serif; display:block; margin-bottom:.5rem; }
+    .bundles { grid-template-columns:repeat(4,minmax(0,1fr)); }
+    .recommended { border:2px solid var(--blue); }
+    .climax { background:var(--ink); color:var(--paper); margin:2rem -1rem 0; padding:3rem clamp(1rem,4vw,3rem); border:none; }
+    .climax h2 { font-size:clamp(2.5rem,6vw,4.5rem); max-width:850px; }
+    .climax .label { color:#b4d3e7; }
+    .climax .grid { margin:2rem 0; }
+    .climax .panel { border-color:#879092; }
+    .climax code { color:#e9cc90; }
+    .warning { border-left:5px solid #e9cc90; padding-left:1.2rem; }
+    table { border-collapse:collapse; width:100%; font-size:.93rem; }
+    caption { text-align:left; font-weight:700; margin-bottom:.7rem; }
+    th,td { text-align:left; vertical-align:top; padding:.8rem; border-bottom:1px solid var(--rule); }
+    th { background:var(--wash); }
+    .tablewrap { overflow-x:auto; }
+    footer { color:var(--muted); font-size:.9rem; padding-bottom:3rem; }
+    @media(max-width:760px) { .grid,.two,.bundles,.pipeline { grid-template-columns:1fr; } .rail { grid-template-columns:1fr 1fr; } .ideas,.inversions { grid-template-columns:1fr; } .passhead { grid-template-columns:3rem 1fr; } .path { grid-template-columns:1fr; gap:.2rem; } .ledger p { display:block; } .ledger b { display:block; } }
+    @media print { body { background:white; } header,main,footer { max-width:none; } .climax { background:white; color:var(--ink); border:2px solid var(--ink); } .climax .label,.climax code { color:var(--ink); } details { break-inside:avoid; } nav,.skip { display:none; } }
+  </style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to exploration</a>
+<header>
+  <p class="eyebrow">shl / autonomous field notes / 08 October 2026</p>
+  <h1>The Evidence<br>Switchboard</h1>
+  <p class="dek">When is a link really broken? Eleven passes through timing, uncertainty, recovery, and publishing turn a tempting binary switch into a careful chain of evidence.</p>
+  <div class="meta"><span>110 coach-generated candidates</span><span>11 technique passes · 7 techniques</span><span>Exploration complete · decisions still open</span></div>
+  <nav aria-label="Keepsake navigation"><a href="#baseline">The fixed baseline</a><a href="#pass01">The eleven passes</a><a href="#bundles">Four possible bundles</a><a href="#synthesis">The synthesis</a><a href="#evidence">Workflow evidence</a></nav>
+</header>
+<main id="main">
+  <section id="baseline" aria-labelledby="baseline-title">
+    <p class="label">Read the labels before the signals</p>
+    <h2 id="baseline-title">An agreement is not a recommendation.</h2>
+    <div class="grid">
+      <article class="panel fixed"><h3>Fixed user baseline</h3><p>The agreed reference is <code>aid-docs/forge/link-state-tags/forged-idea.md</code>, as recorded in the session.</p><ul><li>Exact case-insensitive <code>broken</code> may be added or removed, even when manually assigned.</li><li>No ownership metadata.</li><li>Broken detection never automatically adds <code>hidden</code>.</li><li><code>disabled</code> remains user-controlled.</li></ul></article>
+      <article class="panel proposal"><h3>Coach recommendation</h3><p>Bundle A: a separate daily/manual HTTP scan, a report-only trial, then source-map proposals in a bot PR merged by a human.</p><p>Repeated matching 404/410 evidence is a proposed narrow definition, <strong>not an agreed requirement</strong>. All 110 candidates and every numeric default below are proposals.</p></article>
+      <article class="panel open"><h3>Open decisions</h3><ul><li>Explicit disappearance only, or sustained network/server outages too?</li><li>Daily or weekly?</li><li>Human merge or App-backed unattended merge?</li><li>Which budgets survive trial measurements?</li></ul><p>This keepsake records planning, not implemented behavior.</p></article>
+    </div>
+  </section>
+
+  <section class="pass" id="pass01" aria-labelledby="title01">
+    <div class="passhead"><span class="number">01</span><div><p class="label">Morphological Analysis / timing</p><h2 id="title01">Choose the clock before the alarm.</h2><p>Cadence is a trade between discovery lag, traffic, and recovery speed—not a promise of scheduled service.</p></div></div>
+    <figure><ol class="rail"><li><strong>On demand</strong>Measure first; manually recheck a repair.</li><li><strong>Daily</strong>Coach’s starting direction; choose an off-hour minute.</li><li><strong>Weekly</strong>Less traffic, longer stale-state window.</li><li><strong>Sliced</strong>Spread work; accept slower per-link recovery.</li></ol><figcaption>One checker concurrency group; every report carries start, finish, source SHA, and checked/unknown/skipped coverage.</figcaption></figure>
+    <details><summary>Retain the divergence · I001–I010 · 10 timing candidates</summary><ol class="ideas">
+      <li><span class="id">I001</span>Run a full scan daily at an off-hour minute; balance discovery lag against request traffic.</li>
+      <li><span class="id">I002</span>Run weekly for a rarely edited directory; accept a longer stale-state window.</li>
+      <li><span class="id">I003</span>Offer workflow_dispatch for an immediate recovery check after a destination repair.</li>
+      <li><span class="id">I004</span>Add an optional exact short-code selector for targeted manual scans, without inventing search syntax.</li>
+      <li><span class="id">I005</span>Check changed destinations on PRs in report-only mode; separate external availability from required structural validation.</li>
+      <li><span class="id">I006</span>Check changed destinations after human merges to main, filtering out tag-only changes to avoid a feedback loop.</li>
+      <li><span class="id">I007</span>Run only on demand initially to measure false positives before choosing a schedule.</li>
+      <li><span class="id">I008</span>Spread large directories into daily slices; explicitly accept slower recovery for each slice.</li>
+      <li><span class="id">I009</span>Use one checker concurrency group so overlapping scheduled/manual scans cannot race source updates.</li>
+      <li><span class="id">I010</span>Expose scan start, completion, source SHA, and checked/unknown/skipped counts in the Actions summary; scheduled execution is best-effort, not an SLA.</li>
+    </ol></details>
+  </section>
+
+  <section class="pass" id="pass02" aria-labelledby="title02">
+    <div class="passhead"><span class="number">02</span><div><p class="label">Morphological Analysis / request contract</p><h2 id="title02">Visit the destination. Don’t perform the content.</h2><p>An HTTP observation is deliberately smaller than a browser visit or a script execution.</p></div></div>
+    <figure><div class="contract">Source-map destination → GET → bounded HTTP redirects → final status<br>Record final URL; keep original destination.<br>Close response body; never execute downloaded content.</div><figcaption>shl’s HTML forwarding is not HTTP redirect traversal. Check full destination URLs directly, preserving query parameters; include hidden and disabled entries.</figcaption></figure>
+    <details><summary>Retain the divergence · I011–I020 · 10 request candidates</summary><ol class="ideas">
+      <li><span class="id">I011</span>Check destination URLs from the source map, not shl URLs whose HTML forwarding curl does not follow.</li>
+      <li><span class="id">I012</span>Use GET as the first-version evidence request; avoid treating an unsupported HEAD as a dead destination.</li>
+      <li><span class="id">I013</span>Consider HEAD then GET fallback only if measured bandwidth savings justify the extra state paths.</li>
+      <li><span class="id">I014</span>Follow HTTP redirects with a bounded hop count, recording the final URL without retargeting the source.</li>
+      <li><span class="id">I015</span>Treat HTML meta refresh and JavaScript forwarding as out of scope for an HTTP-only checker.</li>
+      <li><span class="id">I016</span>Cancel or close response bodies after obtaining status to avoid downloading large files or scripts; never execute fetched content.</li>
+      <li><span class="id">I017</span>Deduplicate identical full destination URLs within a scan; apply one observation to every matching entry.</li>
+      <li><span class="id">I018</span>Do not normalize away query parameters or rewrite URLs; signed URLs and query-specific resources may differ.</li>
+      <li><span class="id">I019</span>Check hidden and disabled entries too because discoverability/enforcement are independent of reachability.</li>
+      <li><span class="id">I020</span>Use an honest fixed checker User-Agent and no visitor credentials, cookies, or browser impersonation.</li>
+    </ol></details>
+  </section>
+
+  <section class="pass" id="pass03" aria-labelledby="title03">
+    <div class="passhead"><span class="number">03</span><div><p class="label">Failure Analysis / classification</p><h2 id="title03">Three signals. Only two may touch the switch.</h2><p>Conservative classification separates explicit disappearance from a runner’s inability to establish availability.</p></div></div>
+    <figure><div class="grid"><div class="panel state"><strong>Reachable</strong>Final 2xx → remove exact case-insensitive <code>broken</code>.<p>HTTP reachability only.</p></div><div class="panel state broken"><strong>Broken</strong>404 + 404, or 410 + 410 → add canonical <code>broken</code> if absent.<p>Matching confirmation in this run.</p></div><div class="panel state unknown"><strong>Unknown</strong>Access denial, rate limit, server or transport failure, exhausted redirects, other non-2xx → unchanged.<p>Evidence remains in the report.</p></div></div><figcaption>Proposed policy, not user-approved semantics. Soft-404/content errors belong to manual review.</figcaption></figure>
+    <details><summary>Retain the divergence · I021–I030 · 10 classification candidates</summary><ol class="ideas">
+      <li><span class="id">I021</span>Call final 2xx reachable, not proof that the page content or script works.</li>
+      <li><span class="id">I022</span>Require two matching 404 observations within the latest run before proposing broken.</li>
+      <li><span class="id">I023</span>Require two matching 410 observations within the latest run before proposing broken.</li>
+      <li><span class="id">I024</span>Keep 401/403 inconclusive: authentication, WAFs, geographic rules, and bot denial can differ from visitor access.</li>
+      <li><span class="id">I025</span>Keep 429 inconclusive and honor Retry-After within the run budget.</li>
+      <li><span class="id">I026</span>Keep 5xx inconclusive in the first version even after retries; server outages are often temporary.</li>
+      <li><span class="id">I027</span>Keep DNS, TCP, and TLS failures inconclusive initially; a runner vantage point cannot establish permanent disappearance.</li>
+      <li><span class="id">I028</span>Keep redirect loops and hop-limit exhaustion inconclusive initially; report actionable evidence for a maintainer.</li>
+      <li><span class="id">I029</span>Treat unusual 4xx, unhandled 3xx, and invalid responses as inconclusive rather than assuming every non-2xx is broken.</li>
+      <li><span class="id">I030</span>Report suspected soft-404/content errors for manual review only; detecting them requires content semantics beyond HTTP status.</li>
+    </ol></details>
+  </section>
+
+  <section class="pass" id="pass04" aria-labelledby="title04">
+    <div class="passhead"><span class="number">04</span><div><p class="label">Failure Analysis / budgets and courtesy</p><h2 id="title04">A budget is a brake, not a target.</h2><p>Proposed starting defaults are unmeasured. Every redirect hop participates in origin courtesy.</p></div></div>
+    <figure><div class="meters"><div><b>15 s</b>Total attempt deadline, including redirect chain</div><div><b>2</b>Attempts at most</div><div><b>45 s</b>Per URL, including waits</div><div><b>10</b>Redirect hops</div><div><b>15 min</b>Whole-job ceiling</div><div><b>4 / 1</b>Global / per-origin requests</div></div><figcaption>Short origin pacing and jitter; Retry-After accepts seconds or HTTP date. Excessive waits become unknown, repeated 429s reduce work, and unvisited URLs become skipped.</figcaption></figure>
+    <details><summary>Retain the divergence · I031–I040 · 10 budget candidates</summary><ol class="ideas">
+      <li><span class="id">I031</span>Start with a 15-second total request/redirect-chain deadline, not a fresh full timeout for every hop.</li>
+      <li><span class="id">I032</span>Retry uncertain network/server failures once with short jittered delay; a successful retry may clear broken.</li>
+      <li><span class="id">I033</span>Give each URL a bounded total evaluation budget such as 45 seconds covering attempts and waits.</li>
+      <li><span class="id">I034</span>Cap the whole job, such as 15 minutes; classify unvisited entries as skipped without changing tags.</li>
+      <li><span class="id">I035</span>Limit concurrency to four requests globally and one per origin as unmeasured starting defaults.</li>
+      <li><span class="id">I036</span>Delay between requests to one origin so a directory with many paths does not become a burst.</li>
+      <li><span class="id">I037</span>Parse Retry-After as seconds or HTTP date; malformed values get bounded fallback delay.</li>
+      <li><span class="id">I038</span>If Retry-After exceeds remaining budget, stop requesting that origin and report unknown rather than sleeping indefinitely.</li>
+      <li><span class="id">I039</span>Back off an origin after repeated 429s; rate limiting must reduce work rather than amplify retries.</li>
+      <li><span class="id">I040</span>Attach transport error category, HTTP statuses, retry count, and duration to each observation rather than dumping response bodies.</li>
+    </ol></details>
+  </section>
+
+  <section class="pass" id="pass05" aria-labelledby="title05">
+    <div class="passhead"><span class="number">05</span><div><p class="label">Assumption Reversal / recovery and history</p><h2 id="title05">The latest evaluation is not the latest request.</h2><p>A completed bounded evaluation can contain two attempts. Recovery can win within the run, without durable strike counters.</p></div></div>
+    <figure class="paths"><div class="path"><span>404 → 200</span><span aria-hidden="true">→</span><strong>Reachable · clear broken, including manual</strong></div><div class="path"><span>404 → 404 / 410 → 410</span><span aria-hidden="true">→</span><strong>Broken · add if absent</strong></div><div class="path"><span>404 → timeout or 500 / 404 → 410</span><span aria-hidden="true">→</span><strong>Unknown · preserve all tags</strong></div><div class="path"><span>Not visited</span><span aria-hidden="true">→</span><strong>Skipped · preserve all tags</strong></div><figcaption>Unknown and skipped preserve both existing broken and its absence. Manual broken is not a sticky override; disabled remains a separate user-controlled state.</figcaption></figure>
+    <details><summary>Retain the divergence · I041–I050 · 10 recovery candidates</summary><ol class="ideas">
+      <li><span class="id">I041</span>Replace binary pass/fail with reachable, broken, unknown; skipped is a coverage outcome, not reachability.</li>
+      <li><span class="id">I042</span>Clear every case-insensitive broken tag on the latest completed 2xx evaluation, even if a person added it.</li>
+      <li><span class="id">I043</span>Preserve existing broken on unknown or skipped; preserve absence of broken on unknown or skipped too.</li>
+      <li><span class="id">I044</span>Treat 404 then 200 in one run as reachable; recovery evidence takes precedence over the first failure.</li>
+      <li><span class="id">I045</span>Treat 404 then timeout or 500 as unknown, not confirmed broken.</li>
+      <li><span class="id">I046</span>Treat 404 then 410 as unknown under strict matching-confirmation rules, unless a later policy explicitly accepts mixed gone statuses.</li>
+      <li><span class="id">I047</span>Retry within the current scan to avoid cross-run strike counters and their storage/reset rules.</li>
+      <li><span class="id">I048</span>Explore two-failing-days hysteresis only if single-run confirmation proves noisy; it needs durable history, unlike ownership metadata.</li>
+      <li><span class="id">I049</span>Explore two-successful-runs recovery only if flapping is common; it delays recovery and requires history.</li>
+      <li><span class="id">I050</span>Explain that no ownership tracking means manual broken is not a sticky override; disabled is the separately user-controlled state, not a substitute for broken.</li>
+    </ol></details>
+  </section>
+
+  <section class="pass" id="pass06" aria-labelledby="title06">
+    <div class="passhead"><span class="number">06</span><div><p class="label">Build on What Works / source edits</p><h2 id="title06">One small annotation. The rest stays yours.</h2><p>Reuse validated leaf interpretation; mutate the source carefully rather than inventing another schema.</p></div></div>
+    <figure><div class="ledger"><p><b>Touch</b><span>Only exact trimmed, case-folded broken; add lowercase, remove all case variants.</span></p><p><b>Preserve</b><span>Destination spelling, title, script, hidden/disabled, descriptive tags such as broken-example.</span></p><p><b>Respect</b><span>YAML comments and key order via document nodes; structural JSON edits plus existing Prettier.</span></p><p><b>Stop</b><span>No formatted source diff → no commit, no PR. Second application → no-op.</span></p></div><figcaption>Expand a string leaf only to add broken. Don’t collapse recovered objects back to strings; avoid empty tags arrays without deleting unrelated fields.</figcaption></figure>
+    <details><summary>Retain the divergence · I051–I060 · 10 source-edit candidates</summary><ol class="ideas">
+      <li><span class="id">I051</span>Reuse validated leaf traversal and URL interpretation from src/links.mjs rather than adding a second source schema.</li>
+      <li><span class="id">I052</span>Patch YAML through yaml document nodes to retain comments and key order; do not serialize the whole map through plain JSON.</li>
+      <li><span class="id">I053</span>Patch JSON structurally, then use existing Prettier for stable output; acknowledge formatting diffs may be wider.</li>
+      <li><span class="id">I054</span>Expand a URL-string leaf into an object only when adding broken; a successful untouched string needs no conversion.</li>
+      <li><span class="id">I055</span>Remove broken without collapsing an existing object back to a string, avoiding unnecessary shape churn.</li>
+      <li><span class="id">I056</span>Match tags exactly after trimming and case folding; never remove descriptive tags like broken-example.</li>
+      <li><span class="id">I057</span>Preserve title, script, hidden/disabled tags, descriptive tags, and destination spelling when updating broken.</li>
+      <li><span class="id">I058</span>Add canonical lowercase broken only if absent; remove all case variants on recovery without maintaining ownership metadata.</li>
+      <li><span class="id">I059</span>Avoid empty tags arrays after removal but preserve unrelated fields; make a second application a no-op.</li>
+      <li><span class="id">I060</span>Compare the final formatted source to baseline and create no commit or PR when there is no diff.</li>
+    </ol></details>
+  </section>
+
+  <section class="pass" id="pass07" aria-labelledby="title07">
+    <div class="passhead"><span class="number">07</span><div><p class="label">Failure Analysis / stale results and partial scans</p><h2 id="title07">Good evidence has an expiry problem.</h2><p>A result belongs to an exact source SHA and full destination. A repaired target must not inherit an old verdict.</p></div></div>
+    <div class="grid two"><div class="gate"><h3>Publication stop conditions</h3><p>Main changed; unexpected human commits on the bot branch; crash, parse failure, or cancellation. Stop and report before writing stale or half-finished source.</p></div><div class="panel"><h3>Partial is not invalid</h3><p>An ordinary partial scan may propose completed decisive results, with coverage explicit. Skipped links retain state. Broad transport failures are runner/network incidents, not a directory full of proven dead links.</p></div></div>
+    <p style="margin-top:1rem">Refresh or withdraw obsolete PR suggestions. Show check age and SHA in the PR; an old human-merged PR is not proof of current destination state. Start with safe stop/report rather than automatic reconciliation or unconditional force-push.</p>
+    <details><summary>Retain the divergence · I061–I070 · 10 freshness candidates</summary><ol class="ideas">
+      <li><span class="id">I061</span>Bind every scan to an exact source commit SHA and full destination URL so an old result cannot silently describe a repaired target.</li>
+      <li><span class="id">I062</span>Before pushing, refetch main; if its SHA changed, discard the candidate and rescan on the next run rather than implementing automatic reconciliation first.</li>
+      <li><span class="id">I063</span>Updating an open bot PR from newer main must recompute the desired diff, never replay an old whole-file patch.</li>
+      <li><span class="id">I064</span>Prefer a stop-and-report rule when the bot branch contains unexpected human commits; never overwrite collaborative work blindly.</li>
+      <li><span class="id">I065</span>If a bot PR ages beyond the next scan cadence, refresh its evidence before treating it as current.</li>
+      <li><span class="id">I066</span>On checker crash, parse failure, or cancellation, publish no source updates from a half-written local file.</li>
+      <li><span class="id">I067</span>After an ordinary partial scan, allow completed decisive results into a proposed PR but label coverage explicitly; skipped links retain state.</li>
+      <li><span class="id">I068</span>Detect a broad transport failure and report a runner/network incident instead of presenting many individual unknowns as dead links.</li>
+      <li><span class="id">I069</span>Expose a stale-check age in the PR description instead of inventing last-checked fields on every link.</li>
+      <li><span class="id">I070</span>If a previously proposed change is no longer supported, remove it from the bot PR or close a now-empty PR rather than merging outdated evidence.</li>
+    </ol></details>
+  </section>
+
+  <section class="pass" id="pass08" aria-labelledby="title08">
+    <div class="passhead"><span class="number">08</span><div><p class="label">Morphological Analysis / committing and credentials</p><h2 id="title08">The scan-to-PR-to-Pages relay.</h2><p>Keep the checked-in map authoritative. Publishing evidence is not the same as publishing a site.</p></div></div>
+    <figure><ol class="pipeline"><li><strong>Scan exact main SHA</strong>Daily/manual; bounded evidence tied to destination.</li><li><strong>Calculate source edits</strong>Preserve unrelated fields and YAML structure; format, validate/test/build.</li><li><strong>Refetch and guard</strong>Abort if main changed. No diff means no publication.</li><li><strong>Propose one bot PR</strong>Source-map diff only; evidence in summary/PR/artifact. Clearly bot-managed branch.</li><li><strong>Approve checks; human merge</strong>GITHUB_TOKEN PR workflow runs may require “Approve workflows to run.” Structural CI remains required.</li><li><strong>Deploy and confirm</strong>Human merge → ordinary push to main → existing Deploy shl → confirm Pages completion.</li></ol><figcaption>Coach’s proposed lifecycle. New scans refresh or withdraw old proposals; unexpected branch edits stop publication.</figcaption></figure>
+    <div class="gate"><h3>The token nuance matters</h3><p>As recorded from GitHub docs fetched 2026-10-08: <code>GITHUB_TOKEN</code> pushes do <strong>not</strong> trigger push workflows. Bot PR opened/synchronize/reopened events now create <strong>approval-required workflow runs</strong>, rather than being described as universally absent.</p><p>App/PAT events can trigger automatically; workflow_dispatch and repository_dispatch are exceptions to suppression. A direct GITHUB_TOKEN write to main needs permitted branch rules and explicit deployment dispatch. App/PAT writes can trigger deployment but still need a bypass if main requires PRs. Actual repository rules/settings have not been inspected.</p></div>
+    <details><summary>Retain the divergence · I071–I080 · 10 publishing candidates</summary><ol class="ideas">
+      <li><span class="id">I071</span>Use a scheduled/manual checker to propose a bot PR; human merge keeps the established source-of-truth and Pages path.</li>
+      <li><span class="id">I072</span>Start with GITHUB_TOKEN plus contents:write/pull-requests:write only for the checker publisher, subject to repository settings allowing PR creation.</li>
+      <li><span class="id">I073</span>With GITHUB_TOKEN bot PRs, document the current manual Approve workflows to run step for PR validation.</li>
+      <li><span class="id">I074</span>Use a GitHub App installation token when unattended PR checks and automatic updates justify credential setup.</li>
+      <li><span class="id">I075</span>A scoped PAT is a smaller setup alternative to an App but has person-bound credential lifecycle; evaluate only if needed.</li>
+      <li><span class="id">I076</span>Direct GITHUB_TOKEN commits to main require branch rules to permit them and explicit deployment dispatch; ordinary push will not start Deploy shl.</li>
+      <li><span class="id">I077</span>App/PAT direct writes can trigger deployment normally but still conflict with a PR-required main policy unless an explicit bypass is configured.</li>
+      <li><span class="id">I078</span>Auto-merge bot PRs only as a separately chosen policy after required PR validation passes; external checks should not become a bypass for structural CI.</li>
+      <li><span class="id">I079</span>Avoid deploying uncommitted mutated dist output because the live site could diverge from the checked-in link map.</li>
+      <li><span class="id">I080</span>Commit only the source-map diff with a concise bot message; keep status evidence in summary/PR/artifact, not an expanding committed history file.</li>
+    </ol></details>
+  </section>
+
+  <section class="pass" id="pass09" aria-labelledby="title09">
+    <div class="passhead"><span class="number">09</span><div><p class="label">Ship in 60 Minutes / minimal rollout</p><h2 id="title09">Earn automation one step at a time.</h2><p>The technique’s name is a constraint, not a delivery-time estimate.</p></div></div>
+    <figure><ol class="rail"><li><strong>1 · Baseline first</strong>Implement agreed manual state tags and hidden migration.</li><li><strong>2 · Report only</strong>Representative manual scans; measure classifications.</li><li><strong>3 · Source PRs</strong>Enable scheduled/manual proposals; human merge.</li><li><strong>4 · Reconsider</strong>Only then explore unattended merge and broader evidence.</li></ol><figcaption>Bun fetch and installed yaml; shared dry-run/write calculation, network logic separate from mutation. Keep the deterministic build free of external availability checks.</figcaption></figure>
+    <details><summary>Retain the divergence · I081–I090 · 10 rollout candidates</summary><ol class="ideas">
+      <li><span class="id">I081</span>Begin with report-only manual scans and a few representative destinations before enabling source writes.</li>
+      <li><span class="id">I082</span>Add daily plus manual checks only after the report-only results demonstrate reasonable classifications.</li>
+      <li><span class="id">I083</span>Keep destination availability outside required PR validation so an unrelated external outage cannot block a legitimate edit.</li>
+      <li><span class="id">I084</span>Use Bun fetch and the installed yaml package; no browser farm, crawler library, service, or database in version one.</li>
+      <li><span class="id">I085</span>Keep checker network logic separate from tag mutation so fake HTTP results can verify policy without real websites.</li>
+      <li><span class="id">I086</span>Preserve the existing deploy workflow; a human-merged bot PR should trigger the ordinary push-to-main deployment.</li>
+      <li><span class="id">I087</span>Use one pending bot PR to avoid a daily queue; update only a clearly bot-managed branch and avoid unconditional force pushes.</li>
+      <li><span class="id">I088</span>Default publisher failure to a failed workflow and retained report, never to a fallback direct write to main.</li>
+      <li><span class="id">I089</span>Provide a dry-run mode using exactly the same classification/mutation calculation as write mode.</li>
+      <li><span class="id">I090</span>Defer cross-run caches, adaptive schedules, content inspection, and per-domain exception config until actual false positives or traffic justify them.</li>
+    </ol></details>
+  </section>
+
+  <section class="pass" id="pass10" aria-labelledby="title10">
+    <div class="passhead"><span class="number">10</span><div><p class="label">Worst Possible Idea / inverted shortcuts</p><h2 id="title10">Bad shortcuts reveal the guardrails.</h2><p>Invert the tempting mistake and the architecture becomes easier to see.</p></div></div>
+    <figure><div class="inversions"><p><del>Hide anything that times out.</del><strong>Uncertainty changes no tags.</strong></p><p><del>Execute the script to prove the link.</del><strong>Observe HTTP; never execute content.</strong></p><p><del>Force-push over human edits.</del><strong>Bind to SHA; stop on collaboration.</strong></p><p><del>Push with GITHUB_TOKEN; assume Pages ran.</del><strong>Use human merge or explicit dispatch; check deployment.</strong></p></div><figcaption>Visibility, reachability, content correctness, and publication are different responsibilities.</figcaption></figure>
+    <details><summary>Retain the divergence · I091–I100 · 10 inverted shortcuts</summary><ol class="ideas">
+      <li><span class="id">I091</span>Bad idea: hide anything that times out. Inversion: never couple broken detection to hidden; uncertainty keeps all tags unchanged.</li>
+      <li><span class="id">I092</span>Bad idea: retry 429 immediately until it works. Inversion: bounded host-aware cooldown and deferred checks respect remote limits.</li>
+      <li><span class="id">I093</span>Bad idea: mark every 403 broken. Inversion: distinguish bot visibility from visitor availability and surface access-denied evidence.</li>
+      <li><span class="id">I094</span>Bad idea: permanently exempt manual broken tags. Inversion: successful checks remove them exactly as the agreed baseline allows.</li>
+      <li><span class="id">I095</span>Bad idea: execute a script to prove its link works. Inversion: HTTP-only checks never execute downloaded code; script correctness is not link availability.</li>
+      <li><span class="id">I096</span>Bad idea: rewrite URLs to whatever redirected successfully. Inversion: report final locations but leave destination changes to maintainers.</li>
+      <li><span class="id">I097</span>Bad idea: make a network check a deployment prerequisite. Inversion: publish the valid directory even during external outages; reachability work is independent.</li>
+      <li><span class="id">I098</span>Bad idea: force-push a freshly serialized map over human edits. Inversion: source-SHA and bot-branch ownership guards protect concurrent work without link-tag ownership metadata.</li>
+      <li><span class="id">I099</span>Bad idea: clear broken whenever a scan lacks a failure result. Inversion: only positive reachable evidence clears it; missing data is unknown/skipped.</li>
+      <li><span class="id">I100</span>Bad idea: push with GITHUB_TOKEN and assume Pages ran. Inversion: human merge or an explicit documented dispatch path, with deployment run status checked.</li>
+    </ol></details>
+  </section>
+
+  <section class="pass" id="pass11" aria-labelledby="title11">
+    <div class="passhead"><span class="number">11</span><div><p class="label">Decision Tree Mapping / proof and alternative bundles</p><h2 id="title11">Choose what “automatic” should mean.</h2><p>The detection policy and the publication policy are independent choices. More automation is not automatically more evidence.</p></div></div>
+    <figure id="bundles"><div class="grid bundles"><article class="bundle recommended"><span class="letter">A</span><h3>Conservative + human merge</h3><p>Daily/manual; repeated 404/410 only; GITHUB_TOKEN PR.</p><p><strong>Coach recommends.</strong> Low setup, deliberate publication delay.</p></article><article class="bundle"><span class="letter">B</span><h3>Conservative + unattended</h3><p>Same classification; GitHub App and tested auto-merge.</p><p>Higher credential setup; separately chosen merge policy.</p></article><article class="bundle"><span class="letter">C</span><h3>Broader outage evidence</h3><p>Recurrent transport/5xx also become broken after multi-run evidence.</p><p>Needs durable history and agreed flapping/recovery rules.</p></article><article class="bundle"><span class="letter">D</span><h3>Diagnostics only</h3><p>Report-only health checks; no source-tag edits.</p><p>Simplest, but no automatic broken-tag upkeep.</p></article></div><figcaption>Four candidate bundles, not accepted product decisions. C broadens semantics; B changes publishing; D changes the delivered outcome.</figcaption></figure>
+    <div class="grid two"><div class="panel"><h3>Policy proof, later</h3><p>Deterministic local HTTP: retries, redirects, budgets; both tagged and untagged unknown preservation; manual/case-insensitive broken recovery; hidden/disabled immutability.</p></div><div class="panel"><h3>Publication proof, later</h3><p>Nested source fidelity, JSON/YAML and idempotence; changed SHA, cancellation, publisher failure; actual bot PR validation and merge-to-Pages smoke test.</p></div></div>
+    <details><summary>Retain the divergence · I101–I110 · 10 proof and bundle candidates</summary><ol class="ideas">
+      <li><span class="id">I101</span>Verify 404/404 adds broken, 404/200 clears it, and 404/timeout leaves it unchanged using deterministic local HTTP responses.</li>
+      <li><span class="id">I102</span>Verify 401/403/429/503, DNS/TLS failure, redirect loop, and exhausted budgets leave both tagged and untagged entries unchanged.</li>
+      <li><span class="id">I103</span>Verify a normal redirect to 200 clears broken, redirects to confirmed 404 add it, and HTML-only forwarding does not pretend to be HTTP traversal.</li>
+      <li><span class="id">I104</span>Verify nested YAML comments, JSON, URL-string conversion, case variants, unrelated tags, and repeated-run idempotence against a small map.</li>
+      <li><span class="id">I105</span>Verify hidden and disabled tags never change, while their entries remain eligible for broken updates.</li>
+      <li><span class="id">I106</span>Verify changed main SHA, publisher failure, and cancellation produce no stale source write or deployment.</li>
+      <li><span class="id">I107</span>Prototype bundle A: daily/manual + repeated 404/410 only + human-merged GITHUB_TOKEN PR; low setup, deliberate publication delay.</li>
+      <li><span class="id">I108</span>Prototype bundle B: same classification + GitHub App + tested auto-merge; unattended publishing at a higher setup cost.</li>
+      <li><span class="id">I109</span>Prototype bundle C: recurrent transport/5xx failures also mark broken after multi-run evidence; broader outage coverage at the cost of durable history and flapping policy.</li>
+      <li><span class="id">I110</span>Prototype bundle D: report-only health checks without tag edits; simplest diagnostics, but it does not deliver automatic broken-tag upkeep.</li>
+    </ol></details>
+  </section>
+
+  <section class="climax" id="synthesis" aria-labelledby="synthesis-title">
+    <p class="label">Synthesis / the central connection</p>
+    <h2 id="synthesis-title">Unknown belongs in the evidence.<br>Not in the link.</h2>
+    <p class="dek">The source stores only the checker’s <code>broken</code> annotation—not a new unknown tag. Ambiguous or incomplete observations preserve previous state. This trades stale annotations for fewer false positives, and the report must make that trade visible.</p>
+    <div class="grid"><article class="panel"><h3>Evidence → decision</h3><p>“Latest check” means the latest completed bounded evaluation, not every failed request. Two matching gone statuses confirm disappearance within a run; a 2xx can clear even a manual broken tag.</p></article><article class="panel"><h3>Decision → source</h3><p>Only exact broken changes. Unknown/skipped keep tags unchanged; hidden is never set from broken, and disabled stays user-controlled. No per-link ownership tracking is needed.</p></article><article class="panel"><h3>Source → publication</h3><p>A source-SHA guard and bot-branch guard protect human work. A reviewed source diff takes the established PR → merge → Pages path, rather than deploying an uncommitted mutation.</p></article></div>
+    <div class="warning"><h3>The blind spot is real.</h3><p>Repeated-404/410 detection catches explicit HTTP disappearance, <strong>not all sustained network or server outages</strong>. A permanently dead DNS name, persistent TLS failure, or repeated 503 may remain untagged indefinitely. An already-broken link may also keep its stale annotation under unknown evidence. Broader semantics require an explicit decision about evidence and persistence.</p></div>
+    <p><strong>Proposed v1 boundary:</strong> no cross-run counters, durable health cache, ownership metadata, automatic hiding/disabling, content scraping, browser execution, per-domain rule engine, or downloaded script execution. A 2xx proves observed HTTP reachability—not useful content, complete download, or script correctness.</p>
+    <p><strong>Coach’s landing:</strong> Bundle A, after the state-tag baseline and hidden migration. Trial report-only first; tune unmeasured budgets; enable one human-merged source-edit bot PR; revisit unattended merge and broader evidence only afterward.</p>
+  </section>
+
+  <section aria-labelledby="policy-title">
+    <p class="label">The proposal at a glance</p><h2 id="policy-title">A small switch with explicit paths.</h2>
+    <div class="tablewrap"><table><caption>Proposed evaluation policy · not agreed requirements</caption><thead><tr><th scope="col">Completed observation</th><th scope="col">Outcome</th><th scope="col">Source action</th></tr></thead><tbody>
+      <tr><td>Final 2xx, including 404 then 200</td><td>Reachable</td><td>Remove all exact case-insensitive broken tags immediately, including manual ones.</td></tr>
+      <tr><td>Two matching 404s or two matching 410s</td><td>Broken</td><td>Add canonical lowercase broken if absent.</td></tr>
+      <tr><td>404 then timeout/5xx; mixed 404/410</td><td>Unknown</td><td>Keep all existing tags, including presence or absence of broken.</td></tr>
+      <tr><td>401, 403, 429, 5xx, DNS/TCP/TLS, timeout, redirect exhaustion, other non-2xx</td><td>Unknown</td><td>Keep all tags unchanged; report evidence.</td></tr>
+      <tr><td>Unvisited because budget was exhausted</td><td>Skipped coverage</td><td>Keep all tags unchanged; disclose coverage.</td></tr>
+    </tbody></table></div>
+    <p style="margin-top:1rem">Reports retain check time, source SHA, original/final URL, attempts, statuses/error category, duration, and coverage. Keep this evidence in the Actions summary, PR, or artifact—not an expanding committed history file.</p>
+  </section>
+
+  <section id="evidence" aria-labelledby="evidence-title">
+    <p class="label">Grounding / observed during the session</p><h2 id="evidence-title">The machinery already on the bench.</h2>
+    <div class="grid two"><article class="panel"><h3>PR checks · .github/workflows/check.yml</h3><p>pull_request to main; contents read. PR validation runs bun ci, formatting, required-browser tests, and build. Newer PR runs cancel older runs.</p></article><article class="panel"><h3>Pages · .github/workflows/deploy.yml</h3><p>push to main or workflow_dispatch; contents read, pages write, id-token write. Formatting/build then Pages deployment; no test step. Pages concurrency cancels older runs.</p></article><article class="panel"><h3>Source and implementation gap</h3><p>The root JSON/YAML map is authoritative. README and src/links.mjs establish recursive validated leaves and URL-syntax-only validation. Installed yaml parseDocument can preserve structure. Live code still uses a hidden boolean: state tags/migration precede checker integration.</p></article><article class="panel"><h3>What was not established</h3><p>No scheduled destination-checking workflow and no existing source-writing workflow. A recommended ruleset is documented, but actual branch protection and repository PR-creation settings have not been verified.</p></article></div>
+    <p style="margin-top:1.5rem"><strong>Official-source evidence:</strong> <a href="https://docs.github.com/en/actions/how-tos/writing-workflows/choosing-when-your-workflow-runs/triggering-a-workflow">GitHub Actions: Triggering a workflow</a> — fetched during the session on 2026-10-08. The token/PR approval distinction above reflects that recorded documentation, not a claim that repository settings were inspected.</p>
+  </section>
+
+  <section aria-labelledby="decisions-title"><p class="label">The handoff / four choices remain</p><h2 id="decisions-title">The exploration is complete. The policy is yours.</h2><ol><li><strong>Meaning:</strong> accept repeated-404/410 disappearance only, or include sustained DNS/TLS/5xx outages with history rules?</li><li><strong>Cadence:</strong> daily versus weekly, after report-only observation?</li><li><strong>Publication:</strong> human merge with GITHUB_TOKEN approval-required checks, or App-backed tested auto-merge?</li><li><strong>Budgets:</strong> approve or adjust the proposed request limits after measurement?</li></ol><p>Recommendations recorded for user response; no accepted product decisions are implied.</p></section>
+</main>
+<footer><p>The Evidence Switchboard · Autonomous brainstorming keepsake · 2026-10-08</p><p>Sole content source: the completed session’s .memlog.md. All 110 coach candidates remain in eleven native disclosures. This is a planning artifact, not production UI or an implementation.</p></footer>
+</body>
+</html>
