@@ -60,6 +60,8 @@ The frontmatter roles map to shared CSS tokens in `src/assets/site.css`: paper â
 
 Disabled link rows and their tag popovers use only neutral grayscale: text and focus use disabled ink, resting surfaces use #f7f7f7 light / #000 dark, and hover/focus wash uses #ebebeb light / #181818 dark. Destinations, tags, selection, and unavailable Open/Download fills and borders remain grayscale in every interaction state, overriding the usual teal/amber and green-tinted neutral roles.
 
+Disabled short codes keep their resting text appearance on hover; do not add an underline.
+
 ## Typography
 
 The site uses the system sans for reading and modest headings. Codes and code samples use a system monospace. Codes stay on one line; long destinations truncate in the middle while their full value remains available for copying and to assistive technology.

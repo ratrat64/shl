@@ -3396,6 +3396,7 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
               for (const hovered of [false, true]) {
                 for (const element of elements) element.classList.toggle('verify-hover', hovered);
                 for (const element of elements) grayscale(win, element);
+                check(win.getComputedStyle(code).textDecorationLine === 'none', 'Disabled short code changed on hover');
                 const background = rgb(win.getComputedStyle(r).backgroundColor);
                 for (const element of elements.slice(1)) readable(win, element, background, backdrop, Number(style.opacity));
                 for (const action of r.querySelectorAll('.visit, .download')) check(JSON.stringify(rgb(win.getComputedStyle(action).backgroundColor)) === JSON.stringify(rgb(win.getComputedStyle(r).getPropertyValue('--wash'))), 'Disabled hover changed action wash');

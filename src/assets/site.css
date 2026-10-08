@@ -386,6 +386,7 @@ summary a:hover {
 }
 .disabled-row .code {
   color: var(--disabled);
+  text-decoration: none;
 }
 .links li:has(> .disabled-row) {
   background: var(--disabled-bg);
