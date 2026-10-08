@@ -2,7 +2,7 @@
 
 A URL shortener that runs entirely on GitHub Pages. A JSON or YAML link map is
 the source of truth; a build step turns each entry into a static folder with an
-instant redirect, and GitHub Actions deploys it on every push to `main`.
+instant redirect or disabled explanation, and GitHub Actions deploys it on every push to `main`.
 
 The generated site includes a browsable directory and a guide with About, How to use,
 and How it works sections. The former `/about/` and `/how-it-works/` URLs forward
@@ -143,7 +143,7 @@ the 404 handler. Hiding controls discoverability, not secrecy.
 ## Running Bash scripts
 
 Set `script: true` in YAML (or `"script": true` in JSON) to generate an
-additional `<path>.sh` launcher alongside its browser redirect, including in
+additional `<path>.sh` launcher alongside its browser page, including in
 nested directories. The checked-in `links.yaml` includes:
 
 ```yaml
@@ -167,7 +167,7 @@ Use the full link path's exact casing, with `.sh` and **no trailing slash**. The
 URL ending in `/<path>/` returns HTML, which `curl -L` cannot follow.
 This example is the nested launcher at `/setup/ohmyposh/stable.sh`.
 
-Launchers require Bash, curl, mktemp, and rm. Each run downloads the current
+Enabled launchers require Bash, curl, mktemp, and rm. Each run downloads the current
 destination into a temporary file, executes it only after a successful download,
 and removes it on exit. Download failures and the script's exit status are
 returned by the launcher. Disabled launchers instead print
@@ -176,7 +176,8 @@ returned by the launcher. Disabled launchers instead print
 the currently deployed artifacts, not retained older launchers or deployments.
 
 The `script` field must be a boolean; omitting it or setting it to `false` produces
-only the browser redirect. A generated `<code>.sh` must not collide with another
+no launcher. Enabled entries get browser redirects; disabled entries get explanation
+pages, and `script: true` adds an inert launcher for them. A generated `<code>.sh` must not collide with another
 short code or directory in the same folder, regardless of casing.
 
 ## Pull request checks
@@ -301,7 +302,9 @@ variable is required.
 
 ## Limits
 
-Published destinations are public, including hidden links in `links.json` and redirect pages.
+All published destinations, including hidden and disabled links, remain public in
+`links.json` and directory text. Enabled redirects and launchers also include their
+destinations; disabled explanations and inert launchers do not.
 The homepage lists visible links by default. There is no backend, database,
 anonymous link submission, or built-in click tracking. Managing links is a
 repository edit followed by a deployment.

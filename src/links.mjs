@@ -192,7 +192,7 @@ export async function loadLinks() {
       }
       if (typeof value === "object" && value && "hidden" in value) {
         problems.push(
-          `"${name}" — The hidden property is no longer supported; use tags: [hidden].`,
+          `"${name}" — The hidden property is no longer supported; remove it. Only for hidden: true, append hidden to tags unless already present (case-insensitive); preserve all existing tags.`,
         );
       }
       if (

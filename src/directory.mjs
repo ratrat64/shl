@@ -29,7 +29,7 @@ const renderLinkRow = ({
   const tagId = `tags-${prefix}${code}`;
   const destinationContent = `<span class="sr-only">${esc(url)}</span><span class="destination-start" aria-hidden="true">${esc(url.slice(0, cut))}</span><span class="destination-end" aria-hidden="true">${esc(url.slice(cut))}</span>`;
   const destination = disabled
-    ? `<button type="button" class="destination" data-copy-url="${esc(url)}" aria-label="Copy destination: ${esc(url)}" title="${esc(url)}">${destinationContent}</button>`
+    ? `<button type="button" class="destination" data-copy-url="${esc(url)}" aria-label="Copy destination: ${esc(url)}" title="${esc(url)}"><span class="destination-start" aria-hidden="true">${esc(url.slice(0, cut))}</span><span class="destination-end" aria-hidden="true">${esc(url.slice(cut))}</span></button>`
     : `<a class="destination" href="${esc(url)}" aria-label="Copy destination: ${esc(url)}"${title ? "" : ` title="${esc(url)}"`}>${destinationContent}</a>`;
   const action = (kind, label, target, accessible) =>
     disabled

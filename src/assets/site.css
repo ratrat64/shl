@@ -382,11 +382,24 @@ summary a:hover {
   color: var(--disabled);
 }
 button.destination {
+  display: block;
   padding: 0;
   border: 0;
   background: transparent;
   text-align: left;
   user-select: text;
+}
+/* Inline fragments select as one URL, without flex-item line breaks. */
+button.destination .destination-start,
+button.destination .destination-end {
+  display: inline-block;
+  vertical-align: top;
+}
+button.destination .destination-start {
+  max-width: 45%;
+}
+button.destination:has(.destination-end:empty) .destination-start {
+  max-width: 100%;
 }
 .destination {
   position: relative;

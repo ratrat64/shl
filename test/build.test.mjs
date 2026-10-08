@@ -15,6 +15,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { createContext, runInContext, runInNewContext } from "node:vm";
 import { stringify } from "yaml";
 import { linkFields, entryTree } from "../src/links.mjs";
+import { scriptString } from "../src/layout.mjs";
 
 const buildScript = fileURLToPath(new URL("../build.mjs", import.meta.url));
 
@@ -30,6 +31,8 @@ function availableChrome(t) {
 }
 
 function runChrome(chrome, cwd, url, flags = []) {
+  // --dump-dom cannot dispatch native Enter/Space; .click() checks below are
+  // click/default-action proof only, not browser keyboard activation coverage.
   const result = spawnSync(
     chrome,
     [
@@ -272,7 +275,7 @@ test("missing, conflicting, malformed, or invalid YAML input preserves the prior
     ],
     [
       "Run:\n  url: https://example.com/\n  hidden: yes\n",
-      /hidden property is no longer supported; use tags: \[hidden\]/,
+      /hidden property is no longer supported; remove it\. Only for hidden: true, append hidden to tags unless already present \(case-insensitive\); preserve all existing tags\./,
     ],
     [
       'Run:\n  url: https://example.com/\n  tags: [ok, " "]\n',
@@ -2744,7 +2747,7 @@ test("invalid input fails before replacing an existing build", async (t) => {
     if (value?.code && typeof value.code === "object" && "hidden" in value.code)
       assert.match(
         result.stderr,
-        /"code" — The hidden property is no longer supported; use tags: \[hidden\]/,
+        /"code" — The hidden property is no longer supported; remove it\. Only for hidden: true, append hidden to tags unless already present \(case-insensitive\); preserve all existing tags\./,
       );
     assert.equal(await f.read("marker"), "preserved");
   }
@@ -2913,14 +2916,14 @@ test("404 forwards matching URLs despite malformed tags without probing a parent
   }
 });
 
-const stateMap = () =>
+const stateMap = (script = true) =>
   Object.fromEntries(
     Array.from({ length: 8 }, (_, mask) => [
-      `State${mask}`,
+      `${script ? "" : "Plain"}State${mask}`,
       {
-        url: `https://example.com/state${mask}.sh?q=</script>&x='"`,
+        url: `https://example.com/a/very/long/destination/path/that/requires/middle/truncation/state${mask}.sh?q=</script>&x='"`,
         title: `State ${mask}`,
-        script: true,
+        script,
         tags: [
           "docs",
           "release notes",
@@ -3058,7 +3061,7 @@ test("legacy hidden is always rejected, disabled validation retains output, and 
       assert.equal(result.status, 1);
       assert.match(
         result.stderr,
-        /"folder\/Run" — The hidden property is no longer supported; use tags: \[hidden\]/,
+        /"folder\/Run" — The hidden property is no longer supported; remove it\. Only for hidden: true, append hidden to tags unless already present \(case-insensitive\); preserve all existing tags\./,
       );
       assert.equal(await f.read("Run/index.html"), enabled);
       assert.equal(await f.read("Run.sh"), launcher);
@@ -3259,6 +3262,13 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
   if (!chrome) return;
   const f = await fixture(t, {
     ...stateMap(),
+    ...stateMap(false),
+    nativeFolder: {
+      DisabledCode: {
+        url: "https://example.com/native-disabled",
+        tags: ["disabled"],
+      },
+    },
     onlyHidden: {
       deeper: {
         Broken: {
@@ -3299,6 +3309,8 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
       const wait = () => new Promise(resolve => setTimeout(resolve, 30));
       const load = path => new Promise(resolve => { frame.onload = resolve; frame.src = path; });
       const check = (condition, message) => { if (!condition) throw new Error(message); };
+      const disabledUrl = ${scriptString(stateMap().State7.url)};
+      const configured = ${scriptString({ ...stateMap(), ...stateMap(false) })};
       const rgb = color => { color = color.trim(); if (color.startsWith('#')) { let hex = color.slice(1); if (hex.length === 3) hex = [...hex].map(c => c+c).join(''); return hex.match(/../g).map(c => parseInt(c, 16)); } return color.match(/[\\d.]+/g).slice(0, 3).map(Number); };
       const blend = (front, back, opacity) => front.map((v, i) => v * opacity + back[i] * (1-opacity));
       const luminance = color => color.map(v => { v /= 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }).reduce((sum, v, i) => sum + v * [.2126, .7152, .0722][i], 0);
@@ -3321,12 +3333,20 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
             for (const li of doc.querySelectorAll('li[hidden]')) li.hidden = false;
             for (const details of doc.querySelectorAll('details')) details.open = true;
           } else toggle.click();
+          const rules = [...doc.styleSheets].flatMap(sheet => [...sheet.cssRules]);
+          const pointerRule = rules.find(rule => rule.conditionText === '(hover: hover) and (pointer: fine)');
+          const coarseRule = rules.find(rule => rule.conditionText === '(any-pointer: coarse)');
+          const pointerMedia = pointerRule.media.mediaText, coarseMedia = coarseRule.media.mediaText;
+          const hover = doc.createElement('style');
+          hover.textContent = [...pointerRule.cssRules].filter(rule => rule.selectorText?.includes(':hover')).map(rule => rule.selectorText.replaceAll(':hover', '.verify-hover') + '{' + rule.style.cssText + '}').join('');
+          doc.head.append(hover);
           const bg = rgb(win.getComputedStyle(doc.body).backgroundColor), wash = rgb(win.getComputedStyle(doc.documentElement).getPropertyValue('--wash'));
-          for (let mask = 0; mask < 8; mask++) {
-            const r = row(doc, 'State' + mask), style = win.getComputedStyle(r), code = r.querySelector('.code');
+          for (const script of [true, false]) for (let mask = 0; mask < 8; mask++) {
+            const r = row(doc, (script ? '' : 'Plain') + 'State' + mask), style = win.getComputedStyle(r), code = r.querySelector('.code');
             check(r.getBoundingClientRect().height === 50, 'State row changed height');
             check(Number(style.opacity) === (mask & 1 ? theme === 'dark' ? .8 : .94 : 1), 'State opacity');
-            const expected = win.getComputedStyle(doc.documentElement).getPropertyValue(mask & 4 ? '--disabled' : mask & 2 ? '--broken' : '--script');
+            const expected = win.getComputedStyle(doc.documentElement).getPropertyValue(mask & 4 ? '--disabled' : mask & 2 ? '--broken' : script ? '--script' : '--accent');
+            check(!!r.querySelector('.download') === script, 'Non-script Download control');
             check(JSON.stringify(rgb(win.getComputedStyle(code).color)) === JSON.stringify(rgb(expected)), 'State precedence');
             for (const element of [code, r.querySelector('.tags'), r.querySelector('.destination')]) {
               for (const background of [bg, wash]) check(contrast(blend(rgb(win.getComputedStyle(element).color), background, Number(style.opacity)), background) >= 4.5, 'Dimmed contrast failed: ' + theme + '/' + mask + '/' + element.className);
@@ -3337,26 +3357,46 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
             check(dest.getBoundingClientRect().width >= (width < 500 ? 48 : 64), 'Destination reserve');
             if (mask & 4) {
               check(dest.tagName === 'BUTTON' && !dest.hasAttribute('href') && win.getComputedStyle(dest).userSelect === 'text', 'Disabled destination navigates or not selectable');
+              check(dest.getAttribute('aria-label') === 'Copy destination: ' + configured[code.textContent].url, 'Disabled accessible full value');
+              const height = r.getBoundingClientRect().height, destWidth = dest.getBoundingClientRect().width;
+              pointerRule.media.mediaText = 'all'; coarseRule.media.mediaText = 'not all';
+              check(win.getComputedStyle(dest).opacity === '0' && win.getComputedStyle(dest).pointerEvents === 'none', 'Button visible before hover');
+              r.classList.add('verify-hover');
+              check(win.getComputedStyle(dest).opacity === '1' && win.getComputedStyle(dest).pointerEvents === 'auto', 'Button hover reveal');
+              r.classList.remove('verify-hover'); dest.focus();
+              check(win.getComputedStyle(dest).opacity === '1' && win.getComputedStyle(dest).outlineWidth === '2px' && win.getComputedStyle(r).opacity === '1', 'Button focus reveal');
+              dest.blur(); coarseRule.media.mediaText = 'all';
+              check(win.getComputedStyle(dest).opacity === '1' && win.getComputedStyle(dest).pointerEvents === 'auto', 'Button hybrid/coarse visibility');
+              pointerRule.media.mediaText = 'not all'; coarseRule.media.mediaText = 'not all';
+              check(win.getComputedStyle(dest).opacity === '1', 'Button non-hover visibility');
+              check(r.getBoundingClientRect().height === height && dest.getBoundingClientRect().width === destWidth, 'Button pointer states shift geometry');
+              check(win.getComputedStyle(dest.querySelector('.destination-start')).textOverflow === 'ellipsis' && win.getComputedStyle(dest.querySelector('.destination-end')).textOverflow === 'ellipsis', 'Button middle truncation');
+              const selection = win.getSelection(), range = doc.createRange();
+              range.selectNodeContents(dest); selection.removeAllRanges(); selection.addRange(range);
+              check(selection.toString() === configured[code.textContent].url, 'Disabled native selection duplicates or splits URL: ' + JSON.stringify(selection.toString()));
+              selection.removeAllRanges();
+              pointerRule.media.mediaText = pointerMedia; coarseRule.media.mediaText = coarseMedia;
               for (const action of r.querySelectorAll('.visit, .download')) {
                 check(action.disabled && !action.hasAttribute('href'), 'Disabled action actionable');
                 const before = win.location.href; action.click(); action.dispatchEvent(new win.MouseEvent('click', { ctrlKey: true, bubbles: true })); check(win.location.href === before, 'Disabled modified action navigated');
               }
             }
           }
+          hover.remove();
           if (!native) {
-            query(doc, '  #DOCS  '); check(count(doc) === 8, 'Exact docs');
-            query(doc, '#release notes'); check(count(doc) === 9, 'Spaced tag');
+            query(doc, '  #DOCS  '); check(count(doc) === 16, 'Exact docs');
+            query(doc, '#release notes'); check(count(doc) === 17, 'Spaced tag');
             query(doc, '#'); check(count(doc) === 0 && !doc.querySelector('#search-status').hidden, 'Bare tag');
             query(doc, 'docs guide'); check(count(doc) === 1 && shown(doc) === 'Literal', 'Plain substring split');
             query(doc, '#broken #disabled'); check(count(doc) === 1 && shown(doc) === 'Fragment', 'Literal tag grammar');
-            toggle.click(); query(doc, '#docs'); check(count(doc) === 4, 'Ordinary tags bypass toggle');
-            query(doc, '#disabled'); check(count(doc) === 5, 'State exception');
+            toggle.click(); query(doc, '#docs'); check(count(doc) === 8, 'Ordinary tags bypass toggle');
+            query(doc, '#disabled'); check(count(doc) === 10, 'State exception');
             // Actual clipboard success/failure through both disabled copy controls, including hidden combination.
             const copied = []; let fail = false;
             Object.defineProperty(win.navigator, 'clipboard', { configurable: true, value: { writeText: async value => { if (fail) throw Error('denied'); copied.push(value); } } });
             const r = row(doc, 'State7');
             r.querySelector('.code').click(); await wait(); check(copied.at(-1) === new URL(prefix + 'State7/', location.href).href, 'Disabled short copy');
-            const destination = r.querySelector('.destination'); destination.click(); await wait(); check(copied.at(-1) === destination.dataset.copyUrl, 'Disabled destination copy');
+            const destination = r.querySelector('.destination'); destination.click(); await wait(); check(copied.at(-1) === disabledUrl, 'Disabled destination copy');
             check(doc.querySelector('#copy-status').textContent === 'Destination copied.', 'Copy feedback');
             fail = true; destination.click(); await wait(); check(doc.querySelector('#copy-status').textContent.includes('Select and copy'), 'Copy-only failure fallback');
             const header = doc.querySelector('header'), footer = doc.querySelector('footer');
@@ -3372,15 +3412,29 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
           doc = frame.contentDocument;
           if (!native) {
             check(!doc.querySelector('.search').hidden && count(doc) === 0 && !doc.querySelector('#empty-directory').hidden, 'All-hidden search unreachable');
+            const details = doc.querySelector('details'); check(!details.open, 'Initial hidden disclosure');
             query(doc, '#broken'); check(count(doc) === 1 && shown(doc) === 'Broken', 'Hidden ancestors/siblings');
+            check(details.open, 'State search did not expand ancestor');
             const toggle = doc.querySelector('#hidden-toggle'); check(toggle.getAttribute('aria-pressed') === 'false', 'State query mutated toggle');
             toggle.click(); check(count(doc) === 1 && shown(doc) === 'Broken', 'Toggle changed state matches');
             query(doc, ''); check(count(doc) === 3, 'Clearing lost selected pool');
+            check(!details.open, 'State-search disclosure not restored on clear');
             toggle.click(); check(count(doc) === 0 && !doc.querySelector('#empty-directory').hidden, 'Clearing empty state');
             for (const value of ['broken', '#docs-api', '#missing']) { query(doc, value); check(count(doc) === 0 && !doc.querySelector('#search-status').hidden && doc.querySelector('#empty-directory').hidden && !doc.querySelector('.search').hidden, 'All-hidden zero results'); }
             query(doc, '#disabled'); check(count(doc) === 1 && shown(doc) === 'Disabled', 'Hidden disabled search');
             query(doc, '#hidden'); check(count(doc) === 3, 'Hidden exact state');
             query(doc, ''); check(count(doc) === 0 && !doc.querySelector('#empty-directory').hidden, 'Hidden clearing');
+            check(!details.open, 'Hidden state clear retained auto-expanded ancestor');
+            details.open = true; query(doc, '#broken'); query(doc, '#disabled'); query(doc, '');
+            check(details.open, 'State-search switch/clear collapsed visitor-opened ancestor');
+          }
+          if (native) {
+            await load(prefix + 'nativeFolder/?native=1');
+            doc = frame.contentDocument;
+            const code = row(doc, 'DisabledCode').querySelector('.code');
+            check(new URL(code.href).pathname === prefix + 'nativeFolder/DisabledCode/', 'Nested native disabled code target');
+            await new Promise(resolve => { frame.onload = resolve; code.click(); });
+            check(frame.contentDocument.querySelector('h1')?.textContent === 'Link disabled' && frame.contentWindow.location.pathname === prefix + 'nativeFolder/DisabledCode/', 'Nested native disabled code forwarded');
           }
           // No fallback parameter: native meta refresh would still execute if disabling were faulty.
           await load(prefix + 'State7/' + (native ? '?native=1' : ''));
