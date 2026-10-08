@@ -5,11 +5,17 @@ import {
   page as shell,
   NAV_ITEMS,
 } from "./layout.mjs";
-import { isDirectory, linkUrl } from "./links.mjs";
+import { isDirectory, linkUrl, linkStates } from "./links.mjs";
 
 const shellString = (value) => "'" + value.replace(/'/g, "'\\''") + "'";
 
-export const scriptLauncher = ({ url }) => `#!/usr/bin/env bash
+export const scriptLauncher = ({ url, disabled }) =>
+  disabled
+    ? `#!/usr/bin/env bash
+printf '%s\\n' 'This link is disabled. No script was downloaded or executed.' >&2
+exit 1
+`
+    : `#!/usr/bin/env bash
 set -euo pipefail
 script=$(mktemp)
 trap 'rm -f "$script"' EXIT
@@ -29,13 +35,29 @@ const forwardingPage = (title, url, content) =>
     scripts: `<script data-behavior="forward">location.replace(${scriptString(url)});</script>`,
   });
 
-export const redirectPage = ({ url, title }) =>
-  forwardingPage(
-    "Redirecting",
-    url,
-    /* HTML */ `<p>Taking you to ${esc(title || url)}</p>
-      <p><a href="${esc(url)}">Continue now</a></p>`,
-  );
+export const redirectPage = ({ url, title, disabled }) =>
+  disabled
+    ? documentPage({
+        title: "Link disabled",
+        embedded: true,
+        body: /* HTML */ `<main class="wrap minimal-document">
+          <h1>Link disabled</h1>
+          <p>
+            This short link has been disabled. shl will not forward you to its
+            destination.
+          </p>
+          <p>
+            The destination remains public. Disabling this link does not prevent
+            access outside shl.
+          </p>
+        </main>`,
+      })
+    : forwardingPage(
+        "Redirecting",
+        url,
+        /* HTML */ `<p>Taking you to ${esc(title || url)}</p>
+          <p><a href="${esc(url)}">Continue now</a></p>`,
+      );
 
 export const guidePage = (source) =>
   shell(
@@ -62,11 +84,15 @@ export const guidePage = (source) =>
           </li>
           <li>
             <strong>Copy or open.</strong> Select a code or destination to copy
-            its URL; use Open to visit.
+            its URL; use Open to visit enabled links.
           </li>
           <li>
-            <strong>Script shortcuts.</strong> Optional Bash launchers download
+            <strong>Script shortcuts.</strong> Enabled Bash launchers download
             fully before running and forward arguments and exit status.
+          </li>
+          <li>
+            <strong>Visibility and control.</strong> Hide, flag or disable links
+            with tags, without deleting their destinations.
           </li>
           <li>
             <strong>No server to maintain.</strong> Keep links in Git-reviewed
@@ -120,7 +146,12 @@ docs:
         </ol>
         <p>
           Edit a URL to retarget its code; delete an entry to remove it. Nest
-          entries for folders. Search a tag by name or with <code>#tag</code>.
+          entries for folders.
+        </p>
+        <p>
+          Plain text searches broadly; <code>#tag</code> matches a whole tag,
+          including <code>#release notes</code>. A bare <code>#</code> matches
+          nothing; <code>#broken #disabled</code> is one literal tag, not two.
         </p>
         <p>
           Set <code>script</code> to <code>true</code> for a
@@ -130,27 +161,45 @@ docs:
             >script commands</a
           >.
         </p>
+        <p>Add state names to a link object's <code>tags</code>:</p>
+        <ul>
+          <li>
+            <code>hidden</code> omits it from default listings, counts and
+            search.
+          </li>
+          <li><code>broken</code> adds a warning without blocking actions.</li>
+          <li>
+            <code>disabled</code> shows an explanation instead of forwarding;
+            Open, Download and script execution are blocked. Both URLs remain
+            copyable.
+          </li>
+        </ul>
         <p>
-          Set <code>hidden</code> to <code>true</code> on a link object to omit
-          it from listings and search; Show hidden links reveals it. Hidden
-          links still work and remain public.
+          State names match exactly, ignoring case and surrounding whitespace.
+          The old <code>hidden</code> property is rejected.
+        </p>
+        <p>
+          Show hidden links reveals hidden entries. <code>#hidden</code>,
+          <code>#broken</code> and <code>#disabled</code> also reveal matching
+          hidden links, even in all-hidden folders. Clearing search restores the
+          toggle-selected view.
         </p>
         <p>
           Search, copying and Show hidden links need JavaScript. Without it,
-          visible links still open normally.
+          enabled visible links still open normally.
         </p>
       </section>
       <section id="how-it-works">
         <h2>How it works</h2>
         <p>
           The build validates codes and URL syntax, then generates directory and
-          redirect pages. Merges to <code>main</code> deploy through GitHub
-          Actions; the 404 page recovers differently capitalized paths.
+          redirect or disabled pages. Merges to <code>main</code> deploy through
+          GitHub Actions; the 404 page recovers differently capitalized paths.
         </p>
         <p>
-          All destinations are public. Redirects happen in the browser, not
-          through HTTP 301/302 responses; destination reachability is not
-          checked.
+          All destinations are public; hiding or disabling does not block access
+          outside shl. Redirects happen in the browser, not through HTTP 301/302
+          responses; destination reachability is not checked.
         </p>
         <p>
           See the
@@ -194,6 +243,7 @@ export const notFoundPage = () =>
 (async () => {
   const isDirectory = ${isDirectory.toString()};
   const linkUrl = ${linkUrl.toString()};
+  const linkStates = ${linkStates.toString()};
   const parts = location.pathname.split('/').filter(Boolean);
   const seg = parts.at(-1) || '';
   const home = document.getElementById('home');
@@ -222,7 +272,7 @@ export const notFoundPage = () =>
         location.replace(base + canonical.join('/') + '/');
         return;
       }
-      if (entry) { location.replace(linkUrl(entry)); return; }
+      if (entry) { location.replace(linkStates(entry).disabled ? base + canonical.join('/') + '/' : linkUrl(entry)); return; }
       break;
     } catch (e) { /* try next */ }
   }

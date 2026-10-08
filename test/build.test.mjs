@@ -13,6 +13,9 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawn, spawnSync } from "node:child_process";
 import { createContext, runInContext, runInNewContext } from "node:vm";
+import { stringify } from "yaml";
+import { linkFields, entryTree } from "../src/links.mjs";
+import { scriptString } from "../src/layout.mjs";
 
 const buildScript = fileURLToPath(new URL("../build.mjs", import.meta.url));
 
@@ -28,6 +31,8 @@ function availableChrome(t) {
 }
 
 function runChrome(chrome, cwd, url, flags = []) {
+  // --dump-dom cannot dispatch native Enter/Space; .click() checks below are
+  // click/default-action proof only, not browser keyboard activation coverage.
   const result = spawnSync(
     chrome,
     [
@@ -191,8 +196,7 @@ test("YAML sources generate the same site and public JSON map as JSON", async (t
       url: "https://example.com/setup.sh",
       title: "Setup #1",
       script: true,
-      hidden: true,
-      tags: ["setup", "shell"],
+      tags: ["setup", "shell", "hidden"],
     },
   };
   const yaml = `gh: https://github.com/
@@ -200,8 +204,7 @@ Run:
   url: https://example.com/setup.sh
   title: 'Setup #1'
   script: true
-  hidden: true
-  tags: [setup, shell]
+  tags: [setup, shell, hidden]
 `;
   const json = await fixture(t, links);
   assert.equal(json.build().status, 0);
@@ -265,7 +268,7 @@ test("missing, conflicting, malformed, or invalid YAML input preserves the prior
     ],
     [
       "Run:\n  url: https://example.com/\n  hidden: yes\n",
-      /hidden must be a boolean/,
+      /hidden property is no longer supported; remove it\. Only for hidden: true, append hidden to tags unless already present \(case-insensitive\); preserve all existing tags\./,
     ],
     [
       'Run:\n  url: https://example.com/\n  tags: [ok, " "]\n',
@@ -460,7 +463,9 @@ for (const prefix of ["/", "/project/"])
         git: "https://git-scm.com/",
         editors: { Code: "https://example.org/" },
       },
-      hidden: { secret: { url: "https://example.org/private", hidden: true } },
+      hidden: {
+        secret: { url: "https://example.org/private", tags: ["hidden"] },
+      },
     });
     assert.equal(f.build().status, 0);
     const emptySite = await fixture(t, {});
@@ -1100,16 +1105,25 @@ for (const prefix of ["/", "/project/"])
 test("hidden links and hidden-only folders are hidden by default but keep their resources", async (t) => {
   const links = {
     visible: "https://example.com/visible",
-    shown: { url: "https://example.com/shown", hidden: false },
-    secret: { url: "https://example.com/secret", hidden: true, script: true },
+    shown: { url: "https://example.com/shown" },
+    secret: {
+      url: "https://example.com/secret",
+      tags: ["hidden"],
+      script: true,
+    },
     tools: {
       public: "https://example.com/public",
       private: {
-        deep: { SecretCode: { url: "https://example.com/deep", hidden: true } },
+        deep: {
+          SecretCode: { url: "https://example.com/deep", tags: ["hidden"] },
+        },
       },
       nested: {
         hiddenOnly: {
-          HiddenDeep: { url: "https://example.com/hidden-deep", hidden: true },
+          HiddenDeep: {
+            url: "https://example.com/hidden-deep",
+            tags: ["hidden"],
+          },
         },
         branch: {
           further: { VisibleDeep: "https://example.com/visible-deep" },
@@ -1118,7 +1132,7 @@ test("hidden links and hidden-only folders are hidden by default but keep their 
     },
     onlyHidden: {
       nested: {
-        OtherSecret: { url: "https://example.com/other", hidden: true },
+        OtherSecret: { url: "https://example.com/other", tags: ["hidden"] },
       },
     },
   };
@@ -1141,7 +1155,7 @@ test("hidden links and hidden-only folders are hidden by default but keep their 
     );
     assert.match(
       html,
-      /<li data-hidden="true" hidden data-search="[^"]+"><div class="link-row"[^>]*><a class="code[^>]* href="\.\/.*(?:secret|SecretCode|HiddenDeep)\/"/,
+      /<li data-hidden="true" hidden data-tags="[^"]*" data-search="[^"]+"><div class="link-row"[^>]*><a class="code[^>]* href="\.\/.*(?:secret|SecretCode|HiddenDeep)\/"/,
     );
   }
   const home = await f.read("index.html");
@@ -1210,7 +1224,7 @@ test("hidden links and hidden-only folders are hidden by default but keep their 
 
   const allHidden = await fixture(t, {
     private: {
-      nested: { code: { url: "https://example.com/", hidden: true } },
+      nested: { code: { url: "https://example.com/", tags: ["hidden"] } },
     },
   });
   assert.equal(allHidden.build().status, 0);
@@ -1268,7 +1282,7 @@ test("long destinations keep their trailing path beside single-line short codes"
 
 test("directory clicks copy full short or long URLs while Open follows the destination", async (t) => {
   const url = "https://example.com/a/b/setup.sh?q=<tag>&x='\"";
-  const f = await fixture(t, { tools: { Setup: { url, hidden: true } } });
+  const f = await fixture(t, { tools: { Setup: { url, tags: ["hidden"] } } });
   assert.equal(f.build().status, 0);
   const script = await f.read("assets/copy.js");
   for (const [page, prefix, shortHref] of [
@@ -1755,8 +1769,7 @@ test("tags are displayed safely and searchable on home and nested pages without 
       editor: { url: "https://example.com/editor", tags: [" editor "] },
       private: {
         url: "https://example.com/private",
-        tags: ["How To"],
-        hidden: true,
+        tags: ["How To", "hidden"],
       },
     },
     other: "https://example.com/other",
@@ -1800,6 +1813,11 @@ test("tags are displayed safely and searchable on home and nested pages without 
         firstElementChild: { tagName: "DIV" },
         dataset: {
           search: searchValue,
+          tags: attributes
+            .match(/data-tags="([^"]*)"/)[1]
+            .replaceAll("&quot;", '"')
+            .replaceAll("&lt;", "<")
+            .replaceAll("&gt;", ">"),
           ...(attributes.includes('data-hidden="true"')
             ? { hidden: "true" }
             : {}),
@@ -1890,14 +1908,14 @@ test("toggle updates hidden rows, nested search, counts, and hidden-only empty s
     secret: {
       url: "https://example.com/private",
       title: "Private notes",
-      hidden: true,
+      tags: ["hidden"],
     },
     folder: {
       visible: "https://example.com/visible",
-      private: { deep: { url: "https://example.com/deep", hidden: true } },
+      private: { deep: { url: "https://example.com/deep", tags: ["hidden"] } },
     },
     onlyHidden: {
-      nested: { code: { url: "https://example.com/code", hidden: true } },
+      nested: { code: { url: "https://example.com/code", tags: ["hidden"] } },
     },
   });
   assert.equal(f.build().status, 0);
@@ -1978,7 +1996,7 @@ test("toggle updates hidden rows, nested search, counts, and hidden-only empty s
       document: { querySelector: (selector) => elements[selector] },
     });
     assert.equal(toggle.hidden, false);
-    assert.equal(search.hidden, !visible);
+    assert.equal(search.hidden, false);
     return { html, input, status, toggle, count, empty, wrapper };
   };
 
@@ -2102,14 +2120,14 @@ test("toggle updates hidden rows, nested search, counts, and hidden-only empty s
   assert.equal(hiddenPage.status.textContent, "");
   hiddenPage.toggle.click();
   assert.equal(hiddenPage.count.textContent, "0 links");
-  assert.equal(hiddenPage.empty.hidden, false);
+  assert.equal(hiddenPage.empty.hidden, true);
   assert.equal(hiddenPage.wrapper.hidden, true);
-  assert.equal(hiddenPage.input.parentElement.hidden, true);
-  assert.equal(hiddenPage.status.hidden, true);
+  assert.equal(hiddenPage.input.parentElement.hidden, false);
+  assert.equal(hiddenPage.status.hidden, false);
   assert.equal(hiddenPage.status.textContent, "No links match your search.");
 
   const allHidden = await fixture(t, {
-    secret: { url: "https://example.com/", hidden: true },
+    secret: { url: "https://example.com/", tags: ["hidden"] },
   });
   assert.equal(allHidden.build().status, 0);
   const root = await exercise(
@@ -2361,7 +2379,7 @@ test("shared shell renders consistently across direct/native loads and app navig
     JSON.stringify({
       tools: {
         git: "https://git-scm.com/",
-        private: { url: "https://example.com/private", hidden: true },
+        private: { url: "https://example.com/private", tags: ["hidden"] },
       },
       local: origin + "/guide/#about",
       localProject: origin + "/project/guide/#about",
@@ -2578,7 +2596,7 @@ test("script launchers are opt-in, quote URLs, forward arguments and statuses, a
   const url =
     "https://example.com/setup.sh?q='\";printf injected;#$(printf expanded)&x=`printf backticks`\\path\nnext";
   const f = await fixture(t, {
-    Run: { url, script: true, hidden: true, tags: ["shell"] },
+    Run: { url, script: true, tags: ["shell", "hidden"] },
     tools: { Nested: { url, script: true } },
     disabled: { url, script: false },
     plain: url,
@@ -2590,17 +2608,17 @@ test("script launchers are opt-in, quote URLs, forward arguments and statuses, a
   const home = await f.read("index.html");
   assert.match(
     home,
-    /<li data-hidden="true" hidden data-search="Run script [^"]+"><div class="link-row script-row"><a class="code script-link" href="\.\/Run\/">Run<\/a>/,
+    /<li data-hidden="true" hidden data-tags="[^"]*" data-search="Run script [^"]+"><div class="link-row script-row"><a class="code script-link" href="\.\/Run\/">Run<\/a>/,
   );
   assert.doesNotMatch(home, /class="script-label"/);
   assert.match(
     home,
     /class="download" href="\.\/Run\.sh"[^>]* download>Download<\/a><a class="visit" href="https:\/\/example\.com\/setup\.sh/,
   );
-  assert.match(home, /#shell"[^>]*><div class="link-row script-row">/);
+  assert.match(home, /#shell #hidden"[^>]*><div class="link-row script-row">/);
   assert.match(
     home,
-    /<button class="tags"[^>]*>#shell<\/button><a class="destination"/,
+    /<button class="tags"[^>]*>#shell · #hidden<\/button><a class="destination"/,
   );
   assert.match(
     home,
@@ -2703,7 +2721,7 @@ test("invalid input fails before replacing an existing build", async (t) => {
     ...[null, "true", 1, [], {}].map((script) => ({
       code: { url: "https://example.com", script },
     })),
-    ...[null, "true", 1, [], {}].map((hidden) => ({
+    ...[true, false, null, "true", 1, [], {}].map((hidden) => ({
       code: { url: "https://example.com", hidden },
     })),
     ...[null, "tag", 1, {}, [null], [1], [""], ["  "]].map((tags) => ({
@@ -2740,13 +2758,11 @@ test("invalid input fails before replacing an existing build", async (t) => {
     const result = f.build();
     assert.equal(result.status, 1, JSON.stringify(value));
     assert.match(result.stderr, /Build stopped/);
-    if (
-      value?.code &&
-      typeof value.code === "object" &&
-      "hidden" in value.code &&
-      typeof value.code.hidden !== "boolean"
-    )
-      assert.match(result.stderr, /"code" — hidden must be a boolean/);
+    if (value?.code && typeof value.code === "object" && "hidden" in value.code)
+      assert.match(
+        result.stderr,
+        /"code" — The hidden property is no longer supported; remove it\. Only for hidden: true, append hidden to tags unless already present \(case-insensitive\); preserve all existing tags\./,
+      );
     assert.equal(await f.read("marker"), "preserved");
   }
   await writeFile(join(f.cwd, "links.json"), "{broken");
@@ -2757,12 +2773,21 @@ test("404 resolves root and nested paths under user and project sites", async (t
   const map = {
     tools: {
       Git: "https://git-scm.com/",
-      editors: { Code: { url: "https://example.org/", hidden: true } },
+      editors: {
+        Code: { url: "https://example.org/", tags: ["hidden", "broken"] },
+      },
       hiddenOnly: {
-        Secret: { url: "https://example.com/secret", hidden: true },
+        Secret: { url: "https://example.com/secret", tags: ["hidden"] },
       },
     },
-    Mixed: { url: "https://example.com/", script: true, hidden: true },
+    Mixed: { url: "https://example.com/", script: true, tags: ["hidden"] },
+    Stopped: {
+      Deep: {
+        url: "https://example.com/disabled",
+        tags: [" Hidden ", " DISABLED ", "broken"],
+        script: true,
+      },
+    },
     plain: "https://example.org/",
   };
   const f = await fixture(t, map);
@@ -2808,6 +2833,8 @@ test("404 resolves root and nested paths under user and project sites", async (t
       ...["Mixed", "mixed", "MIXED/"].map((code) => [code, map.Mixed.url]),
       ["plain", map.plain],
       ["PLAIN/", map.plain],
+      ["STOPPED/deep", prefix + "Stopped/Deep/"],
+      ["stopped/DEEP/", prefix + "Stopped/Deep/"],
     ]) {
       const { elements, requests, destination, shellLinks } = await visit(path);
       assert.equal(destination, expected);
@@ -2901,4 +2928,547 @@ test("404 forwards matching URLs despite malformed tags without probing a parent
       assert.equal(elements.home.href, prefix + "tools/");
     }
   }
+});
+
+const stateMap = (script = true) =>
+  Object.fromEntries(
+    Array.from({ length: 8 }, (_, mask) => [
+      `${script ? "" : "Plain"}State${mask}`,
+      {
+        url: `https://example.com/a/very/long/destination/path/that/requires/middle/truncation/state${mask}.sh?q=</script>&x='"`,
+        title: `State ${mask}`,
+        script,
+        tags: [
+          "docs",
+          "release notes",
+          ...[" Hidden ", " BROKEN ", " Disabled "].filter(
+            (_, bit) => mask & (1 << bit),
+          ),
+        ],
+      },
+    ]),
+  );
+
+test("all eight states share interpretation, raw JSON/YAML publication, counts and action precedence", async (t) => {
+  const links = {
+    ...stateMap(),
+    near: {
+      url: "https://example.com/",
+      tags: ["hiddenish", "#hidden", "disabled-ish", "brokenish"],
+    },
+    duplicate: {
+      url: "https://example.com/",
+      tags: [" Hidden ", "hidden", "HIDDEN", " DISABLED "],
+    },
+    plain: "https://example.com/",
+  };
+  const snapshot = JSON.stringify(links);
+  const nodes = entryTree(links);
+  assert.equal(
+    JSON.stringify(links),
+    snapshot,
+    "interpretation borrows readonly source",
+  );
+  assert.equal(
+    nodes.reduce((n, node) => n + node.visible, 0),
+    6,
+  );
+  assert.deepEqual(linkFields(links.near), {
+    url: links.near.url,
+    title: "",
+    script: false,
+    hidden: false,
+    broken: false,
+    disabled: false,
+    tags: links.near.tags,
+  });
+  for (const source of ["links.json", "links.yaml", "links.yml"]) {
+    const f = await fixture(
+      t,
+      source === "links.json" ? links : stringify(links),
+      source,
+    );
+    assert.equal(f.build().status, 0);
+    assert.deepEqual(JSON.parse(await f.read("links.json")), links);
+    const home = await f.read("index.html");
+    assert.match(home, /class="count-number">6</);
+    for (let mask = 0; mask < 8; mask++) {
+      const fields = linkFields(links[`State${mask}`]);
+      assert.equal(fields.hidden, !!(mask & 1));
+      assert.equal(fields.broken, !!(mask & 2));
+      assert.equal(fields.disabled, !!(mask & 4));
+      const row = home.match(
+        new RegExp(
+          `<li([^>]*)><div class="([^"]*)" title="State ${mask}">([\\s\\S]*?)</li>`,
+        ),
+      );
+      assert.ok(row);
+      assert.equal(row[1].includes('data-hidden="true"'), !!(mask & 1));
+      assert.equal(row[2].includes("broken-row"), !!(mask & 2));
+      assert.equal(row[2].includes("disabled-row"), !!(mask & 4));
+      const html = await f.read(`State${mask}/index.html`);
+      if (mask & 4) {
+        assert.match(html, /<title>Link disabled · shl<\/title>/);
+        assert.match(html, /<h1>Link disabled<\/h1>/);
+        assert.match(
+          html.replace(/\s+/g, " "),
+          /This short link has been disabled\. shl will not forward you to its destination\./,
+        );
+        assert.match(
+          html.replace(/\s+/g, " "),
+          /The destination remains public\. Disabling this link does not prevent access outside shl\./,
+        );
+        assert.doesNotMatch(
+          html,
+          /http-equiv="refresh"|rel="canonical"|data-behavior="forward"|Continue|<a\b|<header|<footer|example\.com/,
+        );
+        assert.equal(
+          behaviorScript(html, "theme"),
+          await f.read("assets/theme.js"),
+        );
+        assert.ok(
+          html.includes(`<style>${await f.read("assets/site.css")}</style>`),
+        );
+        assert.match(
+          row[3],
+          /<button type="button" class="destination" data-copy-url=/,
+        );
+        assert.match(row[3], /class="visit" disabled/);
+        assert.match(row[3], /class="download" disabled/);
+        assert.doesNotMatch(
+          row[3],
+          /<a class="(?:destination|visit|download)"/,
+        );
+      } else {
+        assert.match(html, /http-equiv="refresh"/);
+        assert.match(row[3], /<a class="visit" href=/);
+        assert.match(row[3], /<a class="download" href=/);
+      }
+    }
+  }
+});
+
+test("legacy hidden is always rejected, disabled validation retains output, and rebuilds replace stale state artifacts", async (t) => {
+  const f = await fixture(t, {
+    Run: { url: "https://example.com/setup.sh", script: true },
+  });
+  assert.equal(f.build().status, 0);
+  const enabled = await f.read("Run/index.html"),
+    launcher = await f.read("Run.sh");
+  for (const source of ["links.json", "links.yaml"]) {
+    if (source !== "links.json") await unlink(join(f.cwd, "links.json"));
+    for (const hidden of [true, false, null, 0, "true", [], {}]) {
+      const map = {
+        folder: {
+          Run: {
+            url: "https://example.com/",
+            hidden,
+            tags: ["hidden", "disabled"],
+          },
+        },
+      };
+      await writeFile(
+        join(f.cwd, source),
+        source === "links.json" ? JSON.stringify(map) : stringify(map),
+      );
+      const result = f.build();
+      assert.equal(result.status, 1);
+      assert.match(
+        result.stderr,
+        /"folder\/Run" — The hidden property is no longer supported; remove it\. Only for hidden: true, append hidden to tags unless already present \(case-insensitive\); preserve all existing tags\./,
+      );
+      assert.equal(await f.read("Run/index.html"), enabled);
+      assert.equal(await f.read("Run.sh"), launcher);
+    }
+    if (source !== "links.json") await unlink(join(f.cwd, source));
+  }
+  for (const map of [
+    { Run: { url: "javascript:alert(1)", tags: ["disabled"] } },
+    {
+      Run: { url: "https://example.com/", tags: ["disabled"], script: true },
+      "RUN.SH": "https://example.com/",
+    },
+  ]) {
+    await writeFile(join(f.cwd, "links.json"), JSON.stringify(map));
+    assert.equal(f.build().status, 1);
+    assert.equal(await f.read("Run.sh"), launcher);
+  }
+  for (const tags of [["disabled"], []]) {
+    await writeFile(
+      join(f.cwd, "links.json"),
+      JSON.stringify({
+        Run: { url: "https://example.com/setup.sh", script: true, tags },
+      }),
+    );
+    assert.equal(f.build().status, 0);
+    const html = await f.read("Run/index.html"),
+      script = await f.read("Run.sh");
+    if (tags.length) {
+      assert.doesNotMatch(html, /http-equiv="refresh"|data-behavior="forward"/);
+      assert.doesNotMatch(script, /curl|mktemp|trap|bash "\$script"/);
+    } else {
+      assert.equal(html, enabled);
+      assert.equal(script, launcher);
+    }
+  }
+  await writeFile(join(f.cwd, "links.json"), "{}");
+  assert.equal(f.build().status, 0);
+  await assert.rejects(f.read("Run.sh"), { code: "ENOENT" });
+  await assert.rejects(f.read("Run/index.html"), { code: "ENOENT" });
+});
+
+test("disabled Bash launchers exit 1 with exact stderr and invoke no downloader, payload or temp creation", async (t) => {
+  const f = await fixture(t, {
+    folder: {
+      Run: {
+        url: "https://example.com/setup.sh",
+        script: true,
+        tags: ["hidden", "broken", "DISABLED"],
+      },
+    },
+  });
+  assert.equal(f.build().status, 0);
+  await mkdir(join(f.cwd, "bin"));
+  for (const name of ["curl", "mktemp", "bash"]) {
+    await writeFile(
+      join(f.cwd, "bin", name),
+      '#!/bin/sh\nprintf invoked > "$INVOCATION"\nexit 99\n',
+      { mode: 0o755 },
+    );
+  }
+  const result = spawnSync(
+    "/bin/bash",
+    ["-s", "--", "--verbose", "two words", "$(touch unwanted)"],
+    {
+      input: await f.read("folder/Run.sh"),
+      cwd: f.cwd,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: join(f.cwd, "bin"),
+        TMPDIR: join(f.cwd, "missing"),
+        INVOCATION: join(f.cwd, "invoked"),
+      },
+    },
+  );
+  assert.equal(result.status, 1);
+  assert.equal(result.stdout, "");
+  assert.equal(
+    result.stderr,
+    "This link is disabled. No script was downloaded or executed.\n",
+  );
+  await assert.rejects(readFile(join(f.cwd, "invoked")), { code: "ENOENT" });
+  await assert.rejects(readFile(join(f.cwd, "unwanted")), { code: "ENOENT" });
+});
+
+test("disabled copy-only controls keep full values, rejection feedback, timer reset and stale-copy cleanup", async (t) => {
+  const url = "https://example.com/setup.sh?x=</script>&quote='\"";
+  const f = await fixture(t, {
+    Run: { url, tags: ["hidden", "broken", "disabled"], script: true },
+  });
+  assert.equal(f.build().status, 0);
+  const status = { textContent: "" },
+    timers = new Map(),
+    copied = [];
+  let next = 0,
+    reject = false,
+    settle;
+  const list = {
+    addEventListener(_, handler) {
+      this.click = handler;
+    },
+    removeEventListener(_, handler) {
+      assert.equal(handler, this.click);
+      this.click = null;
+    },
+  };
+  const context = {
+    document: {
+      querySelector: (selector) =>
+        ({ ".links": list, "#copy-status": status })[selector],
+    },
+    navigator: {
+      clipboard: {
+        writeText: async (value) => {
+          copied.push(value);
+          if (reject) throw Error("denied");
+          if (settle === true)
+            await new Promise((resolve) => {
+              settle = resolve;
+            });
+        },
+      },
+    },
+    clearTimeout: (id) => timers.delete(id),
+    setTimeout: (callback, delay) => {
+      assert.equal(delay, 5000);
+      timers.set(++next, callback);
+      return next;
+    },
+  };
+  runInNewContext((await f.read("assets/copy.js")) + "\ninitCopy();", context);
+  const destination = {
+    classList: { contains: () => false },
+    hasAttribute: (name) => name === "data-copy-url",
+    getAttribute: (name) => (name === "data-copy-url" ? url : null),
+  };
+  const code = {
+    href: "https://short.example/project/Run/",
+    classList: { contains: (name) => name === "code" },
+    hasAttribute: () => false,
+  };
+  const click = async (control, extra = {}) => {
+    let prevented = false;
+    await list.click({
+      button: 0,
+      target: {
+        closest: (selector) => {
+          assert.ok(selector.includes("button[data-copy-url]"));
+          return control;
+        },
+      },
+      preventDefault() {
+        prevented = true;
+      },
+      ...extra,
+    });
+    return prevented;
+  };
+  assert.equal(await click(code), true);
+  assert.equal(copied.at(-1), code.href);
+  assert.equal(status.textContent, "Short link copied.");
+  const first = [...timers.keys()][0];
+  assert.equal(await click(destination), true);
+  assert.equal(copied.at(-1), url);
+  assert.equal(status.textContent, "Destination copied.");
+  assert.equal(timers.has(first), false);
+  assert.equal(timers.size, 1);
+  timers.values().next().value();
+  assert.equal(status.textContent, "");
+  for (const extra of [
+    { ctrlKey: true },
+    { metaKey: true },
+    { shiftKey: true },
+    { altKey: true },
+    { button: 1 },
+  ])
+    assert.equal(await click(destination, extra), false);
+  assert.equal(copied.length, 2);
+  reject = true;
+  await click(destination);
+  assert.equal(
+    status.textContent,
+    "Could not copy the link. Select and copy the destination text.",
+  );
+  reject = false;
+  settle = true;
+  const pending = click(destination);
+  context.cleanupCopy();
+  settle();
+  await pending;
+  assert.equal(status.textContent, "");
+  assert.equal(timers.size, 0);
+  assert.equal(list.click, null);
+});
+
+test("state rows, exact search, all-hidden traversal, disabled native actions and lifecycle render in both themes and sizes", async (t) => {
+  const chrome = availableChrome(t);
+  if (!chrome) return;
+  const f = await fixture(t, {
+    ...stateMap(),
+    ...stateMap(false),
+    nativeFolder: {
+      DisabledCode: {
+        url: "https://example.com/native-disabled",
+        tags: ["disabled"],
+      },
+    },
+    onlyHidden: {
+      deeper: {
+        Broken: {
+          url: "https://example.com/broken",
+          tags: ["hidden", "broken"],
+        },
+        Disabled: {
+          url: "https://example.com/disabled",
+          script: true,
+          tags: ["hidden", "disabled"],
+        },
+        Unmatched: {
+          url: "https://example.com/other",
+          tags: ["hidden", "docs-api"],
+        },
+      },
+    },
+    docs: {
+      Fragment: {
+        url: "https://example.com/#docs",
+        title: "docs broken disabled",
+        tags: ["docs-api", "broken #disabled"],
+      },
+      Literal: {
+        url: "https://example.com/",
+        title: "docs guide",
+        tags: ["release notes"],
+      },
+    },
+  });
+  assert.equal(f.build().status, 0);
+  const origin = await browserServer(t, f.cwd);
+  await writeFile(
+    join(f.cwd, "dist", "state-check.html"),
+    `<!doctype html><html><body><iframe style="height:900px;border:0"></iframe><script>
+    (async () => { try {
+      const frame = document.querySelector('iframe');
+      const wait = () => new Promise(resolve => setTimeout(resolve, 30));
+      const load = path => new Promise(resolve => { frame.onload = resolve; frame.src = path; });
+      const check = (condition, message) => { if (!condition) throw new Error(message); };
+      const disabledUrl = ${scriptString(stateMap().State7.url)};
+      const configured = ${scriptString({ ...stateMap(), ...stateMap(false) })};
+      const rgb = color => { color = color.trim(); if (color.startsWith('#')) { let hex = color.slice(1); if (hex.length === 3) hex = [...hex].map(c => c+c).join(''); return hex.match(/../g).map(c => parseInt(c, 16)); } return color.match(/[\\d.]+/g).slice(0, 3).map(Number); };
+      const blend = (front, back, opacity) => front.map((v, i) => v * opacity + back[i] * (1-opacity));
+      const luminance = color => color.map(v => { v /= 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }).reduce((sum, v, i) => sum + v * [.2126, .7152, .0722][i], 0);
+      const contrast = (a, b) => { const x = luminance(a), y = luminance(b); return (Math.max(x,y)+.05)/(Math.min(x,y)+.05); };
+      const query = (doc, value) => { const input = doc.querySelector('#link-search'); input.value = value; input.dispatchEvent(new frame.contentWindow.Event('input')); };
+      const count = doc => Number(doc.querySelector('.count-number').textContent);
+      const row = (doc, code) => [...doc.querySelectorAll('.link-row')].find(row => row.querySelector('.code').textContent === code);
+      const shown = doc => [...doc.querySelectorAll('.link-row')].filter(row => !row.closest('li').hidden && row.getClientRects().length).map(row => row.querySelector('.code').textContent).sort().join(',');
+      for (const prefix of ['/', '/project/']) for (const width of [390, 1440]) for (const theme of ['light', 'dark']) {
+        frame.style.width = width + 'px'; localStorage.setItem('shortlink-theme', theme);
+        for (const native of [false, true]) {
+          frame.setAttribute('sandbox', native ? 'allow-same-origin' : 'allow-same-origin allow-scripts');
+          await load(prefix + (native ? '?native=1' : ''));
+          let doc = frame.contentDocument, win = frame.contentWindow;
+          if (native) doc.documentElement.dataset.theme = theme;
+          const toggle = doc.querySelector('#hidden-toggle');
+          if (native) { check(toggle.hidden && doc.querySelector('.search').hidden, 'Native tools visible');
+            for (const li of doc.querySelectorAll('li[data-hidden]')) check(li.hidden, 'Native hidden leaf revealed');
+            // Inspect all variants without enabling scripts; this is a geometry/style projection only.
+            for (const li of doc.querySelectorAll('li[hidden]')) li.hidden = false;
+            for (const details of doc.querySelectorAll('details')) details.open = true;
+          } else toggle.click();
+          const rules = [...doc.styleSheets].flatMap(sheet => [...sheet.cssRules]);
+          const pointerRule = rules.find(rule => rule.conditionText === '(hover: hover) and (pointer: fine)');
+          const coarseRule = rules.find(rule => rule.conditionText === '(any-pointer: coarse)');
+          const pointerMedia = pointerRule.media.mediaText, coarseMedia = coarseRule.media.mediaText;
+          const hover = doc.createElement('style');
+          hover.textContent = [...pointerRule.cssRules].filter(rule => rule.selectorText?.includes(':hover')).map(rule => rule.selectorText.replaceAll(':hover', '.verify-hover') + '{' + rule.style.cssText + '}').join('');
+          doc.head.append(hover);
+          const bg = rgb(win.getComputedStyle(doc.body).backgroundColor), wash = rgb(win.getComputedStyle(doc.documentElement).getPropertyValue('--wash'));
+          for (const script of [true, false]) for (let mask = 0; mask < 8; mask++) {
+            const r = row(doc, (script ? '' : 'Plain') + 'State' + mask), style = win.getComputedStyle(r), code = r.querySelector('.code');
+            check(r.getBoundingClientRect().height === 50, 'State row changed height');
+            check(Number(style.opacity) === (mask & 1 ? theme === 'dark' ? .8 : .94 : 1), 'State opacity');
+            const expected = win.getComputedStyle(doc.documentElement).getPropertyValue(mask & 4 ? '--disabled' : mask & 2 ? '--broken' : script ? '--script' : '--accent');
+            check(!!r.querySelector('.download') === script, 'Non-script Download control');
+            check(JSON.stringify(rgb(win.getComputedStyle(code).color)) === JSON.stringify(rgb(expected)), 'State precedence');
+            for (const element of [code, r.querySelector('.tags'), r.querySelector('.destination')]) {
+              for (const background of [bg, wash]) check(contrast(blend(rgb(win.getComputedStyle(element).color), background, Number(style.opacity)), background) >= 4.5, 'Dimmed contrast failed: ' + theme + '/' + mask + '/' + element.className);
+            }
+            code.focus(); check(win.getComputedStyle(r).opacity === '1', 'Focus opacity');
+            check(win.getComputedStyle(code).outlineWidth === '2px', 'Focus outline'); code.blur();
+            const dest = r.querySelector('.destination');
+            check(dest.getBoundingClientRect().width >= (width < 500 ? 48 : 64), 'Destination reserve');
+            if (mask & 4) {
+              check(dest.tagName === 'BUTTON' && !dest.hasAttribute('href') && win.getComputedStyle(dest).userSelect === 'text', 'Disabled destination navigates or not selectable');
+              check(dest.getAttribute('aria-label') === 'Copy destination: ' + configured[code.textContent].url, 'Disabled accessible full value');
+              const height = r.getBoundingClientRect().height, destWidth = dest.getBoundingClientRect().width;
+              pointerRule.media.mediaText = 'all'; coarseRule.media.mediaText = 'not all';
+              check(win.getComputedStyle(dest).opacity === '0' && win.getComputedStyle(dest).pointerEvents === 'none', 'Button visible before hover');
+              r.classList.add('verify-hover');
+              check(win.getComputedStyle(dest).opacity === '1' && win.getComputedStyle(dest).pointerEvents === 'auto', 'Button hover reveal');
+              r.classList.remove('verify-hover'); dest.focus();
+              check(win.getComputedStyle(dest).opacity === '1' && win.getComputedStyle(dest).outlineWidth === '2px' && win.getComputedStyle(r).opacity === '1', 'Button focus reveal');
+              dest.blur(); coarseRule.media.mediaText = 'all';
+              check(win.getComputedStyle(dest).opacity === '1' && win.getComputedStyle(dest).pointerEvents === 'auto', 'Button hybrid/coarse visibility');
+              pointerRule.media.mediaText = 'not all'; coarseRule.media.mediaText = 'not all';
+              check(win.getComputedStyle(dest).opacity === '1', 'Button non-hover visibility');
+              check(r.getBoundingClientRect().height === height && dest.getBoundingClientRect().width === destWidth, 'Button pointer states shift geometry');
+              check(win.getComputedStyle(dest.querySelector('.destination-start')).textOverflow === 'ellipsis' && win.getComputedStyle(dest.querySelector('.destination-end')).textOverflow === 'ellipsis', 'Button middle truncation');
+              const selection = win.getSelection(), range = doc.createRange();
+              range.selectNodeContents(dest); selection.removeAllRanges(); selection.addRange(range);
+              check(selection.toString() === configured[code.textContent].url, 'Disabled native selection duplicates or splits URL: ' + JSON.stringify(selection.toString()));
+              selection.removeAllRanges();
+              pointerRule.media.mediaText = pointerMedia; coarseRule.media.mediaText = coarseMedia;
+              for (const action of r.querySelectorAll('.visit, .download')) {
+                check(action.disabled && !action.hasAttribute('href'), 'Disabled action actionable');
+                const before = win.location.href; action.click(); action.dispatchEvent(new win.MouseEvent('click', { ctrlKey: true, bubbles: true })); check(win.location.href === before, 'Disabled modified action navigated');
+              }
+            }
+          }
+          hover.remove();
+          if (!native) {
+            query(doc, '  #DOCS  '); check(count(doc) === 16, 'Exact docs');
+            query(doc, '#release notes'); check(count(doc) === 17, 'Spaced tag');
+            query(doc, '#'); check(count(doc) === 0 && !doc.querySelector('#search-status').hidden, 'Bare tag');
+            query(doc, 'docs guide'); check(count(doc) === 1 && shown(doc) === 'Literal', 'Plain substring split');
+            query(doc, '#broken #disabled'); check(count(doc) === 1 && shown(doc) === 'Fragment', 'Literal tag grammar');
+            toggle.click(); query(doc, '#docs'); check(count(doc) === 8, 'Ordinary tags bypass toggle');
+            query(doc, '#disabled'); check(count(doc) === 10, 'State exception');
+            // Actual clipboard success/failure through both disabled copy controls, including hidden combination.
+            const copied = []; let fail = false;
+            Object.defineProperty(win.navigator, 'clipboard', { configurable: true, value: { writeText: async value => { if (fail) throw Error('denied'); copied.push(value); } } });
+            const r = row(doc, 'State7');
+            r.querySelector('.code').click(); await wait(); check(copied.at(-1) === new URL(prefix + 'State7/', location.href).href, 'Disabled short copy');
+            const destination = r.querySelector('.destination'); destination.click(); await wait(); check(copied.at(-1) === disabledUrl, 'Disabled destination copy');
+            check(doc.querySelector('#copy-status').textContent === 'Destination copied.', 'Copy feedback');
+            fail = true; destination.click(); await wait(); check(doc.querySelector('#copy-status').textContent.includes('Select and copy'), 'Copy-only failure fallback');
+            const header = doc.querySelector('header'), footer = doc.querySelector('footer');
+            doc.querySelector('[data-nav="guide"]').click();
+            for (let tries = 0; doc.querySelector('main').dataset.appPage !== 'guide' && tries < 100; tries++) await wait();
+            check(doc.querySelector('header') === header && doc.querySelector('footer') === footer && doc.documentElement.dataset.theme === theme, 'State navigation shell lost');
+            check(!doc.querySelector('#copy-status'), 'Outgoing feedback remained');
+            doc.querySelector('[data-nav="links"]').click();
+            for (let tries = 0; !doc.querySelector('#link-search') && tries < 100; tries++) await wait();
+            check(doc.querySelector('#link-search').value === '' && doc.querySelector('#hidden-toggle').getAttribute('aria-pressed') === 'false', 'State controls did not reset');
+          }
+          await load(prefix + 'onlyHidden/' + (native ? '?native=1' : ''));
+          doc = frame.contentDocument;
+          if (!native) {
+            check(!doc.querySelector('.search').hidden && count(doc) === 0 && !doc.querySelector('#empty-directory').hidden, 'All-hidden search unreachable');
+            const details = doc.querySelector('details'); check(!details.open, 'Initial hidden disclosure');
+            query(doc, '#broken'); check(count(doc) === 1 && shown(doc) === 'Broken', 'Hidden ancestors/siblings');
+            check(details.open, 'State search did not expand ancestor');
+            const toggle = doc.querySelector('#hidden-toggle'); check(toggle.getAttribute('aria-pressed') === 'false', 'State query mutated toggle');
+            toggle.click(); check(count(doc) === 1 && shown(doc) === 'Broken', 'Toggle changed state matches');
+            query(doc, ''); check(count(doc) === 3, 'Clearing lost selected pool');
+            check(!details.open, 'State-search disclosure not restored on clear');
+            toggle.click(); check(count(doc) === 0 && !doc.querySelector('#empty-directory').hidden, 'Clearing empty state');
+            for (const value of ['broken', '#docs-api', '#missing']) { query(doc, value); check(count(doc) === 0 && !doc.querySelector('#search-status').hidden && doc.querySelector('#empty-directory').hidden && !doc.querySelector('.search').hidden, 'All-hidden zero results'); }
+            query(doc, '#disabled'); check(count(doc) === 1 && shown(doc) === 'Disabled', 'Hidden disabled search');
+            query(doc, '#hidden'); check(count(doc) === 3, 'Hidden exact state');
+            query(doc, ''); check(count(doc) === 0 && !doc.querySelector('#empty-directory').hidden, 'Hidden clearing');
+            check(!details.open, 'Hidden state clear retained auto-expanded ancestor');
+            details.open = true; query(doc, '#broken'); query(doc, '#disabled'); query(doc, '');
+            check(details.open, 'State-search switch/clear collapsed visitor-opened ancestor');
+          }
+          if (native) {
+            await load(prefix + 'nativeFolder/?native=1');
+            doc = frame.contentDocument;
+            const code = row(doc, 'DisabledCode').querySelector('.code');
+            check(new URL(code.href).pathname === prefix + 'nativeFolder/DisabledCode/', 'Nested native disabled code target');
+            await new Promise(resolve => { frame.onload = resolve; code.click(); });
+            check(frame.contentDocument.querySelector('h1')?.textContent === 'Link disabled' && frame.contentWindow.location.pathname === prefix + 'nativeFolder/DisabledCode/', 'Nested native disabled code forwarded');
+          }
+          // No fallback parameter: native meta refresh would still execute if disabling were faulty.
+          await load(prefix + 'State7/' + (native ? '?native=1' : ''));
+          doc = frame.contentDocument;
+          check(doc.querySelector('h1')?.textContent === 'Link disabled' && !doc.querySelector('header, footer, a'), 'Direct disabled explanation');
+          check(frame.contentWindow.location.pathname === prefix + 'State7/', 'Disabled forwarding');
+          check(frame.contentWindow.getComputedStyle(doc.querySelector('main')).paddingTop === '32px', 'Minimal foundations');
+        }
+        frame.removeAttribute('sandbox');
+        for (const path of ['state7', 'STATE7/', 'ONLYHIDDEN/DEEPER/disabled', 'onlyhidden/deeper/DISABLED/']) {
+          await load(prefix + path);
+          for (let tries = 0; frame.contentDocument.querySelector('h1')?.textContent !== 'Link disabled' && tries < 100; tries++) await wait();
+          check(frame.contentDocument.querySelector('h1')?.textContent === 'Link disabled', 'Recovered disabled forwarded');
+          check(frame.contentWindow.location.pathname === prefix + (path.toLowerCase().startsWith('state') ? 'State7/' : 'onlyHidden/deeper/Disabled/'), 'Canonical recovery');
+        }
+      }
+      document.body.dataset.stateCheck = 'passed';
+    } catch (error) { document.body.dataset.stateCheck = error.message; } })();
+  </script></body></html>`,
+  );
+  const html = runChrome(chrome, f.cwd, origin + "/state-check.html");
+  assert.match(html, /data-state-check="passed"/, html);
 });

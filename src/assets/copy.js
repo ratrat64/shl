@@ -14,7 +14,9 @@ globalThis.initCopy = () => {
       event.altKey
     )
       return;
-    const link = event.target.closest("a.code, a.destination");
+    const link = event.target.closest(
+      "a.code, a.destination, button[data-copy-url]",
+    );
     if (
       !link ||
       link.hasAttribute("download") ||
@@ -28,13 +30,17 @@ globalThis.initCopy = () => {
     let message;
     try {
       await navigator.clipboard.writeText(
-        link.classList.contains("code") ? link.href : link.getAttribute("href"),
+        link.classList.contains("code")
+          ? link.href
+          : link.getAttribute("data-copy-url") || link.getAttribute("href"),
       );
       message = link.classList.contains("code")
         ? "Short link copied."
         : "Destination copied.";
     } catch {
-      message = "Could not copy the link. Try your browser’s copy-link action.";
+      message = link.hasAttribute("data-copy-url")
+        ? "Could not copy the link. Select and copy the destination text."
+        : "Could not copy the link. Try your browser’s copy-link action.";
     }
     if (current !== interaction) return;
     status.textContent = message;
