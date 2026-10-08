@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Link-state tags — hardened</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; line-height: 1.6; background: #f6f7f5; color: #252b29; }
+    body { max-width: 850px; margin: auto; padding: 2rem 1.25rem; }
+    header { display: flex; align-items: center; gap: 2rem; flex-wrap: wrap; }
+    h1 { line-height: 1.2; } h2 { margin-top: 2rem; }
+    .seal { width: 180px; height: 180px; flex-shrink: 0; }
+    li { margin-bottom: .5rem; } code { font-size: 1em; }
+    .voice { border-left: 3px solid #006b60; padding-left: 1rem; }
+    @media (prefers-color-scheme: dark) { :root { background: #111715; color: #c6d0ca; } .voice { border-color: #64b6a4; } }
+  </style>
+</head>
+<body>
+  <header>
+    <svg class="seal" viewBox="0 0 180 180" role="img" aria-label="Hardened outcome stamp">
+      <circle cx="90" cy="90" r="85" fill="#79362f"/>
+      <circle cx="90" cy="90" r="73" fill="none" stroke="#f7d8b0" stroke-width="3" stroke-dasharray="4 3"/>
+      <circle cx="90" cy="90" r="64" fill="none" stroke="#f7d8b0"/>
+      <path d="M65 65 82 82 116 48" fill="none" stroke="#f7d8b0" stroke-width="6"/>
+      <text x="90" y="109" text-anchor="middle" fill="#f7d8b0" font-family="system-ui, sans-serif" font-size="19" font-weight="bold">HARDENED</text>
+      <text x="90" y="132" text-anchor="middle" fill="#f7d8b0" font-family="system-ui, sans-serif" font-size="12">08 OCT 2026</text>
+    </svg>
+    <div><h1>Link-state tags</h1><p>Special-rule tags survived scrutiny as a unified way to filter and maintain link states. This is a planning outcome; implementation has not started.</p></div>
+  </header>
+  <h2>Locked decisions</h2>
+  <ul>
+    <li>Reserve exact, case-insensitive <code>hidden</code>, <code>broken</code>, and <code>disabled</code> tags. Other tags stay descriptive.</li>
+    <li>Hidden keeps existing default omission and revealed opacity. Broken warns with an orange-red tint but still forwards. Disabled is grey and fully stops forwarding, Open, Download, and script execution; its short URL shows an explanation.</li>
+    <li>Disabled grey takes precedence over broken tint; hidden opacity applies independently. Readable tags communicate states without relying only on color.</li>
+    <li>Whole-tag <code>#tag</code> search is case-insensitive. Explicit state searches reveal matching hidden links and hidden-only ancestors; clearing search restores normal visibility. Ordinary text searches retain broad matching and respect the hidden toggle.</li>
+    <li>Migrate existing hidden booleans to tags, preserve other tags, remove false values, and reject the retired property with useful guidance.</li>
+    <li>The first implementation covers manual tags and their behavior. The automated checker is separate.</li>
+    <li>Future automation can overwrite any broken tag based on its latest check. Broken detection must not automatically hide links. Disabled is user-assigned; hidden may be assigned by users or automation.</li>
+  </ul>
+  <h2>Rejected and why</h2>
+  <ul>
+    <li>A toggle per state: shared tag search supplies the desired filtering without multiplying controls.</li>
+    <li>Keeping both a hidden property and hidden tag: two conventions make maintenance ambiguous.</li>
+    <li>Tracking manual versus automated ownership: deliberately omitted to keep the model simple.</li>
+    <li>Automatically hiding newly broken links: reconsidered and withdrawn by the user.</li>
+  </ul>
+  <h2>Weak points and deferred decisions</h2>
+  <ul>
+    <li>Tags now control behavior: removing disabled reactivates a link. Reserved-name rules must be explicit.</li>
+    <li>A successful automated check may remove a manual broken warning; this is an accepted tradeoff. Failure, timeout, recovery, and false-positive policies remain undefined.</li>
+    <li>All-hidden directories currently hide search. State search must remain reachable there to deliver the agreed filtering behavior.</li>
+    <li>Multi-term search syntax, disabled explanation copy, and copying interactions remain unspecified. Exact colors need accessible rendered verification.</li>
+    <li>Disabled blocks shl-provided paths; public destinations and previously downloaded launchers cannot be revoked by a tag.</li>
+    <li>Shared filtering alone does not require behavioral tags; separate fields could also feed search. Tags were retained for the user's combined goals of a unified editing model, filtering, and future automation.</li>
+  </ul>
+  <h2>Voices that pressure-tested the idea</h2>
+  <p class="voice">🎯 <strong>Yui — The Craftsman:</strong> “One convention, fixed rules, no general-purpose engine.” Challenged descriptive labels becoming commands and duplicate hidden conventions.</p>
+  <p class="voice">🌶️ <strong>Boundary — Edge-Case Hunter:</strong> “Walk every path.” Exposed hidden-search exclusions, conflicting visual states, and script-launcher bypasses.</p>
+  <p class="voice">🚢 <strong>Dana — The Pragmatist:</strong> “Separate the checker from the states.” Kept automation out of the first implementation.</p>
+  <p class="voice">🧭 <strong>Mara — generated maintainer perspective:</strong> “Let me find the state and trust what it means.” Tested editing consequences, search expectations, and automated removal of manual warnings.</p>
+</body>
+</html>
