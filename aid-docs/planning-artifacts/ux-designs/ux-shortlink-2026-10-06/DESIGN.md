@@ -2,12 +2,16 @@
 name: Shortlink
 description: A clear, static directory for short links.
 status: final
-updated: 2026-10-07
+updated: 2026-10-08
 colors:
   action-light: "#006b60"
   action-dark: "#64b6a4"
   script-light: "#895400"
   script-dark: "#c6a36a"
+  broken-light: "#a33d20"
+  broken-dark: "#ee967b"
+  disabled-light: "#59645f"
+  disabled-dark: "#96a59d"
   paper-light: "#f6f7f5"
   surface-light: "#fff"
   ink-light: "#252b29"
@@ -50,9 +54,9 @@ A compact index puts codes, destinations, and search above everything else. Slee
 
 ## Colors
 
-Teal is reserved for standard links and focus; amber marks executable-script entries, with their Download action as a second cue instead of a SCRIPT label. Dark mode uses a pure black page (#000), softly green-tinted panels and softened light ink; light mode uses an off-white page and white panels. The dark palette is deliberately lower in brightness; hidden-row text remains readable with a distinct subdued role. Respect system light/dark preference and retain the visitor's saved theme override.
+Teal is reserved for standard links and focus; amber marks enabled-script entries, with Download as a second cue instead of a SCRIPT label. Broken codes use orange-red; disabled codes use grey, overriding broken/script emphasis. Full tags are non-color cues without duplicate badges, and hidden opacity applies independently. Dark mode uses a pure black page (#000), softly green-tinted panels and softened light ink; light mode uses an off-white page and white panels. Verify state text at least 4.5:1, including dimmed combinations on background/wash, and visible focus in executed rendered checks. Respect system light/dark preference and retain the visitor's saved theme override.
 
-The frontmatter roles map to the CSS tokens in `src/styles.mjs`: paper → `--bg`, surface → `--panel`, ink → `--ink`, secondary → `--muted`, rule → `--line`, action → `--accent`, script → `--script`, and wash → `--wash`, with light/dark variants above.
+The frontmatter roles map to shared CSS tokens in `src/assets/site.css`: paper → `--bg`, surface → `--panel`, ink → `--ink`, secondary → `--muted`, rule → `--line`, action → `--accent`, script → `--script`, broken → `--broken`, disabled → `--disabled`, and wash → `--wash`, with light/dark variants above. `src/styles.mjs` loads the same CSS for embedded documents.
 
 ## Typography
 
@@ -88,11 +92,11 @@ The header brand reads `/shl/`: `shl` uses ink, the leading slash uses teal acti
 
 The count is every directory page's visual heading, not a small aside or a second search-result number. Keep the search label accessible but visually hidden; the visible placeholder is "Search link, title or tag". Reserve the same search and toggle columns on every directory page so the search size and position do not shift. The toggle stays visible but muted and disabled when there are no hidden links; otherwise it sits beside search on desktop and below it, right-aligned, on mobile. The same count responds to searching and to the hidden-links toggle; see EXPERIENCE.md for states and announcements.
 
-Column consistency applies when interactive tools are shown. Preserve the existing empty states: an empty site has no search, and an all-hidden subtree hides search until links are revealed. With JavaScript disabled, search and enabled hidden toggles remain hidden; disabled toggles remain visible.
+Column consistency applies when interactive tools are shown. An empty site has no search; enhanced search is available in every nonempty subtree, including all-hidden pages with initial 0 links and No links listed here. State queries reveal only matching hidden leaves and ancestors without changing the toggle; zero-result queries show the no-match message and clearing restores the selected pool. With JavaScript disabled, search and enabled hidden toggles remain hidden; disabled toggles remain visible.
 
 ### Directory rows
 
-A code copies its full short URL on click; script-enabled codes use amber and have a Download action without a SCRIPT label. Destinations copy their full URL on click, and an Open control at the row end follows it. Folder names link to their browseable pages while the disclosure marker expands the nested list. Optional titles appear on hover over codes and remain searchable. Destinations display their ends without wrapping; the full URL is available for copying and to assistive technology.
+A code copies its full short URL on click; enabled script codes use amber and have Download without a SCRIPT label. Destinations copy their full URL; Open follows enabled destinations. Disabled code native links reach the explanation; disabled destinations are copy-only buttons with full accessible/selectable text and no external href. Open/Download stay visible as disabled buttons with muted wash and no actionable href. Folder names link to their browseable pages while disclosure expands the list. Titles appear on hover and remain searchable. Destinations display their ends without wrapping, retaining full copy/accessibility values.
 
 Only in hover-capable, fine-pointer mode with no coarse input available, destination text is visually hidden with opacity until row hover or focus-within. Its layout space and full accessible value remain reserved, so revealing it never shifts content. Any available coarse pointer, including hybrid touch/mouse devices, forces destinations visible; touch and non-hover modes always show them too. Long URLs remain on one line with the existing middle truncation; copying retains the full value. Every row variant, tagged or untagged, standard or script, reserves at least 4rem for the destination (3rem below 500px). Open and Download remain visible.
 
@@ -102,7 +106,7 @@ Tags sit inline between the code and destination in muted text at the existing m
 
 Folder summaries stay on one line and scroll horizontally for long names, preserving the full name and disclosure marker without ellipsis or wrapping. Their height remains 50px; scrollbar chrome must not increase it.
 
-Link rows and folder summaries share a 50px minimum height (3.125rem), 10px vertical and 12px horizontal padding (.625rem .75rem), and a 4px radius. Both use the theme wash on hover and focus-within, preserving visible focus outlines; folder wash applies only to the summary, never its descendant list. Revealed hidden links use exactly the regular colors and font weights, with reduced opacity across the row and tags: 80% in dark mode and 94% in light mode. Hidden-only folder summaries use the same opacity without dimming their nested lists again. Keyboard focus restores full row or summary opacity so focus outlines stay clear. Do not add hidden or SCRIPT labels.
+Link rows and folder summaries share a 50px minimum height (3.125rem), 10px vertical and 12px horizontal padding (.625rem .75rem), and a 4px radius. Both use the theme wash on hover and focus-within, preserving visible focus outlines; folder wash applies only to the summary, never its descendant list. Revealed hidden links retain their regular/broken/disabled colors and weights with row/tag opacity 80% dark and 94% light. Hidden-only summaries dim independently without dimming descendants again. Keyboard focus restores full opacity. Keep full state tags; do not add duplicate hidden or SCRIPT labels.
 
 ## Do's and Don'ts
 
