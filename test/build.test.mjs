@@ -1625,6 +1625,7 @@ test("directory highlights match, full tags stay inline, and destinations reveal
     plain: { url: "https://example.com/plain", tags: ["reference"] },
     folder: {
       nested: { url: "https://example.com/a/very/long/path/setup.sh" },
+      second: "https://example.com/second",
     },
     ["long-folder-".repeat(12)]: { plain: "https://example.com/folder" },
     ["long-code-".repeat(12)]: "https://example.com/plain",
@@ -1643,6 +1644,7 @@ test("directory highlights match, full tags stay inline, and destinations reveal
         const doc = frame.contentDocument;
         doc.documentElement.style.scrollBehavior = 'auto';
         const win = frame.contentWindow;
+        for (const details of doc.querySelectorAll('details')) details.open = true;
         const rules = [...doc.styleSheets].flatMap(sheet => [...sheet.cssRules]);
         const pointerRule = rules.find(rule => rule.conditionText === '(hover: hover) and (pointer: fine)');
         const coarseRule = rules.find(rule => rule.conditionText === '(any-pointer: coarse)');
@@ -1661,6 +1663,17 @@ test("directory highlights match, full tags stay inline, and destinations reveal
           await new Promise(resolve => setTimeout(resolve, 30));
           for (const theme of ['light', 'dark']) {
             doc.documentElement.dataset.theme = theme;
+            if (doc.documentElement.scrollWidth > doc.documentElement.clientWidth) throw new Error('Directory overflows the viewport');
+            for (const list of doc.querySelectorAll('.links')) {
+              const items = [...list.children].filter(item => !item.hidden);
+              for (const item of items) {
+                if (item.getBoundingClientRect().right > list.getBoundingClientRect().right + 1) throw new Error('Directory entry overflows its list');
+              }
+              for (let i = 1; i < items.length; i++) {
+                const gap = items[i].getBoundingClientRect().top - items[i - 1].getBoundingClientRect().bottom;
+                if (gap !== 4) throw new Error('Adjacent directory highlights need a 4px gap: ' + gap);
+              }
+            }
             const summary = doc.querySelector('summary');
             for (const row of doc.querySelectorAll('.link-row')) {
               const style = win.getComputedStyle(row);
