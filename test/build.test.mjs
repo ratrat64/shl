@@ -154,13 +154,6 @@ test("native assets are copied module-relatively and embedded documents preserve
       }
     }
   }
-  assert.equal(
-    (await f.read("guide/index.html")).match(
-      /<pre><code>([\s\S]*?)<\/code><\/pre>/,
-    )[1],
-    "gh: https://github.com/\ndocs:\n  url: https://docs.github.com/en/pages\n  title: GitHub Pages docs",
-    "HTML formatting preserves the whitespace-sensitive YAML sample",
-  );
   let destination;
   runInNewContext(behaviorScript(await f.read("safe/index.html"), "forward"), {
     location: {
@@ -2168,7 +2161,7 @@ test("information pages use relative navigation and shared theme assets", async 
     const html = await f.read(`${page}/index.html`);
     if (page === "guide") {
       assert.match(html, /<title>Guide · shl<\/title>/);
-      assert.match(html, /<p>\s*shl publishes a public directory/);
+      assert.match(html, /<h2>Features<\/h2>/);
       assert.match(html, /href="\.\.\/assets\/site\.css"/);
       assert.match(html, /src="\.\.\/assets\/theme\.js"/);
       assert.match(html, /href="\.\.\/"/);
@@ -2198,12 +2191,33 @@ test("information pages use relative navigation and shared theme assets", async 
   assert.equal(button.textContent, "Theme: dark");
   assert.match(
     await f.read("guide/index.html"),
-    /github\.com\/ratrat64\/shortlink#readme/,
+    /github\.com\/ratrat64\/shl#readme/,
   );
   assert.match(
     await f.read("guide/index.html"),
-    /tags: \[documentation, github\]/,
+    /&quot;tags&quot;: \[\s*&quot;documentation&quot;\s*\]/,
   );
+  for (const source of ["links.json", "links.yaml", "links.yml"]) {
+    const formatFixture =
+      source === "links.json"
+        ? f
+        : await fixture(t, "gh: https://github.com/", source);
+    if (formatFixture !== f) assert.equal(formatFixture.build().status, 0);
+    const guide = await formatFixture.read("guide/index.html");
+    assert.ok(guide.includes(`<code>${source}</code>`));
+    const sample = guide
+      .match(/<pre><code>([\s\S]*?)<\/code><\/pre>/)[1]
+      .replaceAll("&quot;", '"');
+    const sampleFixture = await fixture(
+      t,
+      source === "links.json" ? JSON.parse(sample) : sample,
+      source,
+    );
+    assert.equal(sampleFixture.build().status, 0, source + " example builds");
+    const map = JSON.parse(await sampleFixture.read("links.json"));
+    assert.equal(map.gh, "https://github.com/");
+    assert.deepEqual(map.docs.tags, ["documentation"]);
+  }
   assert.match(
     await f.read("aboutme/index.html"),
     /<title>Redirecting · shl<\/title>/,

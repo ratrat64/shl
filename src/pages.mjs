@@ -67,112 +67,143 @@ export const guidePage = (source) =>
     /* HTML */ `<article class="prose">
       <h1>Guide</h1>
       <nav aria-label="On this page">
-        <a href="#about" data-app-link>About</a> ·
+        <a href="#about" data-app-link>Features</a> ·
         <a href="#how-to-use" data-app-link>How to use</a> ·
         <a href="#how-it-works" data-app-link>How it works</a>
       </nav>
       <section id="about">
-        <h2>About</h2>
-        <p>
-          shl publishes a public directory and browser redirects from a
-          version-controlled JSON or YAML file. GitHub Pages serves the
-          generated files; no application server or database is required.
-        </p>
-        <p>
-          Links and destinations are public. Redirects are browser-based, not
-          HTTP 301/302 responses. There is no anonymous submission or built-in
-          click tracking.
-        </p>
+        <h2>Features</h2>
+        <ul>
+          <li>
+            <strong>Stable short URLs.</strong> Change a destination without
+            changing the link you've shared.
+          </li>
+          <li>
+            <strong>Easy discovery.</strong> Browse folders or search codes,
+            titles, destinations and tags, including nested links.
+          </li>
+          <li>
+            <strong>Copy or open.</strong> Select a code or destination to copy
+            its URL; use Open to visit enabled links.
+          </li>
+          <li>
+            <strong>Script shortcuts.</strong> Enabled Bash launchers download
+            fully before running and forward arguments and exit status.
+          </li>
+          <li>
+            <strong>Visibility and control.</strong> Hide, flag or disable links
+            with tags, without deleting their destinations.
+          </li>
+          <li>
+            <strong>No server to maintain.</strong> Keep links in Git-reviewed
+            JSON or YAML; GitHub Pages hosts the site. No database or built-in
+            click tracking.
+          </li>
+          <li>
+            <strong>Your theme.</strong> Follow system light/dark mode or save
+            your own choice.
+          </li>
+        </ul>
       </section>
       <section id="how-to-use">
         <h2>How to use</h2>
         <ol>
           <li>
             Create a repository with these files and a <code>main</code> branch.
-            Set Settings → Pages → Source to <strong>GitHub Actions</strong>.
+            In Settings → Pages, choose <strong>GitHub Actions</strong> as
+            Source.
           </li>
           <li>
-            Edit <code>${esc(source)}</code> on a branch. Add an absolute
-            HTTP(S) destination:
+            Edit <code>${esc(source)}</code> on a branch. Use absolute HTTP(S)
+            destinations:
           </li>
         </ol>
-        <pre><code>gh: https://github.com/
+        <pre><code>${esc(
+          source === "links.json"
+            ? JSON.stringify(
+                {
+                  gh: "https://github.com/",
+                  docs: {
+                    url: "https://docs.github.com/en/pages",
+                    title: "GitHub Pages docs",
+                    tags: ["documentation"],
+                  },
+                },
+                null,
+                2,
+              )
+            : `gh: https://github.com/
 docs:
   url: https://docs.github.com/en/pages
-  title: GitHub Pages docs</code></pre>
+  title: GitHub Pages docs
+  tags: [documentation]`,
+        )}</code></pre>
         <ol start="3">
           <li>
-            Open a pull request, pass checks, and merge. After deployment, visit
+            Open a pull request, pass checks, and merge. After deployment, use
             <code>https://&lt;user&gt;.github.io/&lt;repo&gt;/gh/</code>.
           </li>
         </ol>
         <p>
-          Change a URL to retarget a code; delete its entry to remove it. Nest
-          objects for directories. Codes start with a letter or number and may
-          also contain dots, underscores, and hyphens; sibling names cannot
-          differ only by case.
+          Edit a URL to retarget its code; delete an entry to remove it. Nest
+          entries for folders.
         </p>
         <p>
-          Optional: <code>script: true</code> builds a
-          <code>&lt;path&gt;.sh</code> launcher. Use exact casing and no
-          trailing slash; only run scripts from trusted sources.
+          Plain text searches broadly; <code>#tag</code> matches a whole tag,
+          including <code>#release notes</code>. A bare <code>#</code> matches
+          nothing; <code>#broken #disabled</code> is one literal tag, not two.
         </p>
         <p>
-          Add <code>tags: [documentation, github]</code> to a link object to
-          show full inline topic labels beside its code on one line. Crowded
-          rows scroll horizontally; selecting labels optionally opens a
-          convenient popover with all tags. Plain text search is one broad
-          substring. Use <code>#tag</code> for an exact whole tag, including
-          spaces: <code>#release notes</code>. A bare <code>#</code> matches
-          nothing; <code>#broken #disabled</code> is one literal tag label.
+          Set <code>script</code> to <code>true</code> for a
+          <code>&lt;path&gt;.sh</code> launcher. Use exact casing, no trailing
+          slash, and only scripts you trust. See the
+          <a href="https://github.com/ratrat64/shl#running-bash-scripts"
+            >script commands</a
+          >.
+        </p>
+        <p>Add state names to a link object's <code>tags</code>:</p>
+        <ul>
+          <li>
+            <code>hidden</code> omits it from default listings, counts and
+            search.
+          </li>
+          <li><code>broken</code> adds a warning without blocking actions.</li>
+          <li>
+            <code>disabled</code> shows an explanation instead of forwarding;
+            Open, Download and script execution are blocked. Both URLs remain
+            copyable.
+          </li>
+        </ul>
+        <p>
+          State names match exactly, ignoring case and surrounding whitespace.
+          The old <code>hidden</code> property is rejected.
         </p>
         <p>
-          On hover-capable fine-pointer devices without coarse input,
-          destinations appear when a row is hovered or focused, without shifting
-          content. Coarse-pointer and touch devices always show them. Long URLs
-          stay on one line with middle truncation; assistive technology and
-          copying retain the full URL. Select a destination to copy it, or use
-          Open to visit it.
+          Show hidden links reveals hidden entries. <code>#hidden</code>,
+          <code>#broken</code> and <code>#disabled</code> also reveal matching
+          hidden links, even in all-hidden folders. Clearing search restores the
+          toggle-selected view.
         </p>
         <p>
-          Add <code>tags: [hidden]</code> on a link object to omit it from
-          directory listings, counts, and search by default. Use Show hidden
-          links on a directory page to reveal hidden entries. Its redirect and
-          optional launcher still work unless also disabled, and the destination
-          remains public in <code>links.json</code>. Hiding controls
-          discoverability, not secrecy. Exact <code>#hidden</code>,
-          <code>#broken</code> and <code>#disabled</code> searches temporarily
-          reveal matching hidden links, even in all-hidden folders, without
-          changing the toggle. Clearing restores the toggle-selected listing.
-        </p>
-        <p>
-          Exact trimmed, case-insensitive <code>broken</code> tags mark an
-          orange-red warning without blocking actions. <code>disabled</code>
-          tags make links grey and stop shl forwarding and execution: the short
-          URL shows an explanation, Open and Download are unavailable, and the
-          launcher exits 1 without downloading or executing. Both URL copy
-          actions remain available. Destinations remain public; disabling does
-          not prevent access outside shl. The legacy hidden property is
-          rejected.
+          Search, copying and Show hidden links need JavaScript. Without it,
+          enabled visible links still open normally.
         </p>
       </section>
       <section id="how-it-works">
         <h2>How it works</h2>
         <p>
-          The build validates codes, collisions, and URL syntax before replacing
-          output. Each enabled link gets a redirect page with JavaScript, meta
-          refresh, and a clickable fallback. Directories get browsable pages.
+          The build validates codes and URL syntax, then generates directory and
+          redirect or disabled pages. Merges to <code>main</code> deploy through
+          GitHub Actions; the 404 page recovers differently capitalized paths.
         </p>
         <p>
-          GitHub Actions deploys the files after merges to <code>main</code>.
-          The 404 page checks the public link map for differently capitalized
-          codes.
+          All destinations are public; hiding or disabling does not block access
+          outside shl. Redirects happen in the browser, not through HTTP 301/302
+          responses; destination reachability is not checked.
         </p>
         <p>
           See the
-          <a href="https://github.com/ratrat64/shortlink#readme"
-            >repository documentation</a
-          >
+          <a href="https://github.com/ratrat64/shl#readme">README</a>
           for custom domains, local builds, and full validation rules.
         </p>
       </section>
