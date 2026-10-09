@@ -609,8 +609,10 @@ button.destination:has(.destination-end:empty) .destination-start {
 .prose {
   max-width: 740px;
 }
+.prose .page-title {
+  margin-bottom: 2rem;
+}
 .prose section {
-  border-top: 1px solid var(--line);
   padding-top: 1rem;
   margin-top: 2.5rem;
   scroll-margin-top: 1rem;

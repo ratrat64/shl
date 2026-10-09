@@ -78,7 +78,7 @@ The [homepage composition](mockups/directory.html) illustrates the alignment at 
 
 ## Elevation & Depth
 
-Flat by design: surfaces use color instead of shadows; directory entries are separated by space rather than rules. The shared header and footer are borderless on every shell page, including Links, nested directories, Guide, and 404; use spacing to separate sections instead. Guide content section rules remain.
+Flat by design: surfaces use color instead of shadows; directory entries are separated by space rather than rules. The shared header and footer are borderless on every shell page, including Links, nested directories, Guide, and 404; use spacing to separate sections instead. Guide content sections are also unruled, retaining generous section spacing and a 2rem gap below the page title.
 
 ## Shapes
 

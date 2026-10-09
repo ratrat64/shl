@@ -12,9 +12,15 @@
     globalThis.initSearch();
     globalThis.initCopy();
     globalThis.initDownload();
+    globalThis.initRecovery(navigate);
   };
-  rebase(document.querySelector("main"), location.href);
-  mount();
+
+  const cleanup = () => {
+    globalThis.cleanupCopy?.();
+    globalThis.cleanupSearch?.();
+    globalThis.cleanupDownload?.();
+    globalThis.cleanupRecovery?.();
+  };
 
   let request = 0;
   let displayed = location.href;
@@ -48,21 +54,40 @@
       focus.focus({ preventScroll: true });
     }
   };
-  async function navigate(url, push) {
+  let pending;
+  async function navigate(url, push, replace = false) {
     const current = ++request;
+    pending?.abort();
+    globalThis.cleanupRecovery?.();
+    globalThis.cleanupCopy?.();
+    globalThis.cleanupDownload?.();
+    globalThis.initCopy();
+    globalThis.initDownload();
     if (samePage(new URL(url), new URL(displayed))) {
+      if (replace) {
+        cleanup();
+        location.replace(url);
+        return;
+      }
       if (push && url !== location.href) history.pushState(null, "", url);
       displayed = url;
       place(url, !push);
+      globalThis.initRecovery(navigate);
       return;
     }
     try {
+      const controller = new AbortController();
+      pending = controller;
       const fetchUrl = new URL(url);
       fetchUrl.hash = "";
       const response = await fetch(fetchUrl.href, {
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.any([
+          controller.signal,
+          AbortSignal.timeout(10000),
+        ]),
       });
-      if (!response.ok) throw new Error("Page unavailable");
+      if (!response.ok && response.status !== 404)
+        throw new Error("Page unavailable");
       const page = new DOMParser().parseFromString(
         await response.text(),
         "text/html",
@@ -71,9 +96,17 @@
       const title = page.querySelector("title");
       if (
         !main ||
-        ![...document.querySelectorAll("[data-nav]")].some(
-          (link) => link.dataset.nav === main.dataset.appPage,
+        !(
+          main.dataset.appPage === "not-found" ||
+          [...document.querySelectorAll("[data-nav]")].some(
+            (link) => link.dataset.nav === main.dataset.appPage,
+          )
         ) ||
+        (response.status === 404 && main.dataset.appPage !== "not-found") ||
+        (main.dataset.appPage === "not-found" &&
+          (!main.querySelector("#head") ||
+            !main.querySelector("#msg") ||
+            !main.querySelector("#home[data-app-link]"))) ||
         !title ||
         !main.querySelector("h1")
       )
@@ -82,9 +115,7 @@
       rebase(main, url);
       for (const script of main.querySelectorAll("script")) script.remove();
       scroll.set(displayed, window.scrollY);
-      globalThis.cleanupCopy?.();
-      globalThis.cleanupSearch?.();
-      globalThis.cleanupDownload?.();
+      cleanup();
       document.querySelector("main").replaceWith(main);
       document.title = title.textContent;
       for (const link of document.querySelectorAll("[data-nav]")) {
@@ -93,11 +124,16 @@
         else link.removeAttribute("aria-current");
       }
       if (push) history.pushState(null, "", url);
+      else if (replace) history.replaceState(null, "", url);
       displayed = url;
       mount();
       place(url, !push);
     } catch {
-      if (current === request) location.assign(url);
+      if (current === request) {
+        cleanup();
+        if (replace) location.replace(url);
+        else location.assign(url);
+      }
     }
   }
 
@@ -112,14 +148,29 @@
       event.altKey
     )
       return;
-    const link = event.target.closest("a[data-app-link]");
+    const link = event.target.closest("a[href]");
     if (
       !link ||
       link.hasAttribute("download") ||
-      (link.target && link.target !== "_self") ||
-      link.origin !== location.origin
+      (link.target && link.target !== "_self")
     )
       return;
+    if (
+      !link.hasAttribute("data-app-link") ||
+      link.origin !== location.origin
+    ) {
+      const url = new URL(link.href);
+      if (
+        url.origin === location.origin &&
+        url.hash &&
+        samePage(url, new URL(displayed))
+      )
+        return;
+      ++request;
+      pending?.abort();
+      cleanup();
+      return;
+    }
     event.preventDefault();
     scroll.set(displayed, window.scrollY);
     navigate(link.href, true);
@@ -128,5 +179,7 @@
     scroll.set(displayed, window.scrollY);
     navigate(location.href, false);
   });
+  rebase(document.querySelector("main"), location.href);
+  mount();
   if (new URL(displayed).hash) place(displayed, false);
 })();

@@ -4,7 +4,7 @@ globalThis.initDownload = () => {
   if (!list || !status) return;
   let active = true,
     timeout;
-  const pending = new Set();
+  const pending = new Map();
   const resources = new Map();
   const release = (url) => {
     clearTimeout(resources.get(url));
@@ -22,7 +22,7 @@ globalThis.initDownload = () => {
       return;
     event.preventDefault();
     const controller = new AbortController();
-    pending.add(controller);
+    pending.set(controller, button);
     button.disabled = true;
     clearTimeout(timeout);
     status.textContent = "";
@@ -57,8 +57,8 @@ globalThis.initDownload = () => {
           "Could not download the script. Check the destination and whether its host allows CORS.";
     } finally {
       pending.delete(controller);
-      button.disabled = false;
       if (active) {
+        button.disabled = false;
         clearTimeout(timeout);
         timeout = setTimeout(() => {
           status.textContent = "";
@@ -69,7 +69,10 @@ globalThis.initDownload = () => {
   list.addEventListener("click", click);
   globalThis.cleanupDownload = () => {
     active = false;
-    for (const controller of pending) controller.abort();
+    for (const [controller, button] of pending) {
+      controller.abort();
+      button.disabled = false;
+    }
     for (const url of resources.keys()) release(url);
     clearTimeout(timeout);
     status.textContent = "";
