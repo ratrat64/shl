@@ -2,7 +2,7 @@
 title: 'Implement colored tag filters'
 type: 'feature'
 created: '2026-10-09'
-status: 'in-progress'
+status: 'in-review'
 baseline_commit: '34a55f3b0d88d98b339238b5b6c46ff8a5669254'
 route: 'dispatch'
 review_loop_iteration: 0
@@ -59,7 +59,7 @@ context:
 - [x] `src/assets/navigation.js` -- verify one mount, resets/retention and outgoing listener isolation through existing lifecycle.
 - [x] `AGENTS.md`, `README.md`, `docs/reference.md`, `src/pages.mjs`, PRODUCT/DESIGN/EXPERIENCE and ARCHITECTURE-SPINE -- rewrite conflicting live rules under the scoped amendment; record the authorized rename in canonical spec without rewriting historical logs.
 - [x] `test/build.test.mjs` -- cover the companion's validation, color, catalog, predicate, token, lifecycle/native and executed rendered matrices; update intentional incompatible fixtures explicitly.
-- [ ] Task branch -- complete checks, commit/push, open PR against main and report current mergeability.
+- [x] Task branch -- complete checks, commit/push, open PR against main and report current mergeability.
 
 **Acceptance Criteria:**
 - Given the canonical contract, when behavior and rendered checks execute, then every responsibility in its verification table passes without browser skips.
@@ -97,3 +97,4 @@ context:
 - Existing rendered matrices passed for shell native/app loads, 16 script/non-script state combinations, all six tag inks on dimmed/wash backgrounds and disabled popovers, neutral disabled actions, copies, download cancellation, minimal foundations and root/project-prefix 404 recovery.
 - `bun build.mjs`: **68 short links** generated successfully.
 - Impeccable detector over directory/search/styles/navigation/Guide UI targets: `[]` (no findings).
+- Implementation committed and pushed on `feat/colored-tag-filters`; [PR #77](https://github.com/ratrat64/shl/pull/77) targets `main`. GitHub reported `MERGEABLE` against `34a55f3b0d88d98b339238b5b6c46ff8a5669254`; PR validation was running at the initial mergeability check. No unresolved merge conflicts or known incomplete implementation tasks.
