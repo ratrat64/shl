@@ -18,6 +18,7 @@ const tagStyle = (identity) => {
 };
 // JSON string contents survive HTML's NUL replacement and preserve UTF-16.
 const tagIdentity = (identity) => esc(JSON.stringify(identity).slice(1, -1));
+const tagToggleLabels = { collapsed: "Show tags", expanded: "Hide tags" };
 const tagLabel = (label) =>
   `<span class="tag-label" data-tag="${tagIdentity(label.toLowerCase())}" ${tagStyle(label.toLowerCase())}>#${esc(label)}</span>`;
 const tagCatalog = (nodes, catalog = new Map()) => {
@@ -123,7 +124,7 @@ const directoryContents = (
   );
   return /* HTML */ `<section aria-label="Links">
     <div class="directory-tools">
-      ${pageTitle(visible === 1 ? "Link" : "Links", visible)}
+      ${pageTitle(undefined, visible)}
       <div class="directory-actions">
         <div
           id="selected-tags"
@@ -140,9 +141,11 @@ const directoryContents = (
             type="button"
             aria-expanded="false"
             aria-controls="available-tags"
+            data-label-collapsed="${esc(tagToggleLabels.collapsed)}"
+            data-label-expanded="${esc(tagToggleLabels.expanded)}"
             ${catalog.length ? "hidden" : "disabled"}
           >
-            Show tags
+            ${tagToggleLabels.collapsed}
           </button>
         </div>
         <div

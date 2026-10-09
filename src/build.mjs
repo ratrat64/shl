@@ -5,6 +5,7 @@ import { readFile, writeFile, mkdir, rm, cp } from "node:fs/promises";
 import { join } from "node:path";
 import { loadLinks } from "./links.mjs";
 import { indexPage, directoryPage } from "./directory.mjs";
+import { GUIDE_NAV } from "./layout.mjs";
 import {
   redirectPage,
   scriptLauncher,
@@ -52,7 +53,7 @@ for (const directory of directories.slice(1)) {
 }
 for (const [name, page] of [
   ["about", () => oldInfoPage("about")],
-  ["guide", () => guidePage(source)],
+  [GUIDE_NAV.path, () => guidePage(source)],
   ["how-it-works", () => oldInfoPage("how-it-works")],
 ]) {
   await mkdir(join(OUT, name), { recursive: true });

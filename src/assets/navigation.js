@@ -71,7 +71,9 @@
       const title = page.querySelector("title");
       if (
         !main ||
-        !["links", "guide"].includes(main.dataset.appPage) ||
+        ![...document.querySelectorAll("[data-nav]")].some(
+          (link) => link.dataset.nav === main.dataset.appPage,
+        ) ||
         !title ||
         !main.querySelector("h1")
       )

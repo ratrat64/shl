@@ -3,7 +3,7 @@ import {
   scriptString,
   documentPage,
   page as shell,
-  NAV_ITEMS,
+  GUIDE_NAV,
   pageTitle,
 } from "./layout.mjs";
 import { isDirectory, linkUrl, linkStates } from "./links.mjs";
@@ -62,11 +62,11 @@ export const redirectPage = ({ url, title, disabled }) =>
 
 export const guidePage = (source) =>
   shell(
-    "Guide",
-    "guide",
+    GUIDE_NAV.label,
+    GUIDE_NAV.key,
     "../",
     /* HTML */ `<article class="prose">
-      ${pageTitle("Guide")}
+      ${pageTitle(GUIDE_NAV.label)}
       <nav aria-label="On this page">
         <a href="#about" data-app-link>Features</a> ·
         <a href="#how-to-use" data-app-link>How to use</a> ·
@@ -234,9 +234,9 @@ docs:
   );
 
 export const oldInfoPage = (section) => {
-  const url = `../guide/#${section}`;
+  const url = `../${GUIDE_NAV.path}#${section}`;
   return forwardingPage(
-    "Guide",
+    GUIDE_NAV.label,
     url,
     /* HTML */ `<p><a href="${esc(url)}">Continue to the guide</a></p>`,
   );
@@ -286,11 +286,8 @@ export const notFoundPage = () =>
         entry = hit[1];
       }
       home.href = base;
-      const navItems = ${scriptString(NAV_ITEMS)};
-      for (const link of document.querySelectorAll('.site-head a, .footer a[data-app-link]')) {
-        const item = navItems.find(item => item.key === link.dataset.nav);
-        link.href = base + (item ? item.path : link.classList.contains('brand') ? '' : 'guide/');
-      }
+      for (const link of document.querySelectorAll('[data-site-path]'))
+        link.href = base + link.dataset.sitePath;
       if (isDirectory(entry)) {
         location.replace(base + canonical.join('/') + '/');
         return;
