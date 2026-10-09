@@ -1499,7 +1499,10 @@ for (const prefix of ["/", "/project/"])
         return this.raw;
       },
       hasAttribute(name) {
-        return name === "download" && !!this.download;
+        return (
+          (name === "download" && !!this.download) ||
+          (name === "data-app-link" && this.app)
+        );
       },
       setAttribute(name, value) {
         this[name] = value;
@@ -1805,8 +1808,7 @@ for (const prefix of ["/", "/project/"])
         button: 0,
         defaultPrevented: false,
         target: {
-          closest: (selector) =>
-            selector === "a[data-app-link]" && link?.app ? link : null,
+          closest: (selector) => (selector === "a[href]" ? link : null),
         },
         preventDefault() {
           prevented = true;
@@ -1980,18 +1982,20 @@ for (const prefix of ["/", "/project/"])
       text: async () => pages.get(base + path),
     });
     const deferFetch = (url) => {
-      let resolve, reject;
-      fetchOverrides.set(
-        url,
-        () =>
-          new Promise((yes, no) => {
-            resolve = yes;
-            reject = no;
-          }),
-      );
+      let resolve, reject, signal;
+      fetchOverrides.set(url, (fetchSignal) => {
+        signal = fetchSignal;
+        return new Promise((yes, no) => {
+          resolve = yes;
+          reject = no;
+        });
+      });
       return {
         resolve: (value) => resolve(value),
         reject: (error) => reject(error),
+        get signal() {
+          return signal;
+        },
       };
     };
     // Two distinct clicks complete in reverse order; only the newest may commit.
@@ -1999,6 +2003,11 @@ for (const prefix of ["/", "/project/"])
     const second = deferFetch(base + "guide/");
     await click(makeLink(base + "tools/"));
     await click(guide);
+    assert.equal(
+      first.signal.aborted,
+      true,
+      "newer click immediately aborts superseded fetch",
+    );
     second.resolve(response("guide/"));
     await tick();
     const winner = document.currentMain;
@@ -2024,6 +2033,89 @@ for (const prefix of ["/", "/project/"])
     assert.equal(history.pushed, newerPushed);
     assert.equal(location.assigned, undefined);
     fetchOverrides.delete(base + "tools/");
+
+    for (const stage of ["fetch", "body"]) {
+      for (const intent of ["click", "history", "native"]) {
+        await click(guide);
+        let signal, settle;
+        const held = new Promise((resolve) => {
+          settle = resolve;
+        });
+        fetchOverrides.set(base + "tools/", (fetchSignal) => {
+          signal = fetchSignal;
+          return stage === "fetch" ? held : { ok: true, text: () => held };
+        });
+        await click(makeLink(base + "tools/"));
+        assert.equal(signal.aborted, false);
+        const before = document.currentMain;
+        if (intent === "click") await click(guide);
+        else if (intent === "history") {
+          location.href = base + "guide/#about";
+          listeners.popstate();
+        } else {
+          const exit = makeLink("https://other.example/exit", undefined, false);
+          assert.equal(
+            await click(makeLink(base + "guide/#about", undefined, false)),
+            false,
+          );
+          assert.equal(
+            signal.aborted,
+            false,
+            "native local fragment is not an outgoing exit",
+          );
+          for (const options of [
+            { ctrlKey: true },
+            { metaKey: true },
+            { shiftKey: true },
+            { altKey: true },
+            { button: 1 },
+            { defaultPrevented: true },
+          ]) {
+            assert.equal(await click(exit, options), false);
+            assert.equal(
+              signal.aborted,
+              false,
+              "modified/prevented native click retains pending request",
+            );
+          }
+          for (const attrs of [{ target: "_blank" }, { download: true }]) {
+            assert.equal(
+              await click(
+                Object.assign(makeLink(exit.href, undefined, false), attrs),
+              ),
+              false,
+            );
+            assert.equal(
+              signal.aborted,
+              false,
+              "new-tab/download click retains pending request",
+            );
+          }
+          assert.equal(
+            await click(exit),
+            false,
+            "native exit is not intercepted",
+          );
+        }
+        assert.equal(
+          signal.aborted,
+          true,
+          `${intent} immediately aborts pending ${stage}`,
+        );
+        const href = location.href,
+          pushed = history.pushed;
+        location.assigned = undefined;
+        settle(
+          stage === "fetch" ? response("tools/") : pages.get(base + "tools/"),
+        );
+        await tick();
+        assert.equal(document.currentMain, before);
+        assert.equal(location.href, href);
+        assert.equal(history.pushed, pushed);
+        assert.equal(location.assigned, undefined);
+        fetchOverrides.delete(base + "tools/");
+      }
+    }
 
     // Save scrolling done while the fetch was in flight, just before replacement.
     await click(guide);
@@ -2056,6 +2148,28 @@ for (const prefix of ["/", "/project/"])
     assert.equal(linksNav["aria-current"], undefined);
     assert.equal(guide["aria-current"], undefined);
     assert.equal(location.assigned, undefined);
+    const unavailableDirectory = base + "tools/";
+    fetchOverrides.set(unavailableDirectory, () => ({
+      ok: false,
+      status: 404,
+      text: async () => notFound,
+    }));
+    await click(makeLink(unavailableDirectory));
+    const beforeUnavailableRecovery = document.currentMain;
+    const fetchCount = fetched.length;
+    await context.recoveryNavigate(unavailableDirectory, false, true);
+    assert.equal(
+      location.replaced,
+      unavailableDirectory,
+      "already-canonical unavailable directory uses native replacement",
+    );
+    assert.equal(document.currentMain, beforeUnavailableRecovery);
+    assert.equal(
+      fetched.length,
+      fetchCount,
+      "unavailable canonical directory is not retried through app fetch",
+    );
+    fetchOverrides.delete(unavailableDirectory);
     await click(guide);
     const guideBeforeError = document.currentMain;
     for (const html of [
@@ -2710,6 +2824,19 @@ test("destination downloads preserve bytes, handle failures, and cancel outgoing
     assert.equal(button.disabled, true);
     context.cleanupDownload();
     assert.equal(requests.at(-1).signal.aborted, true);
+    assert.equal(
+      button.disabled,
+      false,
+      "cleanup restores retained button immediately",
+    );
+    context.initDownload();
+    let settleSecond;
+    respond = () =>
+      new Promise((resolve) => {
+        settleSecond = resolve;
+      });
+    const second = click();
+    assert.equal(button.disabled, true);
     settle(
       stage === "failure"
         ? new Error("late failure")
@@ -2721,6 +2848,16 @@ test("destination downloads preserve bytes, handle failures, and cancel outgoing
     assert.equal(saved.length, 1);
     assert.equal(status.textContent, "");
     assert.equal(timers.size, 0);
+    assert.equal(
+      button.disabled,
+      true,
+      "old completion cannot re-enable a retained button during the second download",
+    );
+    context.cleanupDownload();
+    settleSecond({ ok: true, blob: async () => blob });
+    await second;
+    assert.equal(button.disabled, false);
+    assert.equal(saved.length, 1);
     assert.equal(list.click, null);
     context.initDownload();
   }
@@ -3902,11 +4039,33 @@ test("Chrome 404 browsing and history preserve document/shell identity at both p
   const f = await fixture(t, {
     tools: {
       Git: { url: "https://example.com/setup.sh", tags: ["script", "shell"] },
+      ...Object.fromEntries(
+        Array.from({ length: 50 }, (_, i) => [
+          `Extra${i}`,
+          "https://example.com/",
+        ]),
+      ),
     },
+    ...Object.fromEntries(
+      Array.from({ length: 50 }, (_, i) => [
+        `Root${i}`,
+        "https://example.com/",
+      ]),
+    ),
   });
   assert.equal(f.build().status, 0);
+  await writeFile(
+    join(f.cwd, "dist", "404.html"),
+    (await f.read("404.html")).replace(
+      '<article class="prose">',
+      '<article class="prose" style="min-height:3000px">',
+    ),
+  );
   const origin = await browserServer(t, f.cwd);
   const { send, evaluate, navigate } = await browserControls(t, chrome, f.cwd);
+  await send("Emulation.setEmulatedMedia", {
+    features: [{ name: "prefers-reduced-motion", value: "reduce" }],
+  });
   await send("Page.addScriptToEvaluateOnNewDocument", {
     source: `
     globalThis.original = { doc: document, root: document.documentElement };
@@ -3934,10 +4093,11 @@ test("Chrome 404 browsing and history preserve document/shell identity at both p
           `localStorage.setItem('shortlink-theme', ${JSON.stringify(theme)})`,
         );
         // Canonical directory recovery must replace the URL through the same controller.
-        await navigate(origin + prefix + "TOOLS/");
+        await navigate(origin + prefix + "TOOLS/?keep=1#link-count");
         await evaluate(`(async () => {
           for (let n = 0; location.pathname !== ${JSON.stringify(prefix + "tools/")} && n < 200; n++) await new Promise(r => setTimeout(r, 10));
           if (location.pathname !== ${JSON.stringify(prefix + "tools/")} || document !== original.doc || document.documentElement !== original.root || document.querySelector('header') !== original.header || document.querySelector('footer') !== original.footer || document.querySelector('[data-theme-control]') !== original.theme) throw Error('Directory recovery replaced document/shell');
+          if (location.search !== '?keep=1' || location.hash !== '#link-count' || document.activeElement.id !== 'link-count') throw Error('Canonical recovery lost query/hash or fragment focus');
         })()`);
         await navigate(origin + prefix + "deep/unknown/");
         const result = await evaluate(`(async () => {
@@ -3974,36 +4134,52 @@ test("Chrome 404 browsing and history preserve document/shell identity at both p
           };
           identity();
           check(document.querySelector('#home').pathname === prefix, 'Home did not rebase');
+          scrollTo({ top: 140, behavior: 'instant' });
+          check(scrollY === 140, '404 fixture is not scrollable');
           await transition(() => document.querySelector('#home').click(), '', 'links', 'Links');
+          scrollTo({ top: 230, behavior: 'instant' });
           await transition(() => document.querySelector('[data-nav=guide]').click(), 'guide/', 'guide', 'Guide');
+          scrollTo({ top: 370, behavior: 'instant' });
+          check(scrollY === 370, 'Guide fixture is not scrollable');
           const guideMain = document.querySelector('main');
           document.querySelector('a[href$="#how-to-use"]').click();
           await wait(() => location.hash === '#how-to-use');
           check(document.querySelector('main') === guideMain && document.activeElement.id === 'how-to-use', 'Fragment remounted or failed focus');
           history.back();
-          await wait(() => !location.hash);
+          await wait(() => !location.hash && document.activeElement === document.querySelector('h1'));
           check(document.querySelector('main') === guideMain, 'Fragment history remounted');
+          check(scrollY === 370, 'Complete Guide URL scroll not restored after fragment Back');
           await transition(() => document.querySelector('[data-nav=links]').click(), '', 'links', 'Links');
+          document.querySelector('main').style.minHeight = '3000px';
+          scrollTo({ top: 230, behavior: 'instant' });
           const main = document.querySelector('main'), input = document.querySelector('#link-search');
           document.querySelector('#tag-toggle').click();
           document.querySelector('#available-tags button').click();
           input.value = '#missing ';
           input.dispatchEvent(new Event('input', { bubbles: true }));
           check(document.querySelector('#selected-tags button') && !document.querySelector('#tag-error').hidden, 'Filters did not initialize');
+          scrollTo({ top: 230, behavior: 'instant' });
           const fragment = document.createElement('a'); fragment.href = '#link-count'; fragment.dataset.appLink = ''; main.append(fragment); fragment.click();
           await wait(() => location.hash === '#link-count');
           check(document.querySelector('main') === main && input.value === '#missing ' && document.querySelector('#selected-tags button'), 'Directory fragment reset state');
-          history.back(); await wait(() => !location.hash);
+          history.back(); await wait(() => !location.hash && scrollY === 230);
+          check(scrollY === 230, 'Complete Links URL scroll not restored after fragment Back');
           await transition(() => document.querySelector('summary a[data-app-link]').click(), 'tools/', 'links', 'tools');
           check(document.querySelector('#link-search').value === '' && document.querySelector('#selected-tags').hidden && document.querySelector('#available-tags').hidden && document.querySelector('#tag-error').hidden, 'Cross-page controls did not reset');
           // One mount owns each control: a duplicate listener would toggle twice.
           document.querySelector('#tag-toggle').click();
           check(document.querySelector('#tag-toggle').getAttribute('aria-expanded') === 'true', 'Controls mounted more than once');
           document.querySelector('#tag-toggle').click();
-          for (const step of [['', 'links', 'Links'], ['guide/', 'guide', 'Guide'], ['', 'links', 'Links'], ['deep/unknown/', 'not-found', 'Link not found']])
-            await transition(() => history.back(), ...step);
-          for (const step of [['', 'links', 'Links'], ['guide/', 'guide', 'Guide'], ['', 'links', 'Links'], ['tools/', 'links', 'tools']])
-            await transition(() => history.forward(), ...step);
+          scrollTo({ top: 480, behavior: 'instant' });
+          check(scrollY === 480, 'Directory fixture is not scrollable');
+          for (const [path, page, title, y] of [['', 'links', 'Links', 230], ['guide/', 'guide', 'Guide', 370], ['', 'links', 'Links', 230], ['deep/unknown/', 'not-found', 'Link not found', 140]]) {
+            await transition(() => history.back(), path, page, title);
+            check(scrollY === y, 'Back complete-URL scroll mismatch: ' + path + ': ' + scrollY);
+          }
+          for (const [path, page, title, y] of [['', 'links', 'Links', 230], ['guide/', 'guide', 'Guide', 370], ['', 'links', 'Links', 230], ['tools/', 'links', 'tools', 480]]) {
+            await transition(() => history.forward(), path, page, title);
+            check(scrollY === y, 'Forward complete-URL scroll mismatch: ' + path + ': ' + scrollY);
+          }
           // Pending local actions cannot complete after a newer history intent,
           // even before the new page's HTML arrives.
           const status = document.querySelector('#copy-status'), downloadStatus = document.querySelector('#download-status');
@@ -4048,6 +4224,50 @@ test("Chrome 404 browsing and history preserve document/shell identity at both p
           await new Promise(r => setTimeout(r, 30));
           verify('guide/', 'guide', 'Guide');
           check(staleHead.textContent === 'Checking that link' && JSON.stringify([...document.querySelectorAll('[data-site-path]')].map(a => a.href)) === JSON.stringify(hrefs), 'Stale recovery mutated or rebased links');
+          globalThis.fetch = nativeFetch;
+          // Same-page Home and fragment clicks must restart held 404 recovery,
+          // preserving main and leaving directory controls untouched.
+          const maps = [];
+          globalThis.fetch = async (url, options) => String(url).endsWith('links.json')
+            ? new Promise(resolve => maps.push({ resolve, signal: options.signal }))
+            : nativeFetch(url, options);
+          history.pushState(null, '', prefix + 'tools/missing/');
+          dispatchEvent(new PopStateEvent('popstate'));
+          await wait(() => maps.length === 1);
+          const retained = document.querySelector('main');
+          document.querySelector('#home').click();
+          await wait(() => maps.length === 2);
+          check(maps[0].signal.aborted && document.querySelector('main') === retained, 'Unrecovered Home did not resume recovery on retained main');
+          const fragment404 = document.createElement('a'); fragment404.href = '#head'; fragment404.dataset.appLink = ''; retained.append(fragment404); fragment404.click();
+          await wait(() => maps.length === 3);
+          check(maps[1].signal.aborted && document.querySelector('main') === retained && document.activeElement.id === 'head', '404 fragment did not resume recovery/focus on retained main');
+          maps[0].resolve({ ok: true, json: async () => ({ missing: 'https://example.com/stale' }) });
+          maps[1].resolve({ ok: true, json: async () => ({ missing: 'https://example.com/stale' }) });
+          maps[2].resolve({ ok: true, json: async () => ({}) });
+          await wait(() => document.querySelector('#head').textContent === 'Link not found');
+          check(document.querySelector('#home').pathname === prefix + 'tools/' && location.hash === '#head', 'Resumed recovery did not finish/rebase');
+          identity();
+          globalThis.fetch = nativeFetch;
+          // Observe an ordinary native exit at the controller, then cancel only
+          // the browser default in this harness so late work remains observable.
+          let exitMap, exitSignal;
+          globalThis.fetch = async (url, options) => String(url).endsWith('links.json')
+            ? new Promise(resolve => { exitMap = resolve; exitSignal = options.signal; })
+            : nativeFetch(url, options);
+          history.pushState(null, '', prefix + 'tools/GIT/');
+          dispatchEvent(new PopStateEvent('popstate'));
+          await wait(() => exitMap);
+          const exitMain = document.querySelector('main');
+          const nativeExit = document.createElement('a'); nativeExit.href = 'https://other.example/exit'; exitMain.append(nativeExit);
+          const keepHarness = event => { if (event.target === nativeExit) { check(!event.defaultPrevented, 'Controller intercepted native exit'); event.preventDefault(); } };
+          document.addEventListener('click', keepHarness);
+          nativeExit.click();
+          document.removeEventListener('click', keepHarness);
+          check(exitSignal.aborted, 'Native exit did not abort recovery');
+          exitMap({ ok: true, json: async () => ({ Git: 'https://example.com/stale-forward' }) });
+          await new Promise(r => setTimeout(r, 30));
+          check(document.querySelector('main') === exitMain && document.querySelector('#head').textContent === 'Checking that link' && location.pathname === prefix + 'tools/GIT/', 'Stale recovery overrode native exit');
+          identity();
           globalThis.fetch = nativeFetch;
           return 'passed';
         })()`);

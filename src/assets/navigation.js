@@ -64,9 +64,15 @@
     globalThis.initCopy();
     globalThis.initDownload();
     if (samePage(new URL(url), new URL(displayed))) {
+      if (replace) {
+        cleanup();
+        location.replace(url);
+        return;
+      }
       if (push && url !== location.href) history.pushState(null, "", url);
       displayed = url;
       place(url, !push);
+      globalThis.initRecovery(navigate);
       return;
     }
     try {
@@ -142,14 +148,29 @@
       event.altKey
     )
       return;
-    const link = event.target.closest("a[data-app-link]");
+    const link = event.target.closest("a[href]");
     if (
       !link ||
       link.hasAttribute("download") ||
-      (link.target && link.target !== "_self") ||
-      link.origin !== location.origin
+      (link.target && link.target !== "_self")
     )
       return;
+    if (
+      !link.hasAttribute("data-app-link") ||
+      link.origin !== location.origin
+    ) {
+      const url = new URL(link.href);
+      if (
+        url.origin === location.origin &&
+        url.hash &&
+        samePage(url, new URL(displayed))
+      )
+        return;
+      ++request;
+      pending?.abort();
+      cleanup();
+      return;
+    }
     event.preventDefault();
     scroll.set(displayed, window.scrollY);
     navigate(link.href, true);

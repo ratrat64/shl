@@ -45,11 +45,9 @@ globalThis.initRecovery = async (navigate) => {
     for (const link of document.querySelectorAll("[data-site-path]"))
       link.href = base + link.dataset.sitePath;
     if (isDirectory(entry)) {
-      navigate(
-        new URL(base + canonical.join("/") + "/", location.href).href,
-        false,
-        true,
-      );
+      const url = new URL(location.href);
+      url.pathname = base + canonical.join("/") + "/";
+      navigate(url.href, false, true);
       return;
     }
     if (entry) {
