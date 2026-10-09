@@ -1,4 +1,4 @@
-import { esc, page } from "./layout.mjs";
+import { esc, page, pageTitle } from "./layout.mjs";
 import { entryTree, entryCounts } from "./links.mjs";
 
 export const tagColors = (identity) => {
@@ -123,10 +123,7 @@ const directoryContents = (
   );
   return /* HTML */ `<section aria-label="Links">
     <div class="directory-tools">
-      <h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">
-        <span class="count-number">${visible}</span
-        ><span class="count-label">${visible === 1 ? " link" : " links"}</span>
-      </h1>
+      ${pageTitle(visible === 1 ? "link" : "links", visible)}
       <div class="directory-actions">
         <div
           id="selected-tags"

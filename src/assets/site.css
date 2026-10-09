@@ -227,14 +227,15 @@ p {
 .directory-tools h1 {
   margin: 0;
 }
-.count {
+.page-title {
   font-variant-numeric: tabular-nums;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 0.35rem;
 }
 .count-number {
   min-width: 4ch;
+  color: var(--script);
   text-align: right;
   display: inline-block;
 }

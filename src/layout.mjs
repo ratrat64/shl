@@ -19,6 +19,12 @@ export const NAV_ITEMS = [
   { label: "Guide", path: "guide/", key: "guide" },
 ];
 
+export const pageTitle = (title, count) => /* HTML */ `
+  <h1${count === undefined ? "" : ' id="link-count"'} class="page-title"${count === undefined ? "" : ' aria-live="polite" aria-atomic="true"'}>
+    <span class="count-number"${count === undefined ? ' aria-hidden="true"' : ""}>${count === undefined ? "" : esc(count)}</span
+    ><span class="count-label">${count === undefined ? "" : " "}${esc(title)}</span>
+  </h1>`;
+
 const header = (active, depth) =>
   /* HTML */ `<header class="site-head">
     <div class="wrap head-inner">

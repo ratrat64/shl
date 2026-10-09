@@ -4,6 +4,7 @@ import {
   documentPage,
   page as shell,
   NAV_ITEMS,
+  pageTitle,
 } from "./layout.mjs";
 import { isDirectory, linkUrl, linkStates } from "./links.mjs";
 
@@ -64,10 +65,8 @@ export const guidePage = (source) =>
     "Guide",
     "guide",
     "../",
-    /* HTML */ `<div class="directory-tools">
-      <h1>Guide</h1>
-    </div>
-    <article class="prose">
+    /* HTML */ `<article class="prose">
+      ${pageTitle("Guide")}
       <nav aria-label="On this page">
         <a href="#about" data-app-link>Features</a> ·
         <a href="#how-to-use" data-app-link>How to use</a> ·
