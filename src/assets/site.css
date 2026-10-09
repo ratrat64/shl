@@ -272,6 +272,7 @@ p {
   scrollbar-width: thin;
   scrollbar-color: var(--line) var(--panel);
   white-space: nowrap;
+  flex-direction: row-reverse;
 }
 #available-tags,
 #tag-error {
