@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hardened — Colored tag filters</title>
+    <style>
+      :root { color-scheme: light dark; font-family: system-ui, sans-serif; line-height: 1.6; background: #f6f7f5; color: #252b29; }
+      body { max-width: 850px; margin: auto; padding: 32px 20px 64px; }
+      header { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+      h1 { line-height: 1.15; font-size: clamp(2rem, 6vw, 3rem); }
+      h2 { margin-top: 32px; }
+      li { margin-bottom: 10px; }
+      .seal { width: 150px; flex-shrink: 0; }
+      .voice { padding: 12px 16px; border-left: 3px solid #006b60; margin: 12px 0; }
+      a { color: #006b60; }
+      @media (prefers-color-scheme: dark) { :root { background: #101412; color: #dce6df; } a { color: #64b6a4; } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <svg class="seal" viewBox="0 0 160 160" role="img" aria-label="Hardened outcome stamp">
+        <circle cx="80" cy="80" r="73" fill="#006b60" />
+        <circle cx="80" cy="80" r="64" fill="none" stroke="#e6f5ed" stroke-width="2" stroke-dasharray="3 4" />
+        <path d="M58 56l15 15 29-32" fill="none" stroke="#e6f5ed" stroke-width="6" />
+        <text x="80" y="100" text-anchor="middle" fill="#fff" font-size="18" font-family="system-ui, sans-serif" font-weight="700">HARDENED</text>
+        <text x="80" y="122" text-anchor="middle" fill="#e6f5ed" font-size="11" font-family="system-ui, sans-serif">TAG FILTERS</text>
+      </svg>
+      <div><p>Forge outcome · 9 October 2026</p><h1>Colored tag filters</h1></div>
+    </header>
+    <p>The tag/search redesign is specific enough for downstream planning. This session settled behavior; application implementation is a subsequent task.</p>
+    <h2>Locked decisions</h2>
+    <ul>
+      <li>Full tags remain visible in link rows. Automatic persistent colors are consistent across folders, row labels, available tags, and selected tags, including tags on disabled links.</li>
+      <li>Show tags replaces Show hidden links and reveals one horizontally scrollable tag row below search and the button.</li>
+      <li>The available pool includes every tag in the current subtree, including hidden leaves, minus selected tags. Search results do not shrink the pool.</li>
+      <li>Tap an available tag to move it beside search into a horizontally scrollable selected-tag row. Tap a selected tag to remove the filter and return it.</li>
+      <li>Selected tags combine with AND. Free text further narrows those results using the existing broad substring search.</li>
+      <li>Typed tags begin with #. Space, comma, or Enter commits a known tag and removes the token and delimiter. Unknown tags stay in search with “Tag not found.”</li>
+      <li>Tag names reject whitespace and commas with clear guidance. Existing affected tags must be renamed explicitly.</li>
+      <li>Only selecting hidden, broken, or disabled permits matching hidden links and ancestors to appear; all selected tags and free text still apply.</li>
+    </ul>
+    <h2>Rejected options and reasons</h2>
+    <ul>
+      <li><strong>Dots and hover-only labels:</strong> reconsidered by the user; keep full tags visible.</li>
+      <li><strong>OR filtering:</strong> results must match both tags, rather than either.</li>
+      <li><strong>Space-containing tags:</strong> spaces must commit typed tags; commas are also forbidden to avoid delimiter ambiguity.</li>
+      <li><strong>Manual color configuration:</strong> user chose automatic persistent colors.</li>
+      <li><strong>Grayscale-only disabled tags:</strong> consistent tag colors take precedence for labels; disabled codes and actions still indicate state.</li>
+      <li><strong>Silently accepting unknown tags or renaming invalid tags:</strong> errors stay visible and corrections are explicit.</li>
+      <li><strong>Result-dependent tag choices:</strong> a steady available pool keeps filters accessible, including after zero results.</li>
+    </ul>
+    <h2>Weak points carried into implementation</h2>
+    <ul>
+      <li>Many tags cannot be reliably distinguished by color alone. Visible labels remain essential; the palette must remain readable in light and dark themes.</li>
+      <li>Search and the selected-tag row compete for narrow-screen space. Preserve usable search and horizontally scrollable tag controls on mobile and by keyboard.</li>
+      <li>The no-whitespace/no-comma rule changes existing validation. Check actual link data and update conflicting documentation explicitly.</li>
+      <li>Exact palette, duplicate-token feedback, and filter reset behavior were not separately decided in this session.</li>
+    </ul>
+    <h2>Pressure-test voices</h2>
+    <div class="voice"><strong>🌶️ Boundary — Edge-Case Hunter</strong><br>“Walk every boundary”: multiple-filter semantics, delimiter ambiguity, hidden visibility, unknown tags, and stable tag pools.</div>
+    <div class="voice"><strong>🎯 Yui — The Craftsman</strong><br>“Keep the boring, obvious version”: one consistent color rule, reversible selection, and explicit validation.</div>
+    <div class="voice"><strong>🧭 Mira — Directory Visitor</strong><br>“Show me the intersection I asked for”: predictable tag combinations, text narrowing, and consistent colors.</div>
+    <div class="voice"><strong>📱 Nia — Touch-Screen Visitor</strong><br>“I cannot hover”: readable labels, reversible taps, and stable filter choices.</div>
+    <p><a href="forged-idea.md">Open the concise planning handoff</a></p>
+  </body>
+</html>
