@@ -2,7 +2,7 @@
 title: 'Reload-free internal navigation through 404'
 type: 'feature'
 created: '2026-10-09'
-status: 'in-review'
+status: 'done'
 baseline_commit: '1b42ee5860a96601e59ae5c2f6b088aaccafd85e'
 route: 'dispatch'
 review_loop_iteration: 0
@@ -72,6 +72,22 @@ context: []
 
 ## Review Triage Log
 
+| Finding | Verdict | Evidence / disposition |
+| --- | --- | --- |
+| Blind: same-page recovery cancellation | medium | Confirmed cleanup preceded the same-page return. Patched retained 404 recovery restart; held-map Home/fragment browser regressions pass. |
+| Blind: unrecovered Home no-op | medium | Same cancellation defect; relative Home now restarts recovery without replacing main. Native relative fallback remains as approved. |
+| Blind: canonical query/fragment loss | medium | Canonical URL previously omitted search/hash. Patched pathname-only canonicalization; browser query/hash/focus assertions pass. |
+| Blind: native exits overridden by stale work | medium | Unmarked anchors previously left recovery/page requests active. Patched cancellation without preventing native activation; held-work checks pass. |
+| Blind: AbortSignal.any compatibility | low | Older engines lacking any fall back natively; current required Chrome executes it. Reject additional compatibility branches for older engines: no supported-browser contract names them, and native fallback remains functional. |
+| Blind: recovery status announcement | medium | Heading/message lacked live-region semantics before this change as well. Defer pre-existing accessibility issue; app heading focus remains preserved. |
+| Blind: real-browser failure fallback coverage | low | VM cases exercise actual controller assign/replace decisions and rejection boundaries; existing native/minimal browser checks pass. Broader failure-deployment browser coverage is not required to establish the changed identity responsibility. No runtime defect demonstrated. |
+| Blind: scroll coverage | medium | Added nonzero complete-URL Back/Forward and fragment restoration checks through 404 in the executed eight-combination browser matrix. |
+| Edge: same-page pending recovery | medium | Same verified cancellation defect as Blind finding; patched and tested. |
+| Edge: canonical unavailable directory | medium | Same-page replacement was swallowed. Patched native replacement fallback without retry loop; focused controller regression passes. |
+| Verification: superseded page cancellation assertions | medium | Added immediate signal-abortion assertions for fetch/body stages on click/history/native intent; all pass. |
+| Verification: overlapping retained download | medium | Added second download before first completion; stale completion cannot re-enable the retained button; passes. |
+| Verification: Home strands checking content | medium | Reproduced same cancellation root cause; retained-main recovery restart browser check passes. |
+
 ## Verification
 
 - `bun ci` using Bun 1.4.2.
@@ -88,3 +104,4 @@ context: []
 - Same-page Guide/directory fragments retained main/control state; cross-page mounts reset filters/error/picker, and single-toggle behavior proved controls were not mounted twice. Pending clipboard/download bodies were released during navigation loading and produced no stale feedback/save. Pending mounted recovery bodies were released after leaving and produced no forwarding/rebasing/mutation.
 - VM regressions passed generated-404 admission, unrelated/error/minimal rejection and native fallback, canonical replacement history and replacement failure fallback, superseded fetch/body suppression, map fetch/body abortion (including abort-ignoring transports), first-readable-map stopping, enabled/disabled leaf interpretation, and unavailable-map relative fallback. Existing required-browser checks passed direct/native shell appearance, minimal foundations, native actions/popovers/themes, downloads and state recovery.
 - Deployed GitHub Pages smoke proof is **not available for this task branch**: local generated-artifact HTTP-404 browser proof is complete; actual Pages routing remains a post-deployment check.
+- After review patches, full required-browser suite re-executed: **41 passed, 0 failed**, format check and build passed. Query/fragment canonicalization, resumed same-page recovery, native-exit cancellation, overlapping download ownership and nonzero history scroll restoration are covered.

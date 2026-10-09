@@ -32,3 +32,6 @@
 - source_spec: `aid-docs/implementation-artifacts/spec-shared-page-title.md`
   summary: Refresh DESIGN.md to document the shared two-part sans page title, optional reserved counter slot, and logo-amber numeric emphasis.
   evidence: The user approved this heading behavior; existing design prose describes amber primarily as script emphasis and omits Guide title alignment.
+- source_spec: `spec-reload-free-404-navigation.md`
+  summary: Announce asynchronous 404 recovery completion through a polite status region.
+  evidence: The existing Checking that link heading and message are asynchronously replaced without live-region semantics; this pre-existing behavior can leave assistive-technology users without a completion announcement, although enhanced navigation preserves heading focus.
