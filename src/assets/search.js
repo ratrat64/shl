@@ -92,7 +92,7 @@ globalThis.initSearch = () => {
     const number = countLabel.querySelector(".count-number");
     const label = countLabel.querySelector(".count-label");
     number.textContent = count;
-    label.textContent = count === 1 ? " link" : " links";
+    label.textContent = count === 1 ? " Link" : " Links";
   }
   function chips() {
     selected.hidden = !selections.size;

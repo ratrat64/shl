@@ -123,7 +123,7 @@ const directoryContents = (
   );
   return /* HTML */ `<section aria-label="Links">
     <div class="directory-tools">
-      ${pageTitle(visible === 1 ? "link" : "links", visible)}
+      ${pageTitle(visible === 1 ? "Link" : "Links", visible)}
       <div class="directory-actions">
         <div
           id="selected-tags"
