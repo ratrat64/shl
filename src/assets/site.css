@@ -227,16 +227,16 @@ p {
 .directory-tools h1 {
   margin: 0;
 }
-.count {
+.page-title {
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 0.35rem;
 }
 .count-number {
   min-width: 4ch;
+  color: var(--script);
   text-align: right;
   display: inline-block;
 }

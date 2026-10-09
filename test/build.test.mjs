@@ -1291,7 +1291,7 @@ test("homepage lists sorted links safely with project-relative URLs and handles 
   assert.doesNotMatch(html, /<script>title|<img|undefined/);
   assert.match(
     html,
-    /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">\s*<span class="count-number">3<\/span\s*><span class="count-label"> links<\/span>\s*<\/h1>/,
+    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">3<\/span\s*><span class="count-label"> Links<\/span>\s*<\/h1>/,
   );
   const liveHeading = html.match(
     /<h1\b[^>]*aria-live="polite"[^>]*>[\s\S]*?<\/h1>/,
@@ -1312,7 +1312,7 @@ test("homepage lists sorted links safely with project-relative URLs and handles 
   const emptyHtml = await empty.read("index.html");
   assert.match(
     emptyHtml,
-    /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">\s*<span class="count-number">0<\/span\s*><span class="count-label"> links<\/span>\s*<\/h1>/,
+    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">0<\/span\s*><span class="count-label"> Links<\/span>\s*<\/h1>/,
   );
   assert.equal([...emptyHtml.matchAll(/<h1\b/g)].length, 1);
   assert.match(emptyHtml, /id="tag-toggle"[^>]*disabled\s*>\s*Show tags/);
@@ -1356,7 +1356,7 @@ test("nested JSON and YAML build themed directory pages and redirects", async (t
   );
   assert.match(
     tools,
-    /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">\s*<span class="count-number">2<\/span\s*><span class="count-label"> links<\/span>\s*<\/h1>/,
+    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">2<\/span\s*><span class="count-label"> Links<\/span>\s*<\/h1>/,
   );
   assert.equal([...tools.matchAll(/<h1\b/g)].length, 1);
   assert.doesNotMatch(tools, /<h1>tools<\/h1>/);
@@ -1377,7 +1377,7 @@ test("nested JSON and YAML build themed directory pages and redirects", async (t
   assert.match(editors, /href="\.\.\/\.\.\/assets\/site\.css"/);
   assert.match(
     editors,
-    /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">\s*<span class="count-number">1<\/span\s*><span class="count-label"> link<\/span>\s*<\/h1>/,
+    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">1<\/span\s*><span class="count-label"> Link<\/span>\s*<\/h1>/,
   );
   assert.equal([...editors.matchAll(/<h1\b/g)].length, 1);
   assert.match(editors, /href="\.\.\/\.\.\/" data-app-link>Home<\/a>/);
@@ -2130,7 +2130,7 @@ test("hidden links and hidden-only folders are hidden by default but keep their 
   const home = await f.read("index.html");
   assert.match(
     home,
-    /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">\s*<span class="count-number">4<\/span\s*><span class="count-label"> links<\/span>\s*<\/h1>/,
+    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">4<\/span\s*><span class="count-label"> Links<\/span>\s*<\/h1>/,
   );
   assert.match(home, /href="\.\/tools\/nested\/" data-app-link>nested<\/a>/);
   assert.match(
@@ -2173,7 +2173,7 @@ test("hidden links and hidden-only folders are hidden by default but keep their 
     const html = await f.read(page);
     assert.match(
       html,
-      /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">\s*<span class="count-number">0<\/span\s*><span class="count-label"> links<\/span>\s*<\/h1>/,
+      /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">0<\/span\s*><span class="count-label"> Links<\/span>\s*<\/h1>/,
     );
     assert.match(html, /<p id="empty-directory">No links listed here\.<\/p>/);
     assert.match(html, /<div hidden><ul class="links">/);
@@ -2200,7 +2200,7 @@ test("hidden links and hidden-only folders are hidden by default but keep their 
   assert.match(await allHidden.read("index.html"), /No links listed here\./);
   assert.match(
     await allHidden.read("index.html"),
-    /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">\s*<span class="count-number">0<\/span\s*><span class="count-label"> links<\/span>\s*<\/h1>/,
+    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">0<\/span\s*><span class="count-label"> Links<\/span>\s*<\/h1>/,
   );
   assert.match(
     await allHidden.read("index.html"),
@@ -2792,7 +2792,7 @@ test("search filters nested links on the homepage and directory pages", async (t
     );
     assert.match(
       html,
-      /id="link-count" class="count" aria-live="polite" aria-atomic="true"/,
+      /id="link-count" class="page-title" aria-live="polite" aria-atomic="true"/,
     );
     assert.match(
       html,
@@ -3308,6 +3308,25 @@ test("shared shell renders consistently across direct/native loads and app navig
           });
           return [normal, focused, hovered, outlines];
         };
+        const titleGeometry = doc => {
+          const title = doc.querySelector('.page-title');
+          if (!title) return;
+          const win = frame.contentWindow;
+          const number = title.querySelector('.count-number');
+          const label = title.querySelector('.count-label');
+          const style = win.getComputedStyle(title);
+          const rect = label.getBoundingClientRect();
+          for (const part of [number, label]) {
+            const partStyle = win.getComputedStyle(part);
+            if (partStyle.fontFamily !== win.getComputedStyle(doc.body).fontFamily || partStyle.fontSize !== style.fontSize || partStyle.fontWeight !== style.fontWeight || partStyle.lineHeight !== style.lineHeight || partStyle.letterSpacing !== style.letterSpacing) throw new Error('Title part does not use sans heading typography');
+          }
+          if (win.getComputedStyle(number).fontVariantNumeric !== 'tabular-nums') throw new Error('Counter digits not tabular');
+          if (win.getComputedStyle(number).color !== win.getComputedStyle(doc.querySelector('.brand-slash:last-child')).color) throw new Error('Counter does not use logo amber');
+          if (doc.querySelector('main').dataset.appPage === 'guide') {
+            if (number.textContent !== '' || number.getAttribute('aria-hidden') !== 'true' || title.textContent.trim() !== 'Guide' || title.hasAttribute('aria-live')) throw new Error('Guide counter not disabled');
+          } else if (!title.matches('#link-count[aria-live="polite"][aria-atomic="true"]')) throw new Error('Count announcement lost');
+          return [rect.x, rect.y + win.scrollY, style.fontFamily, style.fontSize, style.fontWeight, style.lineHeight, style.letterSpacing];
+        };
         for (const prefix of ['/', '/project/']) {
           for (const width of [390, 1440]) {
             frame.style.width = width + 'px';
@@ -3315,6 +3334,7 @@ test("shared shell renders consistently across direct/native loads and app navig
               localStorage.setItem('shortlink-theme', theme);
               let baseline;
               let controls;
+              let titleBaseline;
               for (const native of [false, true]) {
                 let directBaseline;
                 frame.setAttribute('sandbox', native ? 'allow-same-origin' : 'allow-same-origin allow-scripts');
@@ -3329,6 +3349,11 @@ test("shared shell renders consistently across direct/native loads and app navig
                   await wait();
                   checkPalette(doc, theme);
                   shellGeometry(doc);
+                  const title = titleGeometry(doc);
+                  if (title) {
+                    if (!titleBaseline) titleBaseline = title;
+                    equal(title, titleBaseline, 'page title alignment/font ' + path);
+                  }
                   if (!native) {
                     const states = controlStates(doc);
                     if (!controls) controls = states;
@@ -3350,6 +3375,13 @@ test("shared shell renders consistently across direct/native loads and app navig
               const footer = frame.contentDocument.querySelector('footer');
               const themeControl = frame.contentDocument.querySelector('[data-theme-control]');
                const hiddenToggle = frame.contentDocument.querySelector('#tag-toggle');
+               const search = frame.contentDocument.querySelector('#link-search');
+               for (const [query, count, label] of [['git', '1', 'Link'], ['unmatched', '0', 'Links'], ['', '3', 'Links']]) {
+                 search.value = query;
+                 search.dispatchEvent(new frame.contentWindow.Event('input', { bubbles: true }));
+                 equal([frame.contentDocument.querySelector('.count-number').textContent, frame.contentDocument.querySelector('.count-label').textContent.trim()], [count, label], 'dynamic page title');
+                 equal(titleGeometry(frame.contentDocument), titleBaseline, 'stable filtered title');
+               }
               hiddenToggle.click();
                const hiddenState = [hiddenToggle.textContent, hiddenToggle.getAttribute('aria-expanded'), frame.contentDocument.querySelector('#link-count').textContent];
               if (hiddenState[1] !== 'true') throw new Error('Hidden toggle did not activate');
@@ -3373,7 +3405,8 @@ test("shared shell renders consistently across direct/native loads and app navig
                 if (doc.querySelector('header') !== header || doc.querySelector('footer') !== footer || doc.querySelector('[data-theme-control]') !== themeControl) throw new Error('Shell replaced');
                 if (doc.documentElement.dataset.theme !== theme) throw new Error('Theme lost on transition');
                 await wait();
-                shellGeometry(doc);
+                 shellGeometry(doc);
+                 equal(titleGeometry(doc), titleBaseline, 'app title alignment/font');
                 equal(controlStates(doc), controls, 'app control states');
                 equal(snapshot(doc), baseline, 'app ' + path + '/' + width + '/' + theme);
               }
@@ -3455,7 +3488,7 @@ test("script launchers are opt-in, quote URLs, forward arguments and statuses, a
   assert.doesNotMatch(home, /class="download" href="\.\/disabled\.sh"/);
   assert.match(
     home,
-    /<span class="count-number">3<\/span\s*><span class="count-label"> links<\/span>/,
+    /<span class="count-number">3<\/span\s*><span class="count-label"> Links<\/span>/,
   );
   assert.match(home, /class="code" href="\.\/disabled\/">disabled<\/a>/);
   assert.match(await f.read("assets/site.css"), /--script:\s*#c6a36a/);

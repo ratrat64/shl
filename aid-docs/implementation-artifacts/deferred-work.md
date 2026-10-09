@@ -29,3 +29,6 @@
 - source_spec: `aid-docs/implementation-artifacts/spec-colored-tag-filters.md`
   summary: Verify first token-error announcements with a screen reader before deciding whether the live-region exposure needs adjustment.
   evidence: Unverified medium concern: the independent role=status/aria-live region is synchronously revealed and populated, which may affect first announcements in some assistive technology; executed screen-reader evidence would settle it. Browser checks establish separate error state and search association, not spoken output.
+- source_spec: `aid-docs/implementation-artifacts/spec-shared-page-title.md`
+  summary: Refresh DESIGN.md to document the shared two-part sans page title, optional reserved counter slot, and logo-amber numeric emphasis.
+  evidence: The user approved this heading behavior; existing design prose describes amber primarily as script emphasis and omits Guide title alignment.
