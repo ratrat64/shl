@@ -267,7 +267,13 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
       check(count() === baseline && choices() === '' && picker.hidden && selected.hidden, 'Fresh mount');
       const catalog = pool(); check(catalog.includes('hidden') && catalog.includes('disabled') && (page ? !catalog.includes('outside') : catalog.includes('outside')), 'Subtree scope');
       toggle.click(); check(!picker.hidden && toggle.getAttribute('aria-expanded') === 'true' && count() === baseline, 'Opening changed results');
+      const availableOrder = [...picker.querySelectorAll('button')];
+      check(availableOrder.every((b, i) => !i || b.getBoundingClientRect().left > availableOrder[i - 1].getBoundingClientRect().left), 'Available visual catalog order');
       pick('shell'); check(doc.activeElement === selected.querySelector('button') && choices() === 'shell' && count() === 4, 'Picker move/focus');
+      const selectedBounds = selected.getBoundingClientRect(), selectedChip = selected.querySelector('button').getBoundingClientRect();
+      check(Math.abs(selectedBounds.right - selectedChip.right - parseFloat(win.getComputedStyle(selected).paddingRight)) < 2, 'Selected tags right alignment');
+      for (const track of [selected, picker]) check(win.getComputedStyle(track).maskImage.includes('linear-gradient'), 'Tag track edge fades');
+      if (width > 740) check(doc.querySelector('.directory-actions').getBoundingClientRect().width > doc.querySelector('#link-count').getBoundingClientRect().width * 2, 'Tools width priority');
       pick('setup'); check(count() === 2 && choices() === 'shell,setup', 'Ordinary AND');
       check(selected.querySelectorAll('button')[1].getAttribute('aria-label') === 'Remove #setup filter' && selected.querySelector('button').getAttribute('aria-pressed') === 'true', 'Removal accessibility');
       type('setup notes'); check(count() === 1 && shown() === 'Both', 'AND with broad title');
@@ -338,6 +344,13 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
         check(selected.getBoundingClientRect().right <= input.getBoundingClientRect().left, 'Selected not LEFT of search');
       } else check(selected.getBoundingClientRect().bottom <= input.getBoundingClientRect().top, 'Selected mobile track must be above search');
       check(picker.getBoundingClientRect().top >= input.getBoundingClientRect().bottom, 'Picker not below search'); clear();
+      for (const button of picker.querySelectorAll('button')) if (!['shell', 'setup'].includes(button.dataset.tag)) button.click();
+      picker.scrollLeft = 0;
+      const remaining = [...picker.querySelectorAll('button')].filter(b => !b.hidden);
+      const bounds = picker.getBoundingClientRect(), last = remaining.at(-1).getBoundingClientRect();
+      check(remaining.map(b => b.dataset.tag).join(',') === 'setup,shell' && remaining[0].getBoundingClientRect().left < last.left, 'Available remaining order');
+      check(Math.abs(bounds.right - last.right - parseFloat(win.getComputedStyle(picker).paddingRight)) < 2, 'Available tags right alignment');
+      clear();
       // Disclosure restoration, same-page retention, exactly one mount, stale listeners.
       const details = [...doc.querySelectorAll('details')].find(d => d.querySelector('summary').textContent === (page ? 'deeper' : 'tools')); if (details) {
         details.open = false; type('deeper'); check(details.open, 'Search did not expand'); type(''); check(!details.open, 'Disclosure restore');
@@ -849,7 +862,7 @@ test("native track scrolling uses Tab focus and horizontal touch gestures withou
       };
       const geometry = () =>
         evaluate(
-          `(() => {const t=document.getElementById(${JSON.stringify(id)}), b=t.querySelector('button'), r=b.getBoundingClientRect(), v=t.getBoundingClientRect(); return {scroll:t.scrollLeft,max:t.scrollWidth-t.clientWidth,left:r.left,right:r.right,trackLeft:v.left,trackRight:v.right,width:r.width,client:t.clientWidth,label:b.textContent,whole:b.scrollWidth<=b.clientWidth};})()`,
+          `(() => {const t=document.getElementById(${JSON.stringify(id)}); if(!t) throw Error('Missing track ${id} at '+location.href); const b=t.querySelector('button'), r=b.getBoundingClientRect(), v=t.getBoundingClientRect(); return {scroll:t.scrollLeft,max:t.scrollWidth-t.clientWidth,left:r.left,right:r.right,trackLeft:v.left,trackRight:v.right,width:r.width,client:t.clientWidth,label:b.textContent,whole:b.scrollWidth<=b.clientWidth};})()`,
         );
       let start = await geometry();
       assert.equal(start.label, "#" + long);
