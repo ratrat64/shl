@@ -228,7 +228,6 @@ p {
 }
 .count {
   font-variant-numeric: tabular-nums;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
