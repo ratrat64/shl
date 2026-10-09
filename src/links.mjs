@@ -44,7 +44,7 @@ export const linkFields = (value) => ({
   url: linkUrl(value),
   title: typeof value === "string" ? "" : (value.title ?? ""),
   ...linkStates(value),
-  tags: (value?.tags ?? []).map((tag) => tag.trim()),
+  tags: value?.tags ?? [],
 });
 
 export const entryCounts = (nodes) => ({
@@ -184,12 +184,12 @@ export async function loadLinks() {
       }
       if (typeof value === "object" && value && "script" in value) {
         problems.push(
-          `"${name}" — The script property is no longer supported; remove it. Only for script: true, append script to tags unless a trimmed case-insensitive equivalent already exists; preserve all other tags, fields and order. False must not remove an independently configured script tag.`,
+          `"${name}" — The script property is no longer supported; remove it. Only for script: true, append script to tags unless a trimmed case-insensitive equivalent already exists; preserve all other tags, fields and order. False must not remove an independently configured script tag. Explicitly rename existing tags containing whitespace, commas, Unicode uppercase/titlecase characters or emoji to maintainer-chosen valid names; preserve all other valid raw values. No automatic renaming is performed.`,
         );
       }
       if (typeof value === "object" && value && "hidden" in value) {
         problems.push(
-          `"${name}" — The hidden property is no longer supported; remove it. Only for hidden: true, append hidden to tags unless already present (case-insensitive); preserve all existing tags.`,
+          `"${name}" — The hidden property is no longer supported; remove it. Only for hidden: true, append hidden to tags unless already present (case-insensitive); preserve all existing tags. Explicitly rename existing tags containing whitespace, commas, Unicode uppercase/titlecase characters or emoji to maintainer-chosen valid names; preserve all other valid raw values. No automatic renaming is performed.`,
         );
       }
       if (
@@ -202,6 +202,17 @@ export async function loadLinks() {
         problems.push(`"${name}" — tags must be an array of nonblank strings`);
       }
       const urlError = validateUrl(url, name);
+      if (Array.isArray(value?.tags))
+        for (const tag of value.tags)
+          if (
+            typeof tag === "string" &&
+            /[\s,\p{Uppercase}\p{Lt}\p{Extended_Pictographic}\p{Emoji_Presentation}\p{Regional_Indicator}\u20e3]/u.test(
+              tag,
+            )
+          )
+            problems.push(
+              `"${name}" — ${JSON.stringify(tag)}: Tag names must not contain whitespace, commas, Unicode uppercase/titlecase characters or emoji (pictographs, emoji-presentation symbols, flags or keycaps); rename this tag explicitly. No automatic renaming is performed.`,
+            );
       if (urlError) problems.push(urlError);
       if (linkStates(value).script) launchers.push(code);
       if (problems.length === before)

@@ -243,22 +243,67 @@ p {
 }
 .directory-actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 9rem;
+  grid-template-columns: minmax(0, 1fr) minmax(12rem, 1fr) max-content;
   align-items: center;
   gap: 0.65rem;
-  width: min(100%, 30rem);
+  width: min(100%, 43rem);
   min-width: 0;
 }
 .directory-toggles {
-  grid-column: 2;
+  grid-column: 3;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 0.5rem;
 }
 .search {
-  grid-column: 1;
+  grid-column: 2;
   min-width: 0;
+}
+#selected-tags {
+  grid-column: 1;
+}
+.tag-track {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  min-width: 0;
+  padding: 0.4rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) var(--panel);
+  white-space: nowrap;
+}
+#available-tags,
+#tag-error {
+  grid-column: 1 / -1;
+}
+.tag-chip {
+  flex: 0 0 auto;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.tag-chip[aria-pressed="true"]::after {
+  content: " ×";
+}
+.tag-label {
+  display: inline-block;
+  padding: 0.05rem 0.3rem;
+  white-space: nowrap;
+}
+.tag-label,
+.tag-chip {
+  --tag-tone: light-dark(var(--tag-light), var(--tag-dark));
+  color: var(--tag-tone);
+  border: 1px solid color-mix(in srgb, var(--tag-tone) 30%, var(--panel));
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--tag-tone) 5%, var(--panel));
+}
+.tags:hover .tag-label,
+.tag-label:hover,
+.tag-chip:hover {
+  border-color: color-mix(in srgb, var(--tag-tone) 45%, var(--panel));
+  background: color-mix(in srgb, var(--tag-tone) 8%, var(--panel));
 }
 .search input {
   width: 100%;
@@ -644,6 +689,10 @@ main.minimal-document {
   .directory-actions {
     width: 100%;
     grid-template-columns: minmax(0, 1fr);
+  }
+  #selected-tags,
+  .search {
+    grid-column: 1;
   }
   .directory-toggles {
     grid-column: 1;

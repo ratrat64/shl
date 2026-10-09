@@ -114,7 +114,7 @@ routing. Local preview servers may serve 404 pages differently from GitHub Pages
    active navigation, and keyboard focus after each transition.
 3. Select the current navigation link and Guide section links, then use Back/Forward.
    Content, fragments, and saved scroll should match, with instant history restoration.
-4. Check search, Show hidden links, and both URL copy actions after returning from Guide.
+4. Check search, Show tags, tag selection/removal, and both URL copy actions after returning from Guide.
    Each interaction should run once; controls reset after leaving and returning.
 5. Repeat with JavaScript disabled for native links, and on a deployed project-prefix
    URL such as `/<repo>/guide/#about`.

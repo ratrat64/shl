@@ -21,3 +21,11 @@
 - source_spec: `aid-docs/implementation-artifacts/spec-broken-link-palette.md`
   summary: Preserve 4.5:1 contrast for standard hidden Open buttons on light-theme hover.
   evidence: The unchanged teal 18% hover fill, #006b60 text, #f6f7f5 page, and 94% parent opacity produce approximately 4.11:1 contrast; applying the new dimmed hover assertion to unchanged variants failed. Warning controls now use a scoped 12% hover fill, while the existing standard palette needs its own correction.
+
+- source_spec: `aid-docs/implementation-artifacts/spec-colored-tag-filters.md`
+  summary: Consider full short-path text searching from a nested directory page.
+  evidence: Both baseline and current search start traversal at the current subtree root, so a nested page searches descendant folder paths but not its own ancestor prefix; the colored-tag task preserves existing broad-search behavior.
+
+- source_spec: `aid-docs/implementation-artifacts/spec-colored-tag-filters.md`
+  summary: Verify first token-error announcements with a screen reader before deciding whether the live-region exposure needs adjustment.
+  evidence: Unverified medium concern: the independent role=status/aria-live region is synchronously revealed and populated, which may affect first announcements in some assistive technology; executed screen-reader evidence would settle it. Browser checks establish separate error state and search association, not spoken output.

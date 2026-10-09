@@ -13,9 +13,358 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawn, spawnSync } from "node:child_process";
 import { createContext, runInContext, runInNewContext } from "node:vm";
-import { stringify } from "yaml";
+import { stringify, parse } from "yaml";
 import { linkFields, entryTree } from "../src/links.mjs";
 import { scriptString } from "../src/layout.mjs";
+import { tagColors } from "../src/directory.mjs";
+
+// Actual generated identities cover every degree of the hue spectrum.
+const hueSamples = new Map();
+for (let n = 0; n < 10000 && hueSamples.size < 360; n++) {
+  const tag = `spectrum-${n}`;
+  const hue = Math.floor(
+    Number(tagColors(tag).light.match(/hsl\(([\d.]+)/)[1]),
+  );
+  if (!hueSamples.has(hue)) hueSamples.set(hue, tag);
+}
+const spectrumTags = [...hueSamples]
+  .sort(([a], [b]) => a - b)
+  .map(([, tag]) => tag);
+const representativeTags = spectrumTags.filter((_, i) => i % 10 === 0);
+
+test("raw invalid tag names fail every format before output deletion; valid lowercase and uncased Unicode stay public", async (t) => {
+  for (const source of ["links.json", "links.yaml", "links.yml"]) {
+    const valid = {
+      folder: {
+        code: {
+          url: "https://example.com/",
+          tags: [
+            "shell",
+            "café",
+            "日本語",
+            "emoji-party",
+            "ελληνικά",
+            "русский",
+            "ａｂｃ",
+            "𐐨",
+            "123",
+            "#",
+            "*",
+            "a._-:;!/?&='\"\\",
+            "a\u0000b",
+            "#literal",
+            "<img/onerror=alert(1)>",
+          ],
+        },
+      },
+    };
+    const encode = (map) => (source === "links.json" ? map : stringify(map));
+    const f = await fixture(t, encode(valid), source);
+    assert.equal(f.build().status, 0);
+    assert.deepEqual(JSON.parse(await f.read("links.json")), valid);
+    await writeFile(join(f.cwd, "dist", "marker"), "preserved");
+    for (const tag of [
+      "release notes",
+      " Hidden",
+      "Disabled ",
+      "a\tb",
+      "a\nb",
+      "a,b",
+      "a\u00a0b",
+      "a\u2028b",
+      "a\ufeffb",
+      "SHELL",
+      "sHeLl",
+      "café-É",
+      "Αλφα",
+      "Журнал",
+      "Ａｂｃ",
+      "ǅuro",
+      "Ⅳ",
+      "emoji-🎉",
+      "👩‍💻",
+      "👍🏽",
+      "🏽",
+      "🇬🇧",
+      "1️⃣",
+      "#️⃣",
+      "*️⃣",
+      "a\u20e3b",
+      "☀️",
+      "⌚",
+    ]) {
+      const map = {
+        folder: { code: { url: "https://example.com/", tags: [tag] } },
+      };
+      await writeFile(
+        join(f.cwd, source),
+        source === "links.json" ? JSON.stringify(map) : stringify(map),
+      );
+      const result = f.build();
+      assert.equal(result.status, 1, source + "/" + JSON.stringify(tag));
+      assert.ok(
+        result.stderr.includes(source) &&
+          result.stderr.includes('"folder/code"') &&
+          result.stderr.includes(JSON.stringify(tag)),
+      );
+      assert.match(
+        result.stderr,
+        /Tag names must not contain whitespace, commas, Unicode uppercase\/titlecase characters or emoji \(pictographs, emoji-presentation symbols, flags or keycaps\); rename this tag explicitly\. No automatic renaming is performed\./,
+      );
+      assert.equal(await f.read("marker"), "preserved");
+    }
+  }
+});
+
+test("renderer publishes deduplicated lexical catalogs, safe full labels and stable UTF-16 seeded colors", async (t) => {
+  const leaf = (tags) => ({ url: "https://example.com/", tags });
+  const entries = {
+    first: leaf(["shell", "shell", "shell", "café", "<tag>", "emoji-party"]),
+    folder: {
+      hidden: leaf(["hidden", "broken", "disabled", "script", "shell"]),
+    },
+  };
+  const a = await fixture(t, entries);
+  const b = await fixture(t, {
+    unrelated: leaf(["added"]),
+    folder: entries.folder,
+    first: entries.first,
+  });
+  const c = await fixture(t, { folder: entries.folder });
+  for (const f of [a, b, c]) assert.equal(f.build().status, 0);
+  assert.deepEqual(JSON.parse(await a.read("links.json")), entries);
+  const first = await a.read("index.html");
+  const inline = first.match(
+    /aria-label="[^"]*Show all tags for first">([\s\S]*?)<\/button>/,
+  )[1];
+  const popover = first.match(
+    /aria-label="Tags for first">([\s\S]*?)<\/div>/,
+  )[1];
+  assert.equal(inline, popover);
+  assert.deepEqual(
+    [...inline.matchAll(/class="tag-label"[^>]*>(.*?)<\/span>/g)].map(
+      (match) => match[1],
+    ),
+    ["#shell", "#café", "#&lt;tag&gt;", "#emoji-party"],
+  );
+  assert.equal(
+    new Set(representativeTags.map((tag) => tagColors(tag).light)).size,
+    36,
+  );
+  for (const [tag, light, dark] of [
+    ["hidden", "hsl(55.3 55% 20%)", "hsl(55.3 55% 81%)"],
+    ["disabled", "hsl(288.5 61% 20%)", "hsl(288.5 61% 81%)"],
+    ["broken", "hsl(80 56% 20%)", "hsl(80 56% 80%)"],
+    ["script", "hsl(153 56% 22%)", "hsl(153 56% 82%)"],
+    ["shell", "hsl(238.5 75% 22%)", "hsl(238.5 75% 82%)"],
+    ["café", "hsl(146.8 57% 20%)", "hsl(146.8 57% 81%)"],
+    ["𐐨", "hsl(223.6 69% 21%)", "hsl(223.6 69% 80%)"],
+    ["a\u0000b", "hsl(109 68% 21%)", "hsl(109 68% 81%)"],
+  ])
+    assert.deepEqual(tagColors(tag), { light, dark });
+  const catalogs = [];
+  for (const [f, path] of [
+    [a, "index.html"],
+    [a, "folder/index.html"],
+    [b, "index.html"],
+    [c, "index.html"],
+  ]) {
+    const html = await f.read(path);
+    assert.doesNotMatch(html, /<tag>/);
+    const catalog = html.match(/id="available-tags"[\s\S]*?<\/div>/)[0];
+    catalogs.push(catalog);
+    assert.doesNotMatch(html, /data-slot=/);
+    for (const match of html.matchAll(
+      /data-tag="([^"]*)" style="--tag-light:([^;]+);--tag-dark:([^"]+)"/g,
+    )) {
+      const identity = match[1].replaceAll("&lt;", "<").replaceAll("&gt;", ">");
+      assert.deepEqual(
+        { light: match[2], dark: match[3] },
+        tagColors(identity),
+      );
+    }
+  }
+  assert.match(
+    catalogs[0],
+    /data-tag="shell"[^>]*aria-label="Filter by #shell">#shell/,
+  );
+  assert.equal([...catalogs[0].matchAll(/data-tag="shell"/g)].length, 1);
+  assert.ok(
+    catalogs[0].indexOf('data-tag="broken"') <
+      catalogs[0].indexOf('data-tag="shell"'),
+  );
+  for (const catalog of catalogs)
+    assert.match(catalog, /data-tag="hidden" style="--tag-light:hsl\(/);
+});
+
+test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle and rendered root/nested matrix", async (t) => {
+  const chrome = availableChrome(t);
+  if (!chrome) return;
+  const leaf = (tags, title = "") => ({
+    url: "https://example.com/setup.sh",
+    tags,
+    title,
+  });
+  const subtree = {
+    Both: leaf(
+      [
+        "shell",
+        "setup",
+        "script",
+        "café",
+        "#literal",
+        "a-very-long-label-that-must-scroll-fully".repeat(3),
+      ],
+      "setup notes",
+    ),
+    Shell: leaf(["shell"]),
+    Setup: leaf(["setup"]),
+    Hidden: leaf(["hidden", "shell", "setup"]),
+    Broken: leaf(["hidden", "broken", "shell"]),
+    Disabled: leaf(["hidden", "disabled", "setup"]),
+    Combined: leaf([
+      "hidden",
+      "broken",
+      "disabled",
+      "shell",
+      "setup",
+      "script",
+    ]),
+    VisibleBroken: leaf(["broken", "shell"]),
+    deeper: { Nested: leaf(["shell", "setup"]) },
+  };
+  const f = await fixture(t, {
+    tools: subtree,
+    onlyHidden: { Secret: leaf(["hidden"]) },
+    noTags: { Plain: "https://example.com/" },
+    Outside: leaf(["outside"]),
+  });
+  assert.equal(f.build().status, 0);
+  const origin = await browserServer(t, f.cwd);
+  await writeFile(
+    join(f.cwd, "dist", "filters-check.html"),
+    `<!doctype html><html><body><iframe style="height:900px;border:0"></iframe><script>
+  (async () => { try {
+    const frame = document.querySelector('iframe');
+    const wait = () => new Promise(resolve => setTimeout(resolve, 30));
+    const load = path => new Promise(resolve => { frame.onload = resolve; frame.src = path; });
+    const check = (yes, label) => { if (!yes) throw Error(label); };
+    for (const prefix of ['/', '/project/']) for (const page of ['', 'tools/']) for (const width of [320, 1440]) for (const theme of ['light', 'dark']) {
+      frame.style.width = width + 'px'; localStorage.setItem('shortlink-theme', theme);
+      await load(prefix + page);
+      const doc = frame.contentDocument, win = frame.contentWindow;
+      const input = doc.querySelector('#link-search'), picker = doc.querySelector('#available-tags'), selected = doc.querySelector('#selected-tags'), toggle = doc.querySelector('#tag-toggle');
+      const count = () => Number(doc.querySelector('.count-number').textContent);
+      const pool = () => [...picker.querySelectorAll('button')].filter(b => !b.hidden).map(b => b.dataset.tag).join(',');
+      const choices = () => [...selected.querySelectorAll('button')].map(b => b.dataset.tag).join(',');
+      const pick = tag => picker.querySelector('button[data-tag="' + tag + '"]').click();
+      const remove = tag => selected.querySelector('button[data-tag="' + tag + '"]').click();
+      const clear = () => { for (const b of [...selected.querySelectorAll('button')]) b.click(); type(''); };
+      const type = (value, caret = value.length, event = 'input') => { input.value = value; input.setSelectionRange(caret, caret); input.dispatchEvent(new win.Event(event)); };
+      const enter = () => input.dispatchEvent(new win.KeyboardEvent('keydown', {key: 'Enter', cancelable: true}));
+      const shown = () => [...doc.querySelectorAll('.link-row')].filter(r => !r.closest('li').hidden && r.getClientRects().length).map(r => r.querySelector('.code').textContent).sort().join(',');
+      const baseline = page ? 5 : 7;
+      check(count() === baseline && choices() === '' && picker.hidden && selected.hidden, 'Fresh mount');
+      const catalog = pool(); check(catalog.includes('hidden') && catalog.includes('disabled') && (page ? !catalog.includes('outside') : catalog.includes('outside')), 'Subtree scope');
+      toggle.click(); check(!picker.hidden && toggle.getAttribute('aria-expanded') === 'true' && count() === baseline, 'Opening changed results');
+      pick('shell'); check(doc.activeElement === selected.querySelector('button') && choices() === 'shell' && count() === 4, 'Picker move/focus');
+      pick('setup'); check(count() === 2 && choices() === 'shell,setup', 'Ordinary AND');
+      check(selected.querySelectorAll('button')[1].getAttribute('aria-label') === 'Remove #setup filter' && selected.querySelector('button').getAttribute('aria-pressed') === 'true', 'Removal accessibility');
+      type('setup notes'); check(count() === 1 && shown() === 'Both', 'AND with broad title');
+      type('setup  notes'); check(count() === 0 && !doc.querySelector('#search-status').hidden && !picker.hidden, 'Prose split or choices lost');
+      check(pool() === catalog.split(',').filter(t => !['shell','setup'].includes(t)).join(','), 'Result-dependent pool');
+      type('deeper'); check(count() === 1 && shown() === 'Nested', 'Ancestor text/AND');
+      type(''); toggle.click(); check(picker.hidden && count() === 2 && choices() === 'shell,setup', 'Collapse/clear lost filters');
+      remove('shell'); check(doc.activeElement.dataset.tag === 'setup', 'Removal next focus');
+      remove('setup'); check(doc.activeElement === input && selected.hidden && pool() === catalog, 'Removal search/order');
+      type('#hidden'); check(count() === 0 && !choices(), 'Pending hidden revealed');
+      enter(); check(count() === (page ? 4 : 5) && input.value === '' && choices() === 'hidden', 'Enter commit'); clear();
+      type('#broken '); check(count() === 3 && !shown().includes('Hidden') && !shown().includes('Disabled'), 'Broken admission');
+      type('#shell,#setup '); check(count() === 1 && shown() === 'Combined', 'Reserved plus ordinary AND');
+      type('combined'); check(count() === 1, 'Reserved AND with text'); type('both'); check(count() === 0, 'Reserved text leaked hidden sibling');
+      remove('shell'); remove('setup'); type('');
+      type('#disabled,'); check(count() === 1 && shown() === 'Combined', 'Reserved AND');
+      remove('broken'); check(count() === 2 && shown() === 'Combined,Disabled', 'Disabled admission');
+      remove('disabled'); check(count() === baseline, 'Last reserved removal');
+      type('#script '); check(count() === 1 && shown() === 'Both', 'Script revealed hidden'); clear();
+      type('#shell,#setup '); check(choices() === 'shell,setup' && input.value === '' && count() === 2, 'Pasted multi tokens');
+      type('#SHELL '); check(choices() === 'shell,setup' && input.value === '' && doc.querySelector('#tag-notice').textContent === 'Tag already selected.', 'Duplicate toggled');
+      clear(); type('#missing, #shell '); check(input.value === '#missing, ' && choices() === 'shell' && doc.querySelector('#tag-error').textContent === 'Tag not found' && count() === 0, 'Unknown retention/known elsewhere');
+      type('#setup, '); check(input.value === ' ' && choices() === 'shell,setup' && doc.querySelector('#tag-error').hidden, 'Correction');
+      type('#absent '); check(!doc.querySelector('#tag-error').hidden, 'Unknown missing error');
+      type(''); check(doc.querySelector('#tag-error').hidden && choices() === 'shell,setup', 'Clear error lost selection');
+      clear(); type('#absent'); enter(); check(!doc.querySelector('#tag-error').hidden && input.value === '#absent', 'Unknown Enter');
+      type('#shell'); check(!doc.querySelector('#tag-error').hidden && !choices(), 'Pending correction cleared error');
+      enter(); check(doc.querySelector('#tag-error').hidden && choices() === 'shell', 'Committed correction error');
+      clear(); type('#missing, #setup'); type('#setup'); check(doc.querySelector('#tag-error').hidden && !choices(), 'Removed error retained by unrelated pending token');
+      clear(); pick('shell'); pick('setup'); pick('script'); remove('setup'); check(doc.activeElement.dataset.tag === 'script', 'Middle removal next'); remove('script'); check(doc.activeElement.dataset.tag === 'shell', 'Last removal previous'); clear();
+      clear(); type('setup #shell tail', 13); check(input.value === 'setup tail' && input.selectionStart === 6 && choices() === 'shell', 'Mid-input caret/prose');
+      clear(); type('prefix#shell '); check(!choices() && input.value === 'prefix#shell ', 'Inside-word token');
+      type('https://example.com/#shell '); check(!choices() && input.value === 'https://example.com/#shell ', 'URL fragment token');
+      type('https://example.com/a,#shell '); enter(); check(!choices() && input.value === 'https://example.com/a,#shell ', 'Comma inside URL span');
+      type('https://example.com/a,#shell #setup '); check(choices() === 'setup' && input.value === 'https://example.com/a,#shell ', 'URL retained alongside real token'); clear();
+      type('prose #shell', 2); enter(); check(!choices() && input.value === 'prose #shell', 'Enter outside unfinished candidate');
+      input.setSelectionRange(9, 9); enter(); check(choices() === 'shell' && input.value === 'prose ' && input.selectionStart === 6, 'Enter inside unfinished candidate'); clear();
+      type('#'); check(count() === 0 && !choices(), 'Bare prefix');
+      type('#shell'); check(count() === 4 && !choices(), 'Pending token uses broad recorded text');
+      type('##literal '); check(choices() === '#literal' && input.value === '', 'Exactly one prefix'); clear();
+      input.dispatchEvent(new win.CompositionEvent('compositionstart')); type('#shell '); enter(); check(!choices() && input.value === '#shell ', 'IME premature');
+      input.dispatchEvent(new win.CompositionEvent('compositionend')); check(choices() === 'shell' && input.value === '', 'IME completion'); clear();
+      type('#CAFÉ '); check(choices() === 'café', 'Uppercase Unicode input resolves lowercase source'); clear();
+      // Every surface consumes the same generated theme pair and tinted treatment.
+      toggle.click();
+      check(doc.documentElement.scrollWidth <= doc.documentElement.clientWidth && input.getBoundingClientRect().width >= 150, 'Viewport/search collapse');
+      for (const chip of picker.querySelectorAll('button')) {
+        check(win.getComputedStyle(chip).whiteSpace === 'nowrap' && chip.scrollWidth <= chip.clientWidth, 'Wrapped/truncated chip');
+        chip.focus(); check(win.getComputedStyle(chip).outlineWidth === '2px', 'Chip focus');
+        const a = chip.getBoundingClientRect(), track = picker.getBoundingClientRect();
+        if (a.width <= picker.clientWidth) check(a.right <= track.right + 1 && a.left >= track.left - 1, 'Focused chip not scrolled: ' + chip.textContent + '/' + JSON.stringify([a.left, a.right, track.left, track.right]));
+        else {
+          check(a.right > track.left && a.left < track.right, 'Oversized focused chip not revealed');
+          const offset = picker.scrollLeft + a.left - track.left;
+          picker.scrollLeft = offset;
+          check(chip.getBoundingClientRect().left >= track.left - 1, 'Long label start unreachable');
+          picker.scrollLeft = offset + a.width - picker.clientWidth;
+          check(chip.getBoundingClientRect().right <= track.right + 1, 'Long label end unreachable');
+        }
+        for (const span of doc.querySelectorAll('.tag-label')) if (span.dataset.tag === chip.dataset.tag) check(span.getAttribute('style') === chip.getAttribute('style') && win.getComputedStyle(span).color === win.getComputedStyle(chip).color, 'Surface seed/color mismatch');
+      }
+      for (const button of [...picker.querySelectorAll('button')]) button.click();
+      check(!doc.querySelector('#all-tags-selected').hidden && !toggle.disabled && !picker.hidden, 'All-selected state');
+      check(selected.scrollWidth > selected.clientWidth && selected.getBoundingClientRect().width > 0, 'Selected scroll track');
+      check(!!(selected.compareDocumentPosition(input) & win.Node.DOCUMENT_POSITION_FOLLOWING), 'Selected DOM order must precede search');
+      if (width > 740) {
+        check(Math.abs(selected.getBoundingClientRect().top - input.getBoundingClientRect().top) < 15, 'Selected not beside search');
+        check(selected.getBoundingClientRect().right <= input.getBoundingClientRect().left, 'Selected not LEFT of search');
+      } else check(selected.getBoundingClientRect().bottom <= input.getBoundingClientRect().top, 'Selected mobile track must be above search');
+      check(picker.getBoundingClientRect().top >= input.getBoundingClientRect().bottom, 'Picker not below search'); clear();
+      // Disclosure restoration, same-page retention, exactly one mount, stale listeners.
+      const details = [...doc.querySelectorAll('details')].find(d => d.querySelector('summary').textContent === (page ? 'deeper' : 'tools')); if (details) {
+        details.open = false; type('deeper'); check(details.open, 'Search did not expand'); type(''); check(!details.open, 'Disclosure restore');
+        details.open = true; type('deeper'); type(''); check(details.open, 'Visitor disclosure lost');
+      }
+      toggle.click(); pick('shell'); type('setup');
+      const navigate = async path => { const a = doc.createElement('a'); a.href = path; a.dataset.appLink = ''; doc.querySelector('main').append(a); a.click(); for (let i = 0; win.location.pathname + win.location.hash !== path && i < 100; i++) await wait(); };
+      const oldMain = doc.querySelector('main');
+      await navigate(prefix + page + '#link-count'); check(doc.querySelector('main') === oldMain && choices() === 'shell' && input.value === 'setup', 'Same-page reset');
+      let mounts = 0; const original = win.initSearch; win.initSearch = () => { mounts++; return original(); };
+      await navigate(prefix + 'guide/'); check(mounts === 1 && !doc.querySelector('#link-search'), 'Guide mount');
+      const oldValue = input.value; type('#setup '); check(input.value === '#setup ' && choices() === 'shell', 'Outgoing input listener');
+      picker.querySelector('button[data-tag="setup"]').click(); check(choices() === 'shell', 'Outgoing picker listener');
+      win.history.back(); for (let i = 0; !doc.querySelector('#link-search') && i < 100; i++) await wait();
+      check(mounts === 2 && doc.querySelector('#link-search').value === '' && doc.querySelector('#selected-tags').hidden && doc.querySelector('#available-tags').hidden, 'Back reset/mount');
+      win.history.forward(); for (let i = 0; doc.querySelector('#link-search') && i < 100; i++) await wait(); check(mounts === 3, 'Forward mount');
+    }
+    await load('/noTags/'); check(frame.contentDocument.querySelector('#tag-toggle').disabled && !frame.contentDocument.querySelector('.search').hidden, 'Untagged search');
+    await load('/onlyHidden/'); check(frame.contentDocument.querySelector('.count-number').textContent === '0' && !frame.contentDocument.querySelector('#empty-directory').hidden, 'All-hidden baseline');
+    frame.contentDocument.querySelector('#tag-toggle').click(); frame.contentDocument.querySelector('#available-tags button').click(); check(frame.contentDocument.querySelector('.count-number').textContent === '1', 'All-hidden selection');
+    document.body.dataset.filtersCheck = 'passed';
+  } catch(error) { document.body.dataset.filtersCheck = error.message; } })();
+  </script></body></html>`,
+  );
+  const html = runChrome(chrome, f.cwd, origin + "/filters-check.html");
+  assert.match(html, /data-filters-check="passed"/, html);
+});
 
 const buildScript = fileURLToPath(new URL("../build.mjs", import.meta.url));
 
@@ -94,6 +443,238 @@ async function browserServer(t, cwd) {
   return `http://localhost:${port}`;
 }
 
+async function browserControls(t, chrome, cwd) {
+  const process = spawn(chrome, [
+    "--headless",
+    "--no-sandbox",
+    "--disable-gpu",
+    "--remote-debugging-port=0",
+    `--user-data-dir=${join(cwd, "keyboard-profile")}`,
+    "about:blank",
+  ]);
+  t.after(() => process.kill());
+  const endpoint = await new Promise((resolve, reject) => {
+    let output = "";
+    process.stderr.on("data", (data) => {
+      output += data;
+      const match = output.match(/DevTools listening on (ws:\/\/[^\s]+)/);
+      if (match) resolve(new URL(match[1]));
+    });
+    process.once("error", reject);
+    process.once("exit", (code) => reject(Error("Chrome exited: " + code)));
+  });
+  const targets = await (
+    await fetch(`http://${endpoint.host}/json/list`)
+  ).json();
+  const socket = new WebSocket(
+    targets.find((target) => target.type === "page").webSocketDebuggerUrl,
+  );
+  t.after(() => socket.close());
+  await new Promise((resolve, reject) => {
+    socket.onopen = resolve;
+    socket.onerror = reject;
+  });
+  const pending = new Map();
+  const events = new Map();
+  let id = 0;
+  socket.onmessage = (event) => {
+    const response = JSON.parse(event.data);
+    if (events.has(response.method)) {
+      events.get(response.method)(response.params);
+      events.delete(response.method);
+    }
+    if (pending.has(response.id)) {
+      const { resolve, reject } = pending.get(response.id);
+      pending.delete(response.id);
+      if (response.error) reject(Error(JSON.stringify(response.error)));
+      else resolve(response.result);
+    }
+  };
+  const send = (method, params = {}) =>
+    new Promise((resolve, reject) => {
+      pending.set(++id, { resolve, reject });
+      socket.send(JSON.stringify({ id, method, params }));
+    });
+  const evaluate = async (expression) => {
+    const result = await send("Runtime.evaluate", {
+      expression,
+      awaitPromise: true,
+      returnByValue: true,
+    });
+    assert.equal(
+      result.exceptionDetails,
+      undefined,
+      JSON.stringify(result.exceptionDetails),
+    );
+    return result.result.value;
+  };
+  const key = async (key, code, virtualKey, modifiers = 0) => {
+    for (const type of ["keyDown", "keyUp"])
+      await send("Input.dispatchKeyEvent", {
+        type,
+        key,
+        code,
+        windowsVirtualKeyCode: virtualKey,
+        nativeVirtualKeyCode: virtualKey,
+        modifiers,
+        ...(type === "keyDown" && ["Enter", " "].includes(key)
+          ? {
+              text: key === "Enter" ? "\r" : " ",
+              unmodifiedText: key === "Enter" ? "\r" : " ",
+            }
+          : {}),
+      });
+  };
+  await send("Page.enable");
+  const navigate = async (url) => {
+    const loaded = new Promise((resolve) =>
+      events.set("Page.loadEventFired", resolve),
+    );
+    await send("Page.navigate", { url });
+    await loaded;
+    await send("Page.bringToFront");
+  };
+  return { send, evaluate, key, navigate };
+}
+
+test("native Enter/Space chip and popover activation, typed delimiters, touch and scrolling execute in Chrome", async (t) => {
+  const chrome = availableChrome(t);
+  if (!chrome) return;
+  const f = await fixture(t, {
+    tools: {
+      code: {
+        url: "https://example.com/",
+        tags: [
+          "shell",
+          "setup",
+          "a-long-label-that-scrolls-without-truncation",
+        ],
+      },
+    },
+  });
+  assert.equal(f.build().status, 0);
+  const origin = await browserServer(t, f.cwd);
+  const { send, evaluate, key, navigate } = await browserControls(
+    t,
+    chrome,
+    f.cwd,
+  );
+  for (const width of [320, 1440])
+    for (const theme of ["light", "dark"])
+      for (const path of ["/", "/tools/"]) {
+        await send("Emulation.setDeviceMetricsOverride", {
+          width,
+          height: 900,
+          deviceScaleFactor: 1,
+          mobile: width === 320,
+        });
+        await navigate(origin + path);
+        for (
+          let i = 0;
+          i < 100 &&
+          !(await evaluate(
+            "!!document.querySelector('#link-search') && !document.querySelector('.search').hidden",
+          ));
+          i++
+        )
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        await evaluate(
+          `document.documentElement.dataset.theme = ${JSON.stringify(theme)}; document.querySelector('#tag-toggle').focus()`,
+        );
+        await key("Enter", "Enter", 13);
+        assert.equal(
+          await evaluate("document.querySelector('#available-tags').hidden"),
+          false,
+          `${width}/${theme}/${path}: native Enter opens picker`,
+        );
+        await evaluate(
+          "document.querySelector('#available-tags button[data-tag=shell]').focus()",
+        );
+        await key(" ", "Space", 32);
+        assert.equal(
+          await evaluate("document.activeElement.getAttribute('aria-label')"),
+          "Remove #shell filter",
+        );
+        await key("Enter", "Enter", 13);
+        assert.equal(
+          await evaluate("document.activeElement.id"),
+          "link-search",
+        );
+        await send("Input.insertText", { text: "#setup" });
+        await key("Enter", "Enter", 13);
+        assert.equal(
+          await evaluate(
+            "document.querySelector('#selected-tags button').dataset.tag",
+          ),
+          "setup",
+        );
+        await evaluate(
+          "document.querySelector('#selected-tags button').focus()",
+        );
+        await key(" ", "Space", 32);
+        await send("Input.insertText", { text: "#shell " });
+        assert.equal(
+          await evaluate(
+            "document.querySelector('#selected-tags button').dataset.tag",
+          ),
+          "shell",
+        );
+        await evaluate(
+          "document.querySelector('#selected-tags button').focus()",
+        );
+        await key("Enter", "Enter", 13);
+        await send("Input.insertText", { text: "#setup," });
+        assert.equal(
+          await evaluate(
+            "document.querySelector('#selected-tags button').dataset.tag",
+          ),
+          "setup",
+        );
+        await evaluate(
+          "document.querySelector('#selected-tags button').focus()",
+        );
+        await key("Enter", "Enter", 13);
+        await evaluate(
+          "for (const d of document.querySelectorAll('details')) d.open = true; document.querySelector('.tags').focus()",
+        );
+        await key("Enter", "Enter", 13);
+        assert.equal(
+          await evaluate("!!document.querySelector('.tag-panel:popover-open')"),
+          true,
+        );
+        await key("Escape", "Escape", 27);
+        assert.equal(
+          await evaluate("!!document.querySelector('.tag-panel:popover-open')"),
+          false,
+        );
+        await send("Emulation.setTouchEmulationEnabled", { enabled: true });
+        const point = await evaluate(
+          "(() => { const b = document.querySelector('#available-tags button[data-tag=shell]'); b.scrollIntoView({block:'nearest', inline:'nearest'}); const r = b.getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()",
+        );
+        await send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: [{ ...point, id: 1 }],
+        });
+        await send("Input.dispatchTouchEvent", {
+          type: "touchEnd",
+          touchPoints: [],
+        });
+        assert.equal(
+          await evaluate(
+            "document.querySelector('#selected-tags button').dataset.tag",
+          ),
+          "shell",
+        );
+        assert.equal(
+          await evaluate(
+            "getComputedStyle(document.querySelector('.destination')).opacity",
+          ),
+          "1",
+        );
+        await send("Emulation.setTouchEmulationEnabled", { enabled: false });
+      }
+});
+
 async function fixture(t, links, source = "links.json") {
   const cwd = await mkdtemp(join(tmpdir(), "shortlink-"));
   t.after(() => rm(cwd, { recursive: true, force: true }));
@@ -108,6 +689,379 @@ async function fixture(t, links, source = "links.json") {
     read: (path) => readFile(join(cwd, "dist", path), "utf8"),
   };
 }
+
+test("legacy migration guidance requires explicit maintainer renaming before publication", async (t) => {
+  for (const property of ["script", "hidden"]) {
+    const f = await fixture(t, {
+      code: {
+        url: "https://example.com/",
+        [property]: true,
+        tags: [" SHELL ", "a,b", "Valid"],
+      },
+    });
+    const result = f.build();
+    assert.equal(result.status, 1);
+    assert.match(
+      result.stderr,
+      /Explicitly rename existing tags containing whitespace, commas, Unicode uppercase\/titlecase characters or emoji to maintainer-chosen valid names; preserve all other valid raw values\. No automatic renaming is performed\./,
+    );
+  }
+});
+
+test("native track scrolling uses Tab focus and horizontal touch gestures without truncating oversized labels", async (t) => {
+  const chrome = availableChrome(t);
+  if (!chrome) return;
+  const long = "a-long-label-that-remains-completely-readable-".repeat(3);
+  const f = await fixture(t, {
+    tools: {
+      code: { url: "https://example.com/", tags: [long, "shell", "setup"] },
+    },
+  });
+  assert.equal(f.build().status, 0);
+  const origin = await browserServer(t, f.cwd);
+  const { send, evaluate, key, navigate } = await browserControls(
+    t,
+    chrome,
+    f.cwd,
+  );
+  const visible = async () =>
+    assert.equal(
+      await evaluate(`(() => {
+    const b = document.activeElement, track = b.parentElement, r = b.getBoundingClientRect(), t = track.getBoundingClientRect();
+    return b.matches(':focus-visible') && getComputedStyle(b).whiteSpace === 'nowrap' && b.scrollWidth <= b.clientWidth &&
+      (r.width > track.clientWidth ? r.left < t.right && r.right > t.left : r.left >= t.left-1 && r.right <= t.right+1);
+  })()`),
+      true,
+    );
+  for (const width of [320, 1440]) {
+    await send("Emulation.setDeviceMetricsOverride", {
+      width,
+      height: 900,
+      deviceScaleFactor: 1,
+      mobile: width === 320,
+    });
+    await navigate(origin + "/tools/");
+    await evaluate("document.querySelector('#tag-toggle').focus()");
+    await key("Enter", "Enter", 13);
+    await key("Tab", "Tab", 9);
+    await visible();
+    assert.equal(
+      await evaluate("document.activeElement.textContent"),
+      "#" + long,
+    );
+    await key("Tab", "Tab", 9);
+    await visible();
+    assert.equal(await evaluate("document.activeElement.dataset.tag"), "setup");
+    assert.ok(
+      await evaluate(
+        "document.querySelector('#available-tags').scrollLeft > 0",
+      ),
+    );
+    await key("Tab", "Tab", 9, 8);
+    await visible();
+    // Set up both tracks with the same oversized first label; activation itself
+    // has independent native Enter/Space/touch coverage above.
+    await evaluate(
+      `for(const b of [...document.querySelectorAll('#available-tags button')]) b.click(); const h=document.querySelector('h1'); h.tabIndex=-1; h.focus();`,
+    );
+    await key("Tab", "Tab", 9);
+    await visible();
+    assert.equal(
+      await evaluate("document.activeElement.textContent"),
+      "#" + long,
+    );
+    await key("Tab", "Tab", 9);
+    await visible();
+    assert.ok(
+      await evaluate("document.querySelector('#selected-tags').scrollLeft > 0"),
+    );
+    assert.equal(
+      await evaluate("document.activeElement.dataset.tag"),
+      "setup",
+      "Native second selected focus",
+    );
+    await key("Tab", "Tab", 9, 8);
+    await visible();
+    assert.equal(
+      await evaluate("document.activeElement.textContent"),
+      "#" + long,
+      "Reverse Tab returns to first selected chip",
+    );
+    await key("Tab", "Tab", 9);
+    assert.equal(
+      await evaluate("document.activeElement.dataset.tag"),
+      "setup",
+      "First selected chip tabs to second",
+    );
+    await key("Tab", "Tab", 9);
+    assert.equal(
+      await evaluate("document.activeElement.dataset.tag"),
+      "shell",
+      "Second selected chip tabs to third",
+    );
+    await key("Tab", "Tab", 9);
+    assert.equal(
+      await evaluate("document.activeElement.id"),
+      "link-search",
+      "Tab follows selected chips into search",
+    );
+    await key("Tab", "Tab", 9, 8);
+    await visible();
+    assert.equal(await evaluate("document.activeElement.dataset.tag"), "shell");
+    await evaluate(
+      "for(const b of [...document.querySelectorAll('#selected-tags button')]) b.click()",
+    );
+    await send("Emulation.setTouchEmulationEnabled", { enabled: true });
+    for (const id of ["available-tags", "selected-tags"]) {
+      if (id === "selected-tags")
+        await evaluate(
+          "for(const b of [...document.querySelectorAll('#available-tags button')]) b.click()",
+        );
+      await evaluate(
+        `{const track = document.getElementById(${JSON.stringify(id)}); track.querySelector('button').focus(); track.scrollIntoView({block:'nearest'});}`,
+      );
+      const gesture = async (direction) => {
+        const point = await evaluate(
+          `(() => {const r=document.getElementById(${JSON.stringify(id)}).getBoundingClientRect(); return {x:r.left+(r.width*( ${direction} < 0 ? .8 : .2)), y:r.top+r.height/2, distance:r.width*.6};})()`,
+        );
+        await send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: [{ x: point.x, y: point.y, id: 1 }],
+        });
+        for (let step = 1; step <= 6; step++) {
+          await send("Input.dispatchTouchEvent", {
+            type: "touchMove",
+            touchPoints: [
+              {
+                x: point.x + (direction * point.distance * step) / 6,
+                y: point.y,
+                id: 1,
+              },
+            ],
+          });
+          await new Promise((resolve) => setTimeout(resolve, 12));
+        }
+        await send("Input.dispatchTouchEvent", {
+          type: "touchEnd",
+          touchPoints: [],
+        });
+        await new Promise((resolve) => setTimeout(resolve, 80));
+      };
+      const geometry = () =>
+        evaluate(
+          `(() => {const t=document.getElementById(${JSON.stringify(id)}), b=t.querySelector('button'), r=b.getBoundingClientRect(), v=t.getBoundingClientRect(); return {scroll:t.scrollLeft,max:t.scrollWidth-t.clientWidth,left:r.left,right:r.right,trackLeft:v.left,trackRight:v.right,width:r.width,client:t.clientWidth,label:b.textContent,whole:b.scrollWidth<=b.clientWidth};})()`,
+        );
+      let start = await geometry();
+      assert.equal(start.label, "#" + long);
+      assert.ok(start.whole && start.width > start.client);
+      for (
+        let i = 0;
+        i < 12 && (await geometry()).scroll < (await geometry()).max - 1;
+        i++
+      )
+        await gesture(-1);
+      const end = await geometry();
+      assert.ok(
+        end.scroll > start.scroll &&
+          end.right <= end.trackRight + 1 &&
+          end.right > end.trackLeft,
+        "Touch reaches oversized label's end: " + JSON.stringify(end),
+      );
+      for (let i = 0; i < 12 && (await geometry()).scroll > 1; i++)
+        await gesture(1);
+      start = await geometry();
+      assert.ok(
+        start.left >= start.trackLeft - 1 && start.left < start.trackRight,
+        "Touch returns to oversized label's start: " + JSON.stringify(start),
+      );
+    }
+    await send("Emulation.setTouchEmulationEnabled", { enabled: false });
+  }
+});
+
+test("native tag edit ranges, multiline clipboard paste and lossless NUL identities regressions", async (t) => {
+  const chrome = availableChrome(t);
+  if (!chrome) return;
+  const links = {
+    nul: {
+      url: "https://example.com/nul",
+      tags: ["a\u0000b", "shell", "setup"],
+    },
+    replacement: { url: "https://example.com/replacement", tags: ["a\ufffdb"] },
+  };
+  for (const source of ["links.json", "links.yaml", "links.yml"]) {
+    const f = await fixture(
+      t,
+      source === "links.json" ? links : stringify(links),
+      source,
+    );
+    assert.equal(f.build().status, 0);
+    assert.deepEqual(JSON.parse(await f.read("links.json")), links);
+  }
+  const f = await fixture(t, links);
+  assert.equal(f.build().status, 0);
+  const origin = await browserServer(t, f.cwd);
+  const { send, evaluate, key, navigate } = await browserControls(
+    t,
+    chrome,
+    f.cwd,
+  );
+  await navigate(origin + "/");
+  await evaluate(`
+    window.input = document.querySelector('#link-search');
+    window.identity = b => JSON.parse(String.fromCharCode(34) + b.dataset.tag + String.fromCharCode(34));
+    window.selected = () => [...document.querySelectorAll('#selected-tags button')].map(identity);
+    window.setText = (value, start = value.length, end = start) => { input.value = value; input.setSelectionRange(start,end); input.dispatchEvent(new Event('input')); input.focus(); };
+    window.clear = () => { for(const b of document.querySelectorAll('#selected-tags button')) b.click(); setText(''); };
+  `);
+  const set = (text, start = text.length, end = start) =>
+    evaluate(`setText(${JSON.stringify(text)},${start},${end})`);
+  const invalid = () =>
+    evaluate("!document.querySelector('#tag-error').hidden");
+  await set("#missing");
+  await key("Enter", "Enter", 13);
+  assert.equal(await invalid(), true);
+  await evaluate("input.setSelectionRange(0,0)");
+  await send("Input.insertText", { text: "#shell " });
+  assert.deepEqual(
+    await evaluate("[input.value,selected(),input.selectionStart]"),
+    ["#missing", ["shell"], 0],
+  );
+  assert.equal(
+    await invalid(),
+    true,
+    "prepend known syntax retains the same attempted occurrence",
+  );
+  await evaluate("clear()");
+  await set("#missing #missing", 0, 9);
+  await key("Backspace", "Backspace", 8);
+  assert.equal(await evaluate("input.value"), "#missing");
+  assert.equal(
+    await invalid(),
+    false,
+    "deleting attempted occurrence must not transfer its error",
+  );
+  await key("Enter", "Enter", 13); // caret is before the remaining candidate: inside its range
+  assert.equal(await invalid(), true);
+  await evaluate("input.setSelectionRange(1,8)");
+  await send("Input.insertText", { text: "shell" });
+  assert.equal(await evaluate("input.value"), "#shell");
+  assert.equal(
+    await invalid(),
+    true,
+    "pending corrected candidate remains attempted",
+  );
+  await key("Enter", "Enter", 13);
+  assert.equal(await invalid(), false);
+  assert.deepEqual(await evaluate("selected()"), ["shell"]);
+  await evaluate("clear()");
+  await set("#missing");
+  await key("Enter", "Enter", 13);
+  await evaluate("input.setSelectionRange(0,input.value.length)");
+  await key("Backspace", "Backspace", 8);
+  assert.deepEqual(
+    await evaluate(
+      "[input.value, document.querySelector('#tag-error').hidden]",
+    ),
+    ["", true],
+  );
+
+  // Ordinary native edits should never invoke the JS value setter or selection API.
+  await evaluate(`
+    window.writes = 0; window.ranges = 0;
+    const value = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');
+    Object.defineProperty(input,'value',{configurable:true,get(){return value.get.call(this)},set(v){writes++;value.set.call(this,v)}});
+    const range = input.setSelectionRange;
+    input.setSelectionRange = function(...args){ranges++;return range.apply(this,args)};
+  `);
+  await send("Input.insertText", { text: "ordinary" });
+  await key("Backspace", "Backspace", 8);
+  assert.deepEqual(await evaluate("[writes,ranges,input.value]"), [
+    0,
+    0,
+    "ordinar",
+  ]);
+  for (const type of ["keyDown", "keyUp"])
+    await send("Input.dispatchKeyEvent", {
+      type,
+      modifiers: 2,
+      key: "z",
+      code: "KeyZ",
+      windowsVirtualKeyCode: 90,
+    });
+  assert.equal(
+    await evaluate("input.value"),
+    "ordinary",
+    "ordinary native deletion remains undoable",
+  );
+  assert.deepEqual(await evaluate("[writes,ranges]"), [0, 0]);
+  await evaluate("delete input.value; delete input.setSelectionRange; clear()");
+
+  // Native paste must expose the unsanitized multiline clipboard event.
+  await send("Browser.grantPermissions", {
+    origin,
+    permissions: ["clipboardReadWrite", "clipboardSanitizedWrite"],
+  });
+  await evaluate(
+    "input.addEventListener('paste',e => {window.pasteProof = [e.isTrusted,e.clipboardData.getData('text/plain')];})",
+  );
+  await set("left REPLACE right", 5, 12);
+  const clipboard = "#shell\n#setup\nextra\nwords";
+  await evaluate(`navigator.clipboard.writeText(${JSON.stringify(clipboard)})`);
+  for (const type of ["keyDown", "keyUp"])
+    await send("Input.dispatchKeyEvent", {
+      type,
+      modifiers: 2,
+      key: "v",
+      code: "KeyV",
+      windowsVirtualKeyCode: 86,
+    });
+  assert.deepEqual(await evaluate("pasteProof"), [true, clipboard]);
+  assert.deepEqual(
+    await evaluate(
+      "[input.value,input.selectionStart,input.selectionEnd,selected()]",
+    ),
+    ["left extra words right", 16, 16, ["shell", "setup"]],
+  );
+  await evaluate(
+    "clear(); input.dispatchEvent(new CompositionEvent('compositionstart'))",
+  );
+  await evaluate(
+    `{ const data = new DataTransfer(); data.setData('text/plain', ${JSON.stringify("#shell\n#setup\n")}); input.dispatchEvent(new ClipboardEvent('paste',{clipboardData:data,cancelable:true})); }`,
+  );
+  assert.deepEqual(await evaluate("[input.value,selected()]"), [
+    "#shell #setup ",
+    [],
+  ]);
+  await evaluate("input.dispatchEvent(new CompositionEvent('compositionend'))");
+  assert.deepEqual(await evaluate("[input.value,selected()]"), [
+    "",
+    ["shell", "setup"],
+  ]);
+  await evaluate("clear(); document.querySelector('#tag-toggle').click()");
+  for (const [tag, code] of [
+    ["a\u0000b", "nul"],
+    ["a\ufffdb", "replacement"],
+  ]) {
+    await evaluate(
+      `{ const button = [...document.querySelectorAll('#available-tags button')].find(b => identity(b) === ${JSON.stringify(tag)}); button.click(); }`,
+    );
+    assert.deepEqual(await evaluate("selected()"), [tag]);
+    assert.deepEqual(
+      await evaluate(
+        "[...document.querySelectorAll('.link-row')].filter(r => !r.closest('li').hidden).map(r => r.querySelector('.code').textContent)",
+      ),
+      [code],
+    );
+    assert.equal(
+      await evaluate(
+        `identity(document.querySelector('li:not([hidden]) .tag-label'))`,
+      ),
+      tag,
+    );
+    await evaluate("clear()");
+  }
+});
 
 const behaviorScript = (html, name) => {
   const matches = [
@@ -348,10 +1302,7 @@ test("homepage lists sorted links safely with project-relative URLs and handles 
     /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">\s*<span class="count-number">0<\/span\s*><span class="count-label"> links<\/span>\s*<\/h1>/,
   );
   assert.equal([...emptyHtml.matchAll(/<h1\b/g)].length, 1);
-  assert.match(
-    emptyHtml,
-    /id="hidden-toggle"[^>]*disabled\s*>\s*Show hidden links/,
-  );
+  assert.match(emptyHtml, /id="tag-toggle"[^>]*disabled\s*>\s*Show tags/);
   assert.match(emptyHtml, /No links available yet\./);
 });
 
@@ -384,7 +1335,7 @@ test("nested JSON and YAML build themed directory pages and redirects", async (t
   for (const page of [home, tools])
     assert.match(
       page,
-      /<div class="directory-toggles">\s*<button\s+id="hidden-toggle"[^>]*disabled\s*>\s*Show hidden links\s*<\/button>\s*<\/div>/,
+      /<div class="directory-toggles">\s*<button\s+id="tag-toggle"[^>]*disabled\s*>\s*Show tags\s*<\/button>\s*<\/div>/,
     );
   assert.match(home, /<div class="breadcrumbs" aria-hidden="true"><\/div>/);
   assert.match(
@@ -599,10 +1550,6 @@ for (const prefix of ["/", "/project/"])
         elements["#copy-status"] = { textContent: "" };
         elements["#download-status"] = { textContent: "" };
         elements["#link-count"] = { textContent: "" };
-        elements["#hidden-toggle"] = control({
-          disabled: /id="hidden-toggle"[^>]*disabled/.test(content),
-          hidden: true,
-        });
         if (content.includes('id="empty-directory"'))
           elements["#empty-directory"] = { hidden: false };
         const children = [
@@ -779,6 +1726,13 @@ for (const prefix of ["/", "/project/"])
       const asset = new URL(src, location.href).href.slice(base.length);
       assetOrder.push(asset);
       runInContext(await f.read(asset), context);
+      // This VM isolates navigation's mount ownership; real search integration
+      // (including outgoing listener cleanup) executes in the browser matrix.
+      if (asset === "assets/search.js")
+        context.initSearch = () => {
+          const input = document.querySelector("#link-search");
+          if (input) input.addEventListener("input", () => {});
+        };
     }
     assert.deepEqual(assetOrder, [
       "assets/theme.js",
@@ -864,14 +1818,9 @@ for (const prefix of ["/", "/project/"])
     assert.equal(await click(folder("/hidden/")), true);
     const controls = document.currentMain.elements;
     assert.equal(controls["#link-search"].handlers.get("input").length, 1);
-    assert.equal(controls["#hidden-toggle"].handlers.get("click").length, 1);
     assert.equal(controls[".links"].handlers.get("click").length, 2);
-    controls["#hidden-toggle"].handlers.get("click")[0]();
-    assert.equal(controls["#hidden-toggle"]["aria-pressed"], "true");
-    assert.equal(controls["#link-count"].textContent, "1 link");
     controls["#link-search"].value = "missing";
     controls["#link-search"].handlers.get("input")[0]();
-    assert.equal(controls["#link-count"].textContent, "0 links");
     const copyLink = {
       href: base + "hidden/secret/",
       hasAttribute: () => false,
@@ -965,7 +1914,7 @@ for (const prefix of ["/", "/project/"])
     assert.equal(document.currentMain.elements["#link-search"], undefined);
     assert.equal(await click(makeLink(base + "hidden/")), true);
     assert.equal(
-      document.currentMain.elements["#hidden-toggle"].handlers.get("click")
+      document.currentMain.elements["#link-search"].handlers.get("input")
         .length,
       1,
     );
@@ -1146,11 +2095,11 @@ test("hidden links and hidden-only folders are hidden by default but keep their 
     const html = await f.read(page);
     assert.match(
       html,
-      /<div class="directory-toggles">\s*<button\s+id="hidden-toggle"/,
+      /<div class="directory-toggles">\s*<button\s+id="tag-toggle"/,
     );
     assert.match(
       html,
-      /id="hidden-toggle"[^>]*aria-pressed="false"\s+hidden\s*>\s*Show hidden links/,
+      /id="tag-toggle"[^>]*aria-expanded="false"[^>]*hidden\s*>\s*Show tags/,
     );
     assert.doesNotMatch(html, /data-visible=|data-total=/);
     assert.match(
@@ -1212,7 +2161,7 @@ test("hidden links and hidden-only folders are hidden by default but keep their 
     );
     assert.match(html, /<p id="empty-directory">No links listed here\.<\/p>/);
     assert.match(html, /<div hidden><ul class="links">/);
-    assert.match(html, /id="hidden-toggle"[^>]*hidden\s*>\s*Show hidden links/);
+    assert.match(html, /id="tag-toggle"[^>]*hidden\s*>\s*Show tags/);
     assert.match(html, /id="link-search"/);
   }
   assert.match(
@@ -1823,7 +2772,7 @@ test("search filters nested links on the homepage and directory pages", async (t
     const html = await f.read(page);
     assert.match(
       html,
-      /<div class="search" hidden>\s*<label class="sr-only" for="link-search">Search links<\/label>\s*<input\s+id="link-search"\s+type="search"\s+placeholder="Search link, title or tag"/,
+      /<div class="search" hidden>\s*<label class="sr-only" for="link-search">Search links<\/label>\s*<input\s+id="link-search"\s+type="search"[^>]*placeholder="Search link, title or tag"/,
     );
     assert.match(
       html,
@@ -1834,58 +2783,9 @@ test("search filters nested links on the homepage and directory pages", async (t
       new RegExp(`src="${depth.replaceAll(".", "\\.")}assets/search\\.js"`),
     );
     assert.match(html, /id="search-status"[^>]*role="status" hidden/);
-    assert.match(
-      html,
-      /id="hidden-toggle"[^>]*disabled\s*>\s*Show hidden links/,
-    );
+    assert.match(html, /id="tag-toggle"[^>]*disabled\s*>\s*Show tags/);
   }
 
-  const leaf = (text, title = "") => ({
-    firstElementChild: { tagName: "DIV" },
-    textContent: text,
-    dataset: { title },
-    hidden: false,
-  });
-  const group = (name, ...children) => {
-    const details = {
-      tagName: "DETAILS",
-      open: false,
-      querySelector: (selector) =>
-        selector === "summary" ? { textContent: name } : { children },
-    };
-    return { firstElementChild: details, dataset: {}, hidden: false };
-  };
-  const gh = leaf("gh https://github.com/ Open");
-  gh.dataset.search = "gh https://github.com/";
-  const git = leaf("git https://git-scm.com/");
-  const code = leaf("Code https://example.org/", "VS Code");
-  const editors = group("editors", code);
-  const tools = group("tools", git, editors);
-  const list = { children: [gh, tools] };
-  const search = { hidden: true };
-  const input = {
-    value: "",
-    parentElement: search,
-    addEventListener: (_, listener) => {
-      input.update = listener;
-    },
-  };
-  const status = { hidden: true, textContent: "" };
-  const count = { textContent: "3 links" };
-  const disabledToggle = {
-    disabled: true,
-    hidden: false,
-    addEventListener() {
-      throw new Error("disabled toggle should not activate");
-    },
-  };
-  const elements = {
-    "#link-search": input,
-    ".links": list,
-    "#search-status": status,
-    "#link-count": count,
-    "#hidden-toggle": disabledToggle,
-  };
   runInNewContext((await f.read("assets/search.js")) + "\ninitSearch();", {
     document: { querySelector: () => null },
   });
@@ -1894,57 +2794,6 @@ test("search filters nested links on the homepage and directory pages", async (t
       querySelector: (selector) => (selector === "#link-search" ? {} : null),
     },
   });
-  runInNewContext((await f.read("assets/search.js")) + "\ninitSearch();", {
-    document: { querySelector: (selector) => elements[selector] },
-  });
-  assert.equal(search.hidden, false);
-  assert.equal(disabledToggle.hidden, false);
-
-  tools.firstElementChild.open = true; // Preserve directories opened by the visitor.
-  input.value = "vs code";
-  input.update();
-  assert.equal(status.textContent, "");
-  assert.equal(status.hidden, true);
-  assert.equal(count.textContent, "1 link");
-  assert.equal(code.hidden, false);
-  assert.equal(git.hidden, true);
-  assert.equal(gh.hidden, true);
-  assert.equal(editors.firstElementChild.open, true);
-
-  input.value = "TOOLS/GIT";
-  input.update();
-  assert.equal(count.textContent, "1 link");
-  assert.equal(git.hidden, false);
-  assert.equal(code.hidden, true);
-  assert.equal(editors.hidden, true);
-
-  input.value = "tools";
-  input.update();
-  assert.equal(status.textContent, "");
-  assert.equal(count.textContent, "2 links");
-  assert.equal(git.hidden, false);
-  assert.equal(code.hidden, false);
-
-  input.value = "missing";
-  input.update();
-  assert.equal(status.textContent, "No links match your search.");
-  assert.equal(status.hidden, false);
-  assert.equal(count.textContent, "0 links");
-  assert.equal(tools.hidden, true);
-
-  input.value = "open";
-  input.update();
-  assert.equal(gh.hidden, true);
-  assert.equal(count.textContent, "0 links");
-
-  input.value = "";
-  input.update();
-  assert.equal(status.hidden, true);
-  assert.equal(status.textContent, "");
-  assert.equal(count.textContent, "3 links");
-  assert.equal(gh.hidden, false);
-  assert.equal(editors.firstElementChild.open, false);
-  assert.equal(tools.firstElementChild.open, true);
 });
 
 test("directory highlights match, full tags stay inline, and destinations reveal accessibly", async (t) => {
@@ -2086,12 +2935,12 @@ test("inline tag disclosures target the correct link when codes repeat in differ
     const html = await f.read(path);
     const buttons = [
       ...html.matchAll(
-        /<button class="tags"[^>]*popovertarget="([^"]+)"[^>]*>([^<]+)<\/button>/g,
+        /<button class="tags"[^>]*popovertarget="([^"]+)"[^>]*>([\s\S]*?)<\/button>/g,
       ),
     ];
     const panels = [
       ...html.matchAll(
-        /<div class="tag-panel" id="([^"]+)"[^>]*>([^<]+)<\/div>/g,
+        /<div class="tag-panel" id="([^"]+)"[^>]*>([\s\S]*?)<\/div>/g,
       ),
     ];
     assert.equal(buttons.length, path === "index.html" ? 3 : 1);
@@ -2101,391 +2950,6 @@ test("inline tag disclosures target the correct link when codes repeat in differ
     }
     assert.doesNotMatch(html, /Show all tags for untagged/);
   }
-});
-
-test("tags are displayed safely and searchable on home and nested pages without revealing hidden links", async (t) => {
-  const links = {
-    tools: {
-      manual: {
-        url: "https://example.com/guide",
-        tags: ["How To", "<img src=x onerror=alert(1)>"],
-      },
-      editor: { url: "https://example.com/editor", tags: [" editor "] },
-      private: {
-        url: "https://example.com/private",
-        tags: ["How To", "hidden"],
-      },
-    },
-    other: "https://example.com/other",
-  };
-  const f = await fixture(t, links);
-  const build = f.build();
-  assert.equal(build.status, 0, build.stderr);
-  assert.deepEqual(JSON.parse(await f.read("links.json")), links);
-  for (const page of ["index.html", "tools/index.html"]) {
-    const html = await f.read(page);
-    assert.match(
-      html,
-      /data-search="manual https:\/\/example\.com\/guide How To &lt;img src=x onerror=alert\(1\)&gt; #How To #&lt;img src=x onerror=alert\(1\)&gt;"/,
-    );
-    assert.match(
-      html,
-      /<button class="tags"[^>]*aria-label="#How To · #&lt;img src=x onerror=alert\(1\)&gt;\. Show all tags for manual">#How To · #&lt;img src=x onerror=alert\(1\)&gt;<\/button><a class="destination"/,
-    );
-    assert.match(html, /<button class="tags"[^>]*>#editor<\/button>/);
-    assert.match(
-      html,
-      /<div class="tag-panel"[^>]*popover tabindex="0" role="region" aria-label="Tags for manual">#How To · #&lt;img src=x onerror=alert\(1\)&gt;<\/div>/,
-    );
-    assert.doesNotMatch(html, /<img/);
-    const rows = [
-      ...html.matchAll(
-        /<li([^>]*)><div class="link-row"[^>]*>[\s\S]*?<\/div>(?:<div class="tag-panel"[^>]*>[\s\S]*?<\/div>)?<\/li>/g,
-      ),
-    ];
-    const leaf = (code) => {
-      const [, attributes] =
-        rows.find(([, attributes]) =>
-          attributes.includes(`data-search="${code} `),
-        ) || [];
-      assert.ok(attributes, `missing ${code} on ${page}`);
-      const searchValue = attributes
-        .match(/data-search="([^"]*)"/)[1]
-        .replaceAll("&lt;", "<")
-        .replaceAll("&gt;", ">");
-      return {
-        firstElementChild: { tagName: "DIV" },
-        dataset: {
-          search: searchValue,
-          tags: attributes
-            .match(/data-tags="([^"]*)"/)[1]
-            .replaceAll("&quot;", '"')
-            .replaceAll("&lt;", "<")
-            .replaceAll("&gt;", ">"),
-          ...(attributes.includes('data-hidden="true"')
-            ? { hidden: "true" }
-            : {}),
-        },
-        hidden: attributes.includes(" hidden"),
-      };
-    };
-    const guide = leaf("manual");
-    const editor = leaf("editor");
-    const privateLink = leaf("private");
-    const group = {
-      firstElementChild: {
-        tagName: "DETAILS",
-        open: false,
-        querySelector: (selector) =>
-          selector === "summary"
-            ? { textContent: "tools" }
-            : { children: [guide, editor, privateLink] },
-      },
-      dataset: {},
-      hidden: false,
-    };
-    const list = {
-      children: page === "index.html" ? [group] : [guide, editor, privateLink],
-    };
-    const search = { hidden: true };
-    const input = {
-      value: "",
-      parentElement: search,
-      addEventListener: (_, callback) => {
-        input.update = callback;
-      },
-    };
-    const status = { hidden: true, textContent: "" };
-    const count = {
-      textContent: page === "index.html" ? "3 links" : "2 links",
-    };
-    const toggle = {
-      hidden: true,
-      textContent: "Show hidden links",
-      setAttribute(name, value) {
-        this[name] = value;
-      },
-      addEventListener: (_, callback) => {
-        toggle.click = callback;
-      },
-    };
-    runInNewContext((await f.read("assets/search.js")) + "\ninitSearch();", {
-      document: {
-        querySelector: (selector) =>
-          ({
-            "#link-search": input,
-            ".links": list,
-            "#search-status": status,
-            "#hidden-toggle": toggle,
-            "#link-count": count,
-          })[selector] ?? null,
-      },
-    });
-    input.value = "#HOW TO";
-    input.update();
-    assert.equal(status.textContent, "");
-    assert.equal(count.textContent, "1 link");
-    assert.equal(guide.hidden, false);
-    assert.equal(editor.hidden, true);
-    assert.equal(privateLink.hidden, true);
-    if (page === "index.html") assert.equal(group.firstElementChild.open, true);
-    toggle.click();
-    assert.equal(toggle["aria-pressed"], "true");
-    assert.equal(count.textContent, "2 links");
-    assert.equal(status.textContent, "");
-    assert.equal(privateLink.hidden, false);
-    input.value = "<img src=x onerror=alert(1)>";
-    input.update();
-    assert.equal(count.textContent, "1 link");
-    assert.equal(status.textContent, "");
-    input.value = "#editor";
-    input.update();
-    assert.equal(count.textContent, "1 link");
-    assert.equal(status.textContent, "");
-    assert.equal(editor.hidden, false);
-  }
-});
-
-test("toggle updates hidden rows, nested search, counts, and hidden-only empty state", async (t) => {
-  const f = await fixture(t, {
-    public: "https://example.com/public",
-    secret: {
-      url: "https://example.com/private",
-      title: "Private notes",
-      tags: ["hidden"],
-    },
-    folder: {
-      visible: "https://example.com/visible",
-      private: { deep: { url: "https://example.com/deep", tags: ["hidden"] } },
-    },
-    onlyHidden: {
-      nested: { code: { url: "https://example.com/code", tags: ["hidden"] } },
-    },
-  });
-  assert.equal(f.build().status, 0);
-  const script = await f.read("assets/search.js");
-  const leaf = (name, hidden = false) => ({
-    firstElementChild: { tagName: "DIV" },
-    textContent: name,
-    dataset: hidden ? { hidden: "true" } : {},
-    hidden,
-  });
-  const group = (name, children, hidden = false) => ({
-    firstElementChild: {
-      tagName: "DETAILS",
-      open: false,
-      querySelector: (selector) =>
-        selector === "summary" ? { textContent: name } : { children },
-    },
-    dataset: hidden ? { hidden: "true" } : {},
-    hidden,
-  });
-  const exercise = async (page, children, visible, site = f) => {
-    const html = await site.read(page);
-    assert.match(
-      html,
-      /id="hidden-toggle"[^>]*aria-pressed="false"\s+hidden\s*>\s*Show hidden links/,
-    );
-    assert.doesNotMatch(html, /data-visible=|data-total=/);
-    assert.match(
-      html,
-      new RegExp(
-        `id="link-count" class="count" aria-live="polite" aria-atomic="true">\\s*<span class="count-number">${visible}</span\\s*><span class="count-label">${visible === 1 ? " link" : " links"}</span>\\s*</`,
-      ),
-    );
-    const wrapper = { hidden: !visible };
-    const list = { children, parentElement: wrapper };
-    const search = { hidden: true };
-    const input = {
-      value: "",
-      parentElement: search,
-      addEventListener: (_, callback) => {
-        input.update = callback;
-      },
-    };
-    const status = { hidden: true, textContent: "" };
-    const toggle = {
-      hidden: true,
-      textContent: "Show hidden links",
-      setAttribute(name, value) {
-        this[name] = value;
-      },
-      addEventListener: (_, callback) => {
-        toggle.click = callback;
-      },
-    };
-    const numberEl = { textContent: visible };
-    const labelEl = { textContent: visible === 1 ? " link" : " links" };
-    const count = {
-      get textContent() {
-        return `${numberEl.textContent}${labelEl.textContent}`;
-      },
-      querySelector: (sel) =>
-        sel === ".count-number"
-          ? numberEl
-          : sel === ".count-label"
-            ? labelEl
-            : null,
-    };
-    const empty = visible ? null : { hidden: false };
-    const elements = {
-      "#link-search": input,
-      ".links": list,
-      "#search-status": status,
-      "#hidden-toggle": toggle,
-      "#link-count": count,
-      "#empty-directory": empty,
-    };
-    runInNewContext(script + "\ninitSearch();", {
-      document: { querySelector: (selector) => elements[selector] },
-    });
-    assert.equal(toggle.hidden, false);
-    assert.equal(search.hidden, false);
-    return { html, input, status, toggle, count, empty, wrapper };
-  };
-
-  const homeMarkup = await f.read("index.html");
-  const titled = homeMarkup.match(
-    /<li([^>]*)><div class="link-row" title="Private notes"><a class="code" href="([^"]+)" title="Private notes">secret<\/a>/,
-  );
-  assert.ok(titled, "generated hidden titled link is present");
-  const [, attributes, secretHref] = titled;
-  assert.match(
-    attributes,
-    /data-hidden="true" hidden data-title="Private notes"/,
-  );
-  const secret = leaf("secret https://example.com/private");
-  secret.dataset = {
-    hidden: attributes.match(/data-hidden="([^"]+)"/)?.[1],
-    title: attributes.match(/data-title="([^"]+)"/)?.[1],
-  };
-  secret.hidden = attributes.includes(" hidden");
-  const deep = leaf("deep https://example.com/deep", true);
-  const privateGroup = group("private", [deep], true);
-  const visibleLeaf = leaf("visible https://example.com/visible");
-  const folder = group("folder", [visibleLeaf, privateGroup]);
-  const nestedCode = leaf("code https://example.com/code", true);
-  const hiddenGroup = group(
-    "onlyHidden",
-    [group("nested", [nestedCode], true)],
-    true,
-  );
-  const home = await exercise(
-    "index.html",
-    [folder, hiddenGroup, leaf("public https://example.com/public"), secret],
-    2,
-  );
-  assert.match(
-    home.html,
-    /<li data-hidden="true" hidden><details><summary><a href="\.\/onlyHidden\/" data-app-link>/,
-  );
-  const deepHref = home.html.match(/href="(\.\/folder\/private\/deep\/)"/)?.[1];
-  assert.ok(deepHref, "nested short link was generated");
-  for (const prefix of ["/", "/project/"]) {
-    assert.equal(
-      new URL(secretHref, `https://example.org${prefix}`).pathname,
-      `${prefix}secret/`,
-    );
-    assert.equal(
-      new URL(deepHref, `https://example.org${prefix}`).pathname,
-      `${prefix}folder/private/deep/`,
-    );
-  }
-  home.input.value = "private notes";
-  home.input.update();
-  assert.equal(home.status.textContent, "No links match your search.");
-  assert.equal(home.count.textContent, "0 links");
-  assert.equal(privateGroup.hidden, true);
-  assert.equal(secret.hidden, true);
-  home.toggle.click();
-  assert.equal(home.toggle.textContent, "Hide hidden links");
-  assert.equal(home.toggle["aria-pressed"], "true");
-  assert.equal(home.count.textContent, "1 link");
-  assert.equal(home.status.textContent, "");
-  assert.equal(secret.hidden, false);
-  home.input.value = "private";
-  home.input.update();
-  assert.equal(home.count.textContent, "2 links");
-  assert.equal(home.status.textContent, "");
-  assert.equal(secret.hidden, false);
-  assert.equal(privateGroup.hidden, false);
-  assert.equal(deep.hidden, false);
-  home.input.value = "";
-  home.input.update();
-  assert.equal(home.count.textContent, "5 links");
-  assert.equal(hiddenGroup.hidden, false);
-  assert.equal(nestedCode.hidden, false);
-  home.input.value = "private notes";
-  home.input.update();
-  home.toggle.click();
-  assert.equal(home.toggle.textContent, "Show hidden links");
-  assert.equal(home.toggle["aria-pressed"], "false");
-  assert.equal(home.count.textContent, "0 links");
-  assert.equal(home.status.textContent, "No links match your search.");
-  assert.equal(secret.hidden, true);
-  assert.equal(hiddenGroup.hidden, true);
-  assert.equal(privateGroup.hidden, true);
-
-  const nested = group(
-    "private",
-    [leaf("deep https://example.com/deep", true)],
-    true,
-  );
-  const directory = await exercise(
-    "folder/index.html",
-    [nested, leaf("visible https://example.com/visible")],
-    1,
-  );
-  assert.match(directory.html, /href="\.\/private\/"/);
-  directory.toggle.click();
-  assert.equal(directory.count.textContent, "2 links");
-  assert.equal(nested.hidden, false);
-  directory.toggle.click();
-  assert.equal(directory.count.textContent, "1 link");
-  assert.equal(nested.hidden, true);
-
-  const only = group(
-    "nested",
-    [leaf("code https://example.com/code", true)],
-    true,
-  );
-  const hiddenPage = await exercise("onlyHidden/index.html", [only], 0);
-  assert.match(hiddenPage.html, /<div hidden><ul class="links">/);
-  assert.equal(hiddenPage.empty.hidden, false);
-  hiddenPage.toggle.click();
-  assert.equal(hiddenPage.count.textContent, "1 link");
-  assert.equal(hiddenPage.empty.hidden, true);
-  assert.equal(hiddenPage.wrapper.hidden, false);
-  assert.equal(hiddenPage.input.parentElement.hidden, false);
-  assert.equal(only.hidden, false);
-  hiddenPage.input.value = "code";
-  hiddenPage.input.update();
-  assert.equal(hiddenPage.count.textContent, "1 link");
-  assert.equal(hiddenPage.status.textContent, "");
-  hiddenPage.toggle.click();
-  assert.equal(hiddenPage.count.textContent, "0 links");
-  assert.equal(hiddenPage.empty.hidden, true);
-  assert.equal(hiddenPage.wrapper.hidden, true);
-  assert.equal(hiddenPage.input.parentElement.hidden, false);
-  assert.equal(hiddenPage.status.hidden, false);
-  assert.equal(hiddenPage.status.textContent, "No links match your search.");
-
-  const allHidden = await fixture(t, {
-    secret: { url: "https://example.com/", tags: ["hidden"] },
-  });
-  assert.equal(allHidden.build().status, 0);
-  const root = await exercise(
-    "index.html",
-    [leaf("secret https://example.com/", true)],
-    0,
-    allHidden,
-  );
-  assert.equal(root.count.textContent, "0 links");
-  root.toggle.click();
-  assert.equal(root.count.textContent, "1 link");
-  root.toggle.click();
-  assert.equal(root.count.textContent, "0 links");
-  assert.equal(root.empty.hidden, false);
 });
 
 test("information pages use relative navigation and shared theme assets", async (t) => {
@@ -2869,15 +3333,15 @@ test("shared shell renders consistently across direct/native loads and app navig
               const header = frame.contentDocument.querySelector('header');
               const footer = frame.contentDocument.querySelector('footer');
               const themeControl = frame.contentDocument.querySelector('[data-theme-control]');
-              const hiddenToggle = frame.contentDocument.querySelector('#hidden-toggle');
+               const hiddenToggle = frame.contentDocument.querySelector('#tag-toggle');
               hiddenToggle.click();
-              const hiddenState = [hiddenToggle.textContent, hiddenToggle.getAttribute('aria-pressed'), frame.contentDocument.querySelector('#link-count').textContent];
+               const hiddenState = [hiddenToggle.textContent, hiddenToggle.getAttribute('aria-expanded'), frame.contentDocument.querySelector('#link-count').textContent];
               if (hiddenState[1] !== 'true') throw new Error('Hidden toggle did not activate');
               themeControl.click();
               const toggled = theme === 'light' ? 'dark' : 'light';
               if (frame.contentDocument.documentElement.dataset.theme !== toggled || themeControl.textContent !== 'Theme: ' + toggled || localStorage.getItem('shortlink-theme') !== toggled) throw new Error('Theme button did not change theme');
               checkPalette(frame.contentDocument, toggled);
-              equal([hiddenToggle.textContent, hiddenToggle.getAttribute('aria-pressed'), frame.contentDocument.querySelector('#link-count').textContent], hiddenState, 'theme does not change hidden state');
+               equal([hiddenToggle.textContent, hiddenToggle.getAttribute('aria-expanded'), frame.contentDocument.querySelector('#link-count').textContent], hiddenState, 'theme does not change picker state');
               themeControl.click();
               themeControl.blur();
               for (const path of ['guide/', 'tools/', '']) {
@@ -2962,7 +3426,7 @@ test("script launchers are opt-in, quote URLs, forward arguments and statuses, a
   assert.match(home, /data-search="[^"]*#shell #hidden #script"/);
   assert.match(
     home,
-    /<button class="tags"[^>]*>#shell · #hidden · #script<\/button><a class="destination"/,
+    /<button class="tags"[^>]*>[\s\S]*?#shell<\/span> · <span[^>]*>#hidden<\/span> · <span[^>]*>#script<\/span><\/button><a class="destination"/,
   );
   assert.match(
     home,
@@ -3145,7 +3609,7 @@ test("404 resolves root and nested paths under user and project sites", async (t
     Stopped: {
       Deep: {
         url: "https://example.com/disabled",
-        tags: [" Hidden ", " DISABLED ", "broken", "script"],
+        tags: ["hidden", "disabled", "broken", "script"],
       },
     },
     plain: "https://example.org/",
@@ -3253,12 +3717,18 @@ test("404 stops at the first readable ancestor map, even when the entry is missi
   }
 });
 
-test("404 forwards matching URLs despite malformed tags without probing a parent map", async (t) => {
+test("404 defensively interprets malformed and uppercase fetched tags without probing a parent map", async (t) => {
   const f = await fixture(t, {});
   assert.equal(f.build().status, 0);
   const script = behaviorScript(await f.read("404.html"), "recovery");
   for (const prefix of ["/", "/project/"]) {
-    for (const tags of ["invalid", [null], [42]]) {
+    for (const [tags, disabled] of [
+      ["invalid", false],
+      [[null], false],
+      [[42], false],
+      [[" DISABLED ", "HiDdEn", "SCRIPT"], true],
+      [["BROKEN"], false],
+    ]) {
       const requests = [];
       const elements = { home: {}, head: {}, msg: {} };
       let destination;
@@ -3283,14 +3753,17 @@ test("404 forwards matching URLs despite malformed tags without probing a parent
           };
         },
       });
-      assert.equal(destination, "https://example.com/valid");
+      assert.equal(
+        destination,
+        disabled ? prefix + "tools/Mixed/" : "https://example.com/valid",
+      );
       assert.deepEqual(requests, [prefix + "tools/links.json"]);
       assert.equal(elements.home.href, prefix + "tools/");
     }
   }
 });
 
-const stateMap = (script = true) =>
+const stateMap = (script = true, samples = representativeTags) =>
   Object.fromEntries(
     Array.from({ length: 8 }, (_, mask) => [
       `${script ? "" : "Plain"}State${mask}`,
@@ -3299,9 +3772,10 @@ const stateMap = (script = true) =>
         title: `State ${mask}`,
         tags: [
           "docs",
-          "release notes",
+          "release-notes",
+          ...samples,
           ...(script ? ["script"] : []),
-          ...[" Hidden ", " BROKEN ", " Disabled "].filter(
+          ...["hidden", "broken", "disabled"].filter(
             (_, bit) => mask & (1 << bit),
           ),
         ],
@@ -3318,7 +3792,7 @@ test("all eight states share interpretation, raw JSON/YAML publication, counts a
     },
     duplicate: {
       url: "https://example.com/",
-      tags: [" Hidden ", "hidden", "HIDDEN", " DISABLED "],
+      tags: ["hidden", "hidden", "hidden", "disabled"],
     },
     plain: "https://example.com/",
   };
@@ -3486,7 +3960,7 @@ test("disabled Bash launchers exit 1 with exact stderr and invoke no downloader,
     folder: {
       Run: {
         url: "https://example.com/setup.sh",
-        tags: ["hidden", "broken", "DISABLED", "script"],
+        tags: ["hidden", "broken", "disabled", "script"],
       },
     },
   });
@@ -3634,7 +4108,116 @@ test("disabled copy-only controls keep full values, rejection feedback, timer re
   assert.equal(list.click, null);
 });
 
-test("state rows, exact search, all-hidden traversal, disabled native actions and lifecycle render in both themes and sizes", async (t) => {
+test("seeded colors cover the hue spectrum, current map and conservative bounds on real tinted state surfaces", async (t) => {
+  const chrome = availableChrome(t);
+  if (!chrome) return;
+  const collectTags = (nodes) =>
+    nodes.flatMap((node) =>
+      node.isDirectory ? collectTags(node.children) : node.tags,
+    );
+  const current = [
+    ...new Set(
+      collectTags(
+        entryTree(
+          parse(
+            await readFile(new URL("../links.yaml", import.meta.url), "utf8"),
+          ),
+        ),
+      ),
+    ),
+  ];
+  const samples = [
+    ...new Set([
+      "docs",
+      ...spectrumTags,
+      ...current.filter(
+        (tag) => !["hidden", "broken", "disabled", "script"].includes(tag),
+      ),
+    ]),
+  ];
+  const colors = Object.fromEntries(
+    [...samples, "hidden", "broken", "disabled", "script"].map((tag) => [
+      tag,
+      tagColors(tag),
+    ]),
+  );
+  assert.equal(hueSamples.size, 360);
+  assert.ok(new Set(samples.map((tag) => colors[tag].light)).size > 16);
+  const f = await fixture(t, { folder: stateMap(true, samples) });
+  assert.equal(f.build().status, 0);
+  const origin = await browserServer(t, f.cwd);
+  await writeFile(
+    join(f.cwd, "dist", "spectrum-check.html"),
+    `<!doctype html><html><body><iframe style="height:900px;border:0"></iframe><script>
+  (async () => {try {
+    const frame = document.querySelector('iframe');
+    const load = path => new Promise(resolve => {frame.onload = resolve; frame.src = path;});
+    const check = (ok,message) => {if(!ok) throw Error(message)};
+    const colors = ${scriptString(colors)}, current = ${scriptString(current)};
+    const blend = (a,b,o) => a.map((v,i)=>v*o+b[i]*(1-o));
+    const rgb = value => {const v=value.match(/[\\d.]+/g).slice(0,3).map(Number);return value.startsWith('color(srgb ') ? v.map(c=>c*255) : v;};
+    const lum = a => a.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4}).reduce((n,v,i)=>n+v*[.2126,.7152,.0722][i],0);
+    const contrast = (a,b) => (Math.max(lum(a),lum(b))+.05)/(Math.min(lum(a),lum(b))+.05);
+    const identity = e => JSON.parse(String.fromCharCode(34)+e.dataset.tag+String.fromCharCode(34));
+    let minimum = Infinity, generated = 0, boundary = 0;
+    for(const width of [390,1440]) for(const path of ['/', '/folder/']) {
+      frame.style.width = width+'px'; await load(path);
+      const doc=frame.contentDocument, win=frame.contentWindow;
+      const rules=[...doc.styleSheets].flatMap(s=>[...s.cssRules]);
+      for(const rule of rules.filter(r=>r.selectorText?.includes(':hover'))) rule.selectorText=rule.selectorText.replaceAll(':hover',':is(:hover,.verify-hover)');
+      for(const li of doc.querySelectorAll('li[hidden]')) li.hidden=false;
+      for(const d of doc.querySelectorAll('details')) d.open=true;
+      for(const theme of ['light','dark']) {
+        doc.documentElement.dataset.theme=theme;
+        const bg=rgb(win.getComputedStyle(doc.body).backgroundColor);
+        const readable = (label,row,kind) => {
+          const style=win.getComputedStyle(label), opacity=Number(win.getComputedStyle(row).opacity);
+          const backdrop=row.classList.contains('disabled-row') ? rgb(win.getComputedStyle(row.parentElement).backgroundColor) : bg;
+          const ratio=contrast(blend(rgb(style.color),backdrop,opacity),blend(rgb(style.backgroundColor),backdrop,opacity));
+          minimum=Math.min(minimum,ratio); check(ratio>=4.5,kind+' contrast '+ratio+' '+theme+' '+label.getAttribute('style'));
+        };
+        const available = [...doc.querySelectorAll('#available-tags button')];
+        check(current.every(tag=>available.some(e=>identity(e)===tag)),'Current-map tag coverage');
+        const catalog=new Map(available.map(e=>[identity(e),e.getAttribute('style')]));
+        for(const row of doc.querySelectorAll('.link-row')) {
+          check(row.getBoundingClientRect().height===50,'Hue fixture row height');
+          for(const hovered of [false,true]) {
+            row.classList.toggle('verify-hover',hovered);
+            for(const label of row.querySelectorAll('.tag-label')) {
+              const tag=identity(label), expected=colors[tag];
+              check(label.style.getPropertyValue('--tag-light')===expected.light && label.style.getPropertyValue('--tag-dark')===expected.dark,'Seed vector metadata');
+              check(label.getAttribute('style')===catalog.get(tag),'Root/nested/catalog metadata stability');
+              label.classList.toggle('verify-hover',hovered); readable(label,row,'Generated'); generated++;
+            }
+          }
+          row.classList.remove('verify-hover');
+        }
+        // Verify the fixed HSL envelope's hue/saturation/lightness endpoints
+        // through native CSS, not a competing JS HSL conversion.
+        const row=doc.querySelector('.link-row.disabled-row').cloneNode(false);
+        const li=doc.createElement('li'); li.dataset.hidden='true'; li.append(row); doc.querySelector('.links').append(li);
+        const probe=doc.createElement('span'); probe.className='tag-label';probe.textContent='#bounds';row.append(probe);
+        for(let hue=0;hue<360;hue++) for(const sat of [55,75]) for(const light of [20,22]) for(const dark of [80,84]) {
+          probe.style.setProperty('--tag-light','hsl('+hue+' '+sat+'% '+light+'%)');probe.style.setProperty('--tag-dark','hsl('+hue+' '+sat+'% '+dark+'%)');
+          for(const hover of [false,true]) {probe.classList.toggle('verify-hover',hover);readable(probe,row,'Bounds');boundary++;}
+        }
+        li.remove();
+      }
+    }
+    document.body.dataset.minimum=minimum.toFixed(4); document.body.dataset.generated=generated;document.body.dataset.boundary=boundary;document.body.dataset.spectrumCheck='passed';
+  } catch(error){document.body.dataset.spectrumCheck=error.message}})();
+  </script></body></html>`,
+  );
+  const html = runChrome(chrome, f.cwd, origin + "/spectrum-check.html");
+  assert.match(html, /data-spectrum-check="passed"/, html);
+  const minimum = Number(html.match(/data-minimum="([^"]+)"/)[1]);
+  assert.ok(minimum >= 4.5);
+  console.info(
+    `Seeded hue contrast: minimum ${minimum}:1; ${html.match(/data-generated="([^"]+)"/)[1]} generated and ${html.match(/data-boundary="([^"]+)"/)[1]} envelope surface checks`,
+  );
+});
+
+test("state rows, selected filters, all-hidden traversal, disabled native actions and lifecycle render in both themes and sizes", async (t) => {
   const chrome = availableChrome(t);
   if (!chrome) return;
   const f = await fixture(t, {
@@ -3666,12 +4249,12 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
       Fragment: {
         url: "https://example.com/#docs",
         title: "docs broken disabled",
-        tags: ["docs-api", "broken #disabled"],
+        tags: ["docs-api", "broken-#disabled"],
       },
       Literal: {
         url: "https://example.com/",
         title: "docs guide",
-        tags: ["release notes"],
+        tags: ["release-notes"],
       },
     },
   });
@@ -3714,13 +4297,19 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
           await load(prefix + (native ? '?native=1' : ''));
           let doc = frame.contentDocument, win = frame.contentWindow;
           if (native) doc.documentElement.dataset.theme = theme;
-          const toggle = doc.querySelector('#hidden-toggle');
+           const toggle = doc.querySelector('#tag-toggle');
           if (native) { check(toggle.hidden && doc.querySelector('.search').hidden, 'Native tools visible');
             for (const li of doc.querySelectorAll('li[data-hidden]')) check(li.hidden, 'Native hidden leaf revealed');
             // Inspect all variants without enabling scripts; this is a geometry/style projection only.
             for (const li of doc.querySelectorAll('li[hidden]')) li.hidden = false;
             for (const details of doc.querySelectorAll('details')) details.open = true;
-          } else toggle.click();
+           } else {
+             toggle.click();
+             doc.querySelector('#available-tags button[data-tag="hidden"]').click();
+             // Project all variants for style inspection, then reset before predicates.
+             for (const li of doc.querySelectorAll('li[hidden]')) li.hidden = false;
+             for (const details of doc.querySelectorAll('details')) details.open = true;
+           }
           const rules = [...doc.styleSheets].flatMap(sheet => [...sheet.cssRules]);
           const pointerRule = rules.find(rule => rule.conditionText === '(hover: hover) and (pointer: fine)');
           const coarseRule = rules.find(rule => rule.conditionText === '(any-pointer: coarse)');
@@ -3729,7 +4318,36 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
           for (const [rule, selector] of hoverRules) rule.selectorText = selector.replaceAll(':hover', ':is(:hover, .verify-hover)');
           const probe = doc.createElement('div'); probe.style.display = 'none';
           const paint = (value, scope) => { scope.append(probe); probe.style.background = value; const color = win.getComputedStyle(probe).backgroundColor; probe.remove(); return color; };
-          const bg = rgb(win.getComputedStyle(doc.body).backgroundColor);
+           const bg = rgb(win.getComputedStyle(doc.body).backgroundColor);
+           const tagSurface = (element, backdrop = bg, opacity = 1) => {
+             const tag = element.dataset.tag;
+             for (const hovered of [false, true]) {
+               element.classList.toggle('verify-hover', hovered);
+               const s = win.getComputedStyle(element);
+               check(s.color === paint('var(--tag-' + theme + ')', element), 'Generated tag ink mismatch: ' + tag);
+               check(s.backgroundColor === paint('color-mix(in srgb, var(--tag-tone) ' + (hovered ? 8 : 5) + '%, var(--panel))', element), 'Tag tint mismatch: ' + tag);
+               check(s.borderTopWidth === '1px' && s.borderTopStyle === 'solid' && s.borderTopColor === paint('color-mix(in srgb, var(--tag-tone) ' + (hovered ? 45 : 30) + '%, var(--panel))', element), 'Tag border mismatch: ' + tag);
+               readable(win, element, backdrop, backdrop, opacity);
+             }
+             element.classList.remove('verify-hover');
+           };
+           const representatives = ${scriptString(representativeTags)};
+           const covers = elements => representatives.every(tag => [...elements].some(e => e.dataset.tag === tag));
+           if (!native) {
+             check(covers(doc.querySelectorAll('#available-tags button')), 'Available fixture must cover broad generated hues');
+             const selectedSeeds = new Set();
+             for (const chip of doc.querySelectorAll('#available-tags button')) {
+               tagSurface(chip);
+               if (chip.hidden) continue;
+               chip.click();
+               const moved = [...doc.querySelectorAll('#selected-tags button')].find(b => b.dataset.tag === chip.dataset.tag);
+               check(moved.getAttribute('style') === chip.getAttribute('style'), 'Selected metadata must clone catalog');
+               tagSurface(moved); selectedSeeds.add(moved.dataset.tag); moved.click();
+             }
+             check(representatives.every(tag => selectedSeeds.has(tag)), 'Selected fixture must cover generated hues');
+             for (const li of doc.querySelectorAll('li[hidden]')) li.hidden = false;
+             for (const details of doc.querySelectorAll('details')) details.open = true;
+           }
           for (const script of [true, false]) for (let mask = 0; mask < 8; mask++) {
             const r = row(doc, (script ? '' : 'Plain') + 'State' + mask), style = win.getComputedStyle(r), code = r.querySelector('.code');
             check(r.getBoundingClientRect().height === 50, 'State row changed height');
@@ -3757,15 +4375,27 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
             hoveredDestination.classList.remove('verify-hover');
             check(win.getComputedStyle(hoveredDestination).color === restingColor, 'Destination hover palette restoration');
             r.classList.remove('verify-hover'); visit.classList.remove('verify-hover');
-            for (const element of [code, r.querySelector('.tags'), r.querySelector('.destination')]) {
+              for (const element of [code, r.querySelector('.destination')]) {
               for (const background of [bg, rgb(rowWash)]) check(contrast(blend(rgb(win.getComputedStyle(element).color), bg, Number(style.opacity)), blend(background, bg, Number(style.opacity))) >= 4.5, 'Dimmed contrast failed: ' + theme + '/' + mask + '/' + element.className);
             }
             code.focus(); check(win.getComputedStyle(r).opacity === '1', 'Focus opacity');
             check(win.getComputedStyle(r).backgroundColor === rowWash, 'Row focus palette');
             check(contrast(rgb(win.getComputedStyle(visit).color), rgb(win.getComputedStyle(visit).backgroundColor)) >= 4.5, 'Open contrast');
             check(win.getComputedStyle(code).outlineWidth === '2px', 'Focus outline'); code.blur();
-            const dest = r.querySelector('.destination');
-            check(dest.getBoundingClientRect().width >= (width < 500 ? 48 : 64), 'Destination reserve');
+             const dest = r.querySelector('.destination');
+             check(dest.getBoundingClientRect().width >= (width < 500 ? 48 : 64), 'Destination reserve');
+             const labelBackdrop = mask & 4 ? rgb(win.getComputedStyle(r.parentElement).backgroundColor) : bg;
+             check(covers(r.querySelectorAll('.tag-label')), 'Row fixture must cover generated hues');
+             for (const hovered of [false, true]) {
+               r.classList.toggle('verify-hover', hovered);
+               for (const label of r.querySelectorAll('.tag-label')) tagSurface(label, labelBackdrop, Number(style.opacity));
+             }
+             r.classList.remove('verify-hover');
+             const tagsPanel = r.nextElementSibling;
+             tagsPanel.showPopover();
+             check(covers(tagsPanel.querySelectorAll('.tag-label')), 'Popover fixture must cover generated hues');
+             for (const label of tagsPanel.querySelectorAll('.tag-label')) tagSurface(label);
+             tagsPanel.hidePopover();
             if (mask & 4) {
               const elements = [r, ...r.querySelectorAll('a, button')];
               const backdrop = rgb(win.getComputedStyle(r.parentElement).backgroundColor);
@@ -3784,7 +4414,9 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
               }
               for (const span of dest.querySelectorAll('span')) { grayscale(win, span, '::selection'); readable(win, span, backdrop, backdrop, 1, '::selection'); }
               const panel = r.nextElementSibling;
-              panel.showPopover(); grayscale(win, panel); readable(win, panel, backdrop, backdrop); grayscale(win, panel, '::selection'); readable(win, panel, backdrop, backdrop, 1, '::selection'); panel.focus(); grayscale(win, panel); panel.hidePopover(); panel.blur();
+               panel.showPopover(); grayscale(win, panel); readable(win, panel, backdrop, backdrop); grayscale(win, panel, '::selection'); readable(win, panel, backdrop, backdrop, 1, '::selection');
+               for (const label of panel.querySelectorAll('.tag-label')) readable(win, label, backdrop, backdrop);
+               panel.focus(); grayscale(win, panel); panel.hidePopover(); panel.blur();
               check(dest.tagName === 'BUTTON' && !dest.hasAttribute('href') && win.getComputedStyle(dest).userSelect === 'text', 'Disabled destination navigates or not selectable');
               check(dest.getAttribute('aria-label') === 'Copy destination: ' + configured[code.textContent].url, 'Disabled accessible full value');
               const height = r.getBoundingClientRect().height, destWidth = dest.getBoundingClientRect().width;
@@ -3813,13 +4445,16 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
           }
           for (const [rule, selector] of hoverRules) rule.selectorText = selector;
           if (!native) {
-            query(doc, '  #DOCS  '); check(count(doc) === 16, 'Exact docs');
-            query(doc, '#release notes'); check(count(doc) === 17, 'Spaced tag');
+             doc.querySelector('#selected-tags button').click();
+             query(doc, '  #DOCS  '); check(count(doc) === 8, 'Selected docs excludes hidden');
+             doc.querySelector('#selected-tags button').click();
+             query(doc, '#release-notes '); check(count(doc) === 9, 'Selected renamed tag');
+             doc.querySelector('#selected-tags button').click();
             query(doc, '#'); check(count(doc) === 0 && !doc.querySelector('#search-status').hidden, 'Bare tag');
             query(doc, 'docs guide'); check(count(doc) === 1 && shown(doc) === 'Literal', 'Plain substring split');
-            query(doc, '#broken #disabled'); check(count(doc) === 1 && shown(doc) === 'Fragment', 'Literal tag grammar');
-            toggle.click(); query(doc, '#docs'); check(count(doc) === 8, 'Ordinary tags bypass toggle');
-            query(doc, '#disabled'); check(count(doc) === 10, 'State exception');
+             query(doc, '#broken #disabled '); check(count(doc) === 4, 'Reserved AND');
+             for (const chip of [...doc.querySelectorAll('#selected-tags button')]) chip.click();
+             query(doc, '#disabled '); check(count(doc) === 10, 'State exception');
             // Actual clipboard success/failure through both disabled copy controls, including hidden combination.
             const copied = []; let fail = false;
             Object.defineProperty(win.navigator, 'clipboard', { configurable: true, value: { writeText: async value => { if (fail) throw Error('denied'); copied.push(value); } } });
@@ -3835,26 +4470,31 @@ test("state rows, exact search, all-hidden traversal, disabled native actions an
             check(!doc.querySelector('#copy-status'), 'Outgoing feedback remained');
             doc.querySelector('[data-nav="links"]').click();
             for (let tries = 0; !doc.querySelector('#link-search') && tries < 100; tries++) await wait();
-            check(doc.querySelector('#link-search').value === '' && doc.querySelector('#hidden-toggle').getAttribute('aria-pressed') === 'false', 'State controls did not reset');
+             check(doc.querySelector('#link-search').value === '' && doc.querySelector('#tag-toggle').getAttribute('aria-expanded') === 'false' && doc.querySelector('#selected-tags').hidden, 'State controls did not reset');
           }
           await load(prefix + 'onlyHidden/' + (native ? '?native=1' : ''));
           doc = frame.contentDocument;
           if (!native) {
             check(!doc.querySelector('.search').hidden && count(doc) === 0 && !doc.querySelector('#empty-directory').hidden, 'All-hidden search unreachable');
             const details = doc.querySelector('details'); check(!details.open, 'Initial hidden disclosure');
-            query(doc, '#broken'); check(count(doc) === 1 && shown(doc) === 'Broken', 'Hidden ancestors/siblings');
+             query(doc, '#broken '); check(count(doc) === 1 && shown(doc) === 'Broken', 'Hidden ancestors/siblings');
             check(details.open, 'State search did not expand ancestor');
-            const toggle = doc.querySelector('#hidden-toggle'); check(toggle.getAttribute('aria-pressed') === 'false', 'State query mutated toggle');
+             const toggle = doc.querySelector('#tag-toggle'); check(toggle.getAttribute('aria-expanded') === 'false', 'Token mutated picker');
             toggle.click(); check(count(doc) === 1 && shown(doc) === 'Broken', 'Toggle changed state matches');
-            query(doc, ''); check(count(doc) === 3, 'Clearing lost selected pool');
-            check(!details.open, 'State-search disclosure not restored on clear');
-            toggle.click(); check(count(doc) === 0 && !doc.querySelector('#empty-directory').hidden, 'Clearing empty state');
+             query(doc, ''); check(count(doc) === 1, 'Clearing lost selection');
+             check(details.open, 'Selection should retain auto-expanded ancestor');
+             doc.querySelector('#selected-tags button').click();
+             toggle.click(); check(count(doc) === 0 && !doc.querySelector('#empty-directory').hidden, 'Removing last reserved restores empty state');
             for (const value of ['broken', '#docs-api', '#missing']) { query(doc, value); check(count(doc) === 0 && !doc.querySelector('#search-status').hidden && doc.querySelector('#empty-directory').hidden && !doc.querySelector('.search').hidden, 'All-hidden zero results'); }
-            query(doc, '#disabled'); check(count(doc) === 1 && shown(doc) === 'Disabled', 'Hidden disabled search');
-            query(doc, '#hidden'); check(count(doc) === 3, 'Hidden exact state');
+             query(doc, '#disabled '); check(count(doc) === 1 && shown(doc) === 'Disabled', 'Hidden disabled selection');
+             doc.querySelector('#selected-tags button').click();
+             query(doc, '#hidden '); check(count(doc) === 3, 'Hidden selection');
+             doc.querySelector('#selected-tags button').click();
             query(doc, ''); check(count(doc) === 0 && !doc.querySelector('#empty-directory').hidden, 'Hidden clearing');
             check(!details.open, 'Hidden state clear retained auto-expanded ancestor');
-            details.open = true; query(doc, '#broken'); query(doc, '#disabled'); query(doc, '');
+             details.open = true; query(doc, '#broken '); query(doc, '#disabled ');
+             for (const chip of [...doc.querySelectorAll('#selected-tags button')]) chip.click();
+             query(doc, '');
             check(details.open, 'State-search switch/clear collapsed visitor-opened ancestor');
           }
           if (native) {

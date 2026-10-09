@@ -22,10 +22,10 @@ Give directory visitors a discoverable, reversible way to combine tags and text 
 
 - **CAP-1**
   - **intent:** Visitors can recognize full tag labels consistently across directory surfaces.
-  - **success:** The same case-insensitive tag retains its automatic color identity across folders, reloads, builds, row labels, tag popovers, available tags, selected tags, and disabled rows; full labels are readable without hovering.
+  - **success:** Every tag, including state labels, has deterministic HSL light/dark inks generated from its UTF-16 string seed across folders, reloads, builds and all tag surfaces. Full labels have matched tinted backgrounds/borders and remain readable without hovering; colors are generated rather than selected from finite slots.
 - **CAP-2**
   - **intent:** Visitors can discover, select, and remove tags in their current directory subtree.
-  - **success:** Show tags reveals one scrollable available-tag row containing the subtree's tags, including hidden leaves, minus selections. Activation moves a tag to the scrollable selected row beside search; removal returns it. Results never shrink the catalog.
+  - **success:** Show tags reveals one scrollable available-tag row containing the subtree's tags, including hidden leaves, minus selections. Activation moves a tag to the scrollable selected row left of search on desktop and above it on mobile, preceding search in DOM/tab order; removal returns it. Results never shrink the catalog.
 - **CAP-3**
   - **intent:** Visitors can narrow links by every selected tag and remaining free text.
   - **success:** Results satisfy selected-tag AND and the existing broad substring search. Hidden leaves appear only when hidden, broken, or disabled is selected and the leaf satisfies every filter; only matching ancestors remain. One live count and the existing no-match state agree with results.
@@ -34,11 +34,11 @@ Give directory visitors a discoverable, reversible way to combine tags and text 
   - **success:** A #tag committed by space, comma, or Enter selects the same tag as the picker and removes its token/delimiter. Unknown tokens remain with “Tag not found”; repeated known tokens produce no duplicate selection or accidental removal.
 - **CAP-5**
   - **intent:** Maintainers can publish tag names that are unambiguous in typed filters.
-  - **success:** JSON, YAML, and YML reject whitespace or commas anywhere in tag names before replacing output, identify affected entries, and request explicit renaming. Valid raw values remain intact; no silent migration occurs.
+  - **success:** JSON, YAML, and YML reject whitespace, commas, raw Unicode uppercase/titlecase or emoji characters before replacing output, identify source/path/value and request explicit renaming. Valid lowercase/uncased international text, digits, punctuation and raw values remain intact; no silent migration occurs.
 
 ## Constraints
 
-- Preserve all locked source decisions as detailed in tag-filter-behavior.md; no dots, hover-only row labels, OR filtering, result-dependent tag pool, or grayscale-only disabled tags.
+- Preserve locked source decisions except the latest approved 2026-10-09 amendments: generate colors directly from each tag's seed with fixed readable HSL bounds, reject uppercase/titlecase/emoji source names, retain tinted tag surfaces and selected tags left of search (above on mobile) in matching DOM/tab order. No finite palettes, dots, hover-only row labels, OR filtering, result-dependent tag pool or grayscale-only disabled tags.
 - Tag color is independent of link state; disabled codes, destinations, and unavailable actions retain disabled behavior/styling, and hidden opacity remains independent.
 - Keep static GitHub Pages publication, validation-before-output-deletion, public destinations, native browsing, existing routing/launchers, shared component ownership, and the single browser lifecycle. No frontend framework or new dependency.
 - Maintain usable search and one-line, horizontally scrollable full labels at narrow widths; meet existing focus, text contrast, count announcement, and no-JavaScript foundations.
@@ -57,10 +57,11 @@ Give directory visitors a discoverable, reversible way to combine tags and text 
 
 ## Assumptions
 
-- Deterministic palette identity fulfills persistent color assignment without storage; light/dark use corresponding readable variants rather than identical RGB values.
+- Deterministic seeded HSL generation fulfills persistent color assignment without storage or unique-color promises; light/dark use corresponding readable bounds rather than identical RGB values.
 - Uncommitted #tokens use live broad text search, with no hidden reveal; the previous initial-# exact-query mode is replaced by committed selections.
 - Duplicate commits are idempotent. Filters and picker visibility reset on cross-page mounts, matching current navigation; same-page/fragment navigation retains them. Clearing text or collapsing the picker retains selected tags.
 
-## Open Questions
+## Approved data decision
 
-- Which explicit replacement should the maintainer use for `links.yaml`'s `search-test-exact` tag `release notes`? `release-notes` is suggested, not authorized. This blocks an implementation release, not the completed spec; validation must not choose a name.
+- On 2026-10-09 the user explicitly authorized renaming `links.yaml`'s `search-test-exact` tag `release notes` to `release-notes`. No other automatic renaming is authorized.
+- On the same date the user explicitly approved HiDdEn → hidden, BrOkEn → broken, DiSaBlEd → disabled and emoji-🎉 → emoji-party in the checked-in map. No future silent lowercase/strip/renaming is authorized.

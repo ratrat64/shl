@@ -29,7 +29,10 @@ root. Missing or multiple sources fail the build. Both formats accept:
 
 - A URL string for a simple link.
 - An object with `url`, an optional string `title`, and an optional `tags` array of
-  nonblank strings. Titles appear on code hover and redirect fallback pages and
+  nonblank strings without whitespace, commas, Unicode uppercase/titlecase or emoji
+  characters anywhere. Lowercase/uncased languages, digits and punctuation remain
+  valid. Invalid names require explicit renaming; no silent lowercase/strip/migration
+  occurs. Titles appear on code hover and redirect fallback pages and
   remain searchable.
 - A nonempty nested object for a directory. A path cannot be both a directory and
   a redirect; folder names are their display labels.
@@ -71,13 +74,13 @@ The build always publishes `links.json`, regardless of the source format.
 ## Tags and link states
 
 `hidden`, `broken`, `disabled`, and `script` are special tags. They match whole
-labels, ignoring case and surrounding whitespace. Tags such as `hiddenish` or
+labels, ignoring case. Tags such as `hiddenish` or
 literal `#hidden` are descriptive, not states.
 
-- **Hidden:** omitted from default listings, counts, and ordinary search. Show
-  hidden links reveals these entries and hidden-only ancestor folders. Their
+- **Hidden:** omitted from default listings, counts, and ordinary search. Selecting
+  hidden, broken or disabled admits only matching leaves and their ancestors. Their
   direct URLs and launchers still work unless disabled. Hidden-only directories
-  remain directly browseable and initially show an empty state with the toggle.
+  remain directly browseable and initially show an empty state with search and Show tags.
 - **Broken:** adds an orange-red warning without blocking actions.
 - **Disabled:** grey styling overrides broken/script emphasis. The short URL
   shows **Link disabled** rather than forwarding. Open and Download are disabled;
@@ -87,7 +90,17 @@ literal `#hidden` are descriptive, not states.
 
 Tags can be combined. Hidden opacity applies independently of broken/disabled
 styling. Labels stay readable on one line; crowded rows scroll horizontally.
-Selecting the labels opens a popover with all tags.
+Selecting the labels opens an informational popover with all tags. Full labels use
+deterministic HSL light/dark inks generated from the tag string's UTF-16 FNV-1a
+seed, with matched tinted backgrounds/borders. Every tag, including hidden,
+broken, disabled and script labels, uses the same generator; row-state emphasis
+remains separate. No finite palette, storage or unique-color promise. Other
+disabled row content remains neutral.
+
+Unicode validation uses Uppercase and titlecase categories, not ASCII-only checks.
+Emoji detection covers pictographs, emoji-presentation symbols, ZWJ/modifier
+sequences, flags/regional indicators and U+20E3 keycaps. Bare digits, `#` and `*`
+are allowed; they are not rejected just for being possible keycap bases.
 
 ### Migrating legacy properties
 
@@ -95,7 +108,10 @@ For each legacy `hidden` or `script` property:
 
 1. If its value is `true`, append the equivalent tag unless a trimmed,
    case-insensitive equivalent already exists.
-2. Preserve all other tags, fields, and their order.
+2. Explicitly rename existing tags containing whitespace (including padding),
+   commas, Unicode uppercase/titlecase or emoji to maintainer-chosen valid names.
+   Preserve all other valid raw tags, fields and order. The build never silently
+   trims, lowercases, strips or automatically renames tags.
 3. Remove the property for both `true` and `false`. A `false` value must not remove
    an independently configured tag.
 
@@ -108,26 +124,29 @@ Each directory page lists its links and subdirectories. The homepage also has
 expandable folders. Select a short code to copy its full short URL, select a
 destination to copy its full URL, or use Open to visit an enabled destination.
 
-Plain search is one broad, case-insensitive substring across codes, titles,
-destinations, and tags, including nested links. An initial `#` selects an exact
-whole tag, also case-insensitively:
+Plain search is one broad, case-insensitive substring across code/folder path,
+title, destination and tags. Show tags reveals a horizontal catalog of every tag
+in the current subtree, including hidden descendants, minus selected tags. It
+does not shrink with results. Available tags move to a selected track left of search
+on desktop and above it on mobile, preceding search in DOM/keyboard order;
+remove them individually to restore catalog order. Every selected tag must match
+(AND), together with remaining text. Labels retain full text and stable colors.
 
-- `#release notes` matches the single tag `release notes`.
-- A bare `#` matches nothing.
-- `#broken #disabled` is one literal tag label, not a two-tag query.
-- Exact `#hidden`, `#broken`, and `#disabled` searches temporarily reveal only
-  matching hidden leaves and their ancestors without changing Show hidden links.
-  Clearing search restores the toggle-selected view.
-- Other tag searches, including `#script`, respect the hidden-links toggle.
-
-Search remains available in every nonempty subtree, including all-hidden pages.
-The single link count updates with search and the toggle; the toggle is disabled
-where no hidden links exist.
+Commit known `#tag` tokens with whitespace, comma or Enter; uppercase input can
+still resolve known lowercase identities. Duplicates consume
+syntax without toggling; unknown tokens remain with “Tag not found”. Uncommitted
+tokens are ordinary text and bare `#` matches nothing. URL fragments are not tokens.
+Only selected hidden/broken/disabled tags admit hidden leaves satisfying all
+constraints. Selecting script alone never reveals them. Clearing text or collapsing
+Show tags retains selections. Search remains available on all nonempty subtrees,
+including all-hidden or untagged pages. The one polite count reflects matching leaves;
+zero filtered results show “No links match your search.” No-tag pickers are disabled.
 
 With JavaScript, Links, Guide, folder links, breadcrumbs, and Guide section anchors
 navigate without reloading the shared shell. Back/Forward restores content and
-the latest saved scroll position per URL. Search, hidden toggles, and expanded
-folders reset on page transitions. Direct loads and refreshes use generated pages.
+the latest saved scroll position per URL. Text, selected tags, token error, picker
+visibility and expanded folders reset on cross-page transitions; same-page fragments
+retain them. Direct loads and refreshes use generated pages.
 Without JavaScript, enabled visible links remain navigable and hidden links stay hidden.
 
 Destinations appear on row hover or keyboard focus on hover-capable fine-pointer

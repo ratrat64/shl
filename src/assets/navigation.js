@@ -81,6 +81,7 @@
       for (const script of main.querySelectorAll("script")) script.remove();
       scroll.set(displayed, window.scrollY);
       globalThis.cleanupCopy?.();
+      globalThis.cleanupSearch?.();
       globalThis.cleanupDownload?.();
       document.querySelector("main").replaceWith(main);
       document.title = title.textContent;
