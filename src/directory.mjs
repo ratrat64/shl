@@ -99,7 +99,7 @@ const listing = (nodes) =>
   </ul>`;
 
 const searchableListing = () =>
-  /* HTML */ `<div class="search" hidden>
+  /* HTML */ `<div class="search">
     <label class="sr-only" for="link-search">Search links</label>
     <input
       id="link-search"
@@ -128,14 +128,16 @@ const directoryContents = (
         ><span class="count-label">${visible === 1 ? " link" : " links"}</span>
       </h1>
       <div class="directory-actions">
-        <div
-          id="selected-tags"
-          class="tag-track"
-          role="region"
-          aria-label="Selected tags"
-          hidden
-        ></div>
-        ${total ? searchableListing() : ""}
+        <div class="search-tags">
+          ${total ? searchableListing() : ""}
+          <div
+            id="selected-tags"
+            class="tag-track"
+            role="region"
+            aria-label="Selected tags"
+            hidden
+          ></div>
+        </div>
         <div class="directory-toggles">
           <button
             id="tag-toggle"
@@ -181,7 +183,7 @@ export const indexPage = ({ raw, links, source }) =>
     "links",
     "./",
     `
-    ${directoryContents(raw, "", links.length ? "No links listed here." : `No links available yet. Add your first entry to <code>${esc(source)}</code> and rebuild the site.`)}`,
+    ${directoryContents(raw, '<nav class="breadcrumbs" aria-label="Breadcrumb">Links</nav>', links.length ? "No links listed here." : `No links available yet. Add your first entry to <code>${esc(source)}</code> and rebuild the site.`)}`,
   );
 
 export const directoryPage = ({ path, entries }) => {

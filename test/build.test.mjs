@@ -332,11 +332,11 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
       for (const button of [...picker.querySelectorAll('button')]) button.click();
       check(!doc.querySelector('#all-tags-selected').hidden && !toggle.disabled && !picker.hidden, 'All-selected state');
       check(selected.scrollWidth > selected.clientWidth && selected.getBoundingClientRect().width > 0, 'Selected scroll track');
-      check(!!(selected.compareDocumentPosition(input) & win.Node.DOCUMENT_POSITION_FOLLOWING), 'Selected DOM order must precede search');
+      check(!!(selected.compareDocumentPosition(input) & win.Node.DOCUMENT_POSITION_FOLLOWING), 'Selected DOM order follows search');
       if (width > 740) {
-        check(Math.abs(selected.getBoundingClientRect().top - input.getBoundingClientRect().top) < 15, 'Selected not beside search');
-        check(selected.getBoundingClientRect().right <= input.getBoundingClientRect().left, 'Selected not LEFT of search');
-      } else check(selected.getBoundingClientRect().bottom <= input.getBoundingClientRect().top, 'Selected mobile track must be above search');
+        check(selected.getBoundingClientRect().top >= input.getBoundingClientRect().bottom - 5, 'Selected below search');
+        check(selected.getBoundingClientRect().right >= input.getBoundingClientRect().right - 5, 'Selected right-aligned with search');
+      } else check(selected.getBoundingClientRect().bottom <= input.getBoundingClientRect().top, 'Selected mobile track above search');
       check(picker.getBoundingClientRect().top >= input.getBoundingClientRect().bottom, 'Picker not below search'); clear();
       // Disclosure restoration, same-page retention, exactly one mount, stale listeners.
       const details = [...doc.querySelectorAll('details')].find(d => d.querySelector('summary').textContent === (page ? 'deeper' : 'tools')); if (details) {
@@ -1337,7 +1337,10 @@ test("nested JSON and YAML build themed directory pages and redirects", async (t
       page,
       /<div class="directory-toggles">\s*<button\s+id="tag-toggle"[^>]*disabled\s*>\s*Show tags\s*<\/button>\s*<\/div>/,
     );
-  assert.match(home, /<div class="breadcrumbs" aria-hidden="true"><\/div>/);
+  assert.match(
+    home,
+    /<nav class="breadcrumbs" aria-label="Breadcrumb">Links<\/nav>/,
+  );
   assert.match(
     tools,
     /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">\s*<span class="count-number">2<\/span\s*><span class="count-label"> links<\/span>\s*<\/h1>/,
