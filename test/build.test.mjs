@@ -506,7 +506,11 @@ test("session filters preserve exact restoration, absent chips, native history, 
       check(document.querySelector('#link-search').value==='quota fallback','Persisted refresh lost unsaved memory');
       sessionStorage.removeItem(key);initSearch(true);
       check(document.querySelector('#link-search').value===''&&tags().length===0,'Removed record retained unsaved memory');
+      type('first quota edit');initSearch(true);
+      check(document.querySelector('#link-search').value==='first quota edit','Empty readable storage lost unsaved memory');
       Storage.prototype.setItem=set;
+      sessionStorage.setItem(key,JSON.stringify({version:1,text:'newer native edit',tags:[],picker:false}));initSearch(true);
+      check(document.querySelector('#link-search').value==='newer native edit','Newer native storage did not supersede unsaved memory');
       type('saved again');sessionStorage.removeItem(key);initSearch(true);
       check(document.querySelector('#link-search').value===''&&tags().length===0&&document.querySelector('#available-tags').hidden,'Removed record resurrected memory');
       type('read failure');Object.defineProperty(window,'sessionStorage',{configurable:true,get(){throw Error('denied')}});initSearch(true);

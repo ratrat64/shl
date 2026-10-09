@@ -2,7 +2,7 @@
 title: 'Persistent search and tag filters across shl navigation'
 type: 'feature'
 created: '2026-10-09'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'a268ff660ad0d1b2c0377134be68a736c9e11597'
 route: 'dispatch'
 review_loop_iteration: 0
@@ -78,10 +78,27 @@ context: []
 - Existing colored-filter, native keyboard/touch, shell, 404/history and state matrices cover directory transitions, fragments, latest app Back/Forward, all-hidden/untagged/native foundations, focus/scroll/theme/shell identity and listener cleanup.
 - Added CDP session matrix covers root/project × light/dark × 390/1440px: exact noncommitting pending/unknown restoration, ordered absent-subtree chips with exact labels/style/computed colors, AND-zero results, canonical local availability/removal, Guide/404 preservation, detached/pending/stale-fetch writes and superseding fragments, throwing storage access and write-only quota failures, malformed JSON/types/unknown/noncanonical/duplicate identities, native repeated loads/Back/Forward and persisted-pageshow single mounting, independent site bases, empty-site preservation, and fresh storage after session clearing.
 - Existing rendered contrast gate passed 54,592 generated and 46,080 envelope surface checks, minimum 4.6279:1. Redirect/minimal and root/project recovery checks passed. Routing semantics were unchanged, so no deployed routing smoke proof was needed.
+- Post-review patches preserve failed-write memory while storage is unchanged (including empty readable storage), accept newer native records, and distinguish successful record removal from unavailable reads. Paused input is read-only and resumes consistently without stale saves. Absent selected tokens use the duplicate path. Actual native BFCache traversal proves document identity, latest filters, chip/search focus, scroll and single mounting; picker exhaustion is verified with foreign selections.
+- Final full verification after review patches: Bun 1.4.2; formatting and format-check passed; required-Chrome suite 42 passed, 0 failed in 64.36 seconds; build succeeded with 68 short links. No findings deferred.
 
 ## Spec Change Log
 
 ## Review Triage Log
+
+| Finding | Verdict | Evidence and route |
+| --- | --- | --- |
+| Blind 1: paused edits diverge on fragment resume | medium | Handlers are paused but native input remains editable; resume only flips active. Patch: make paused input read-only and reconcile suppressed input on resume without saving obsolete edits. |
+| Blind 2: failed write lost on persisted Back | medium | refreshStorage replaces memory with any valid older storage record after a caught write failure. Patch: retain unsaved memory during refresh. |
+| Blind 3: removed storage record resurrected | low | A successful null read leaves existing memory on persisted restoration. Patch: distinguish absent record from inaccessible storage and restore fresh defaults after successful removal. |
+| Blind 4: untagged picker cannot close | false | Existing live contract expressly disables the no-tag picker; restored visibility is a persisted preference and there are no actionable local choices. No selection or saved state is lost; changing this is not required. |
+| Blind 5: absent selected token not idempotent | medium | Token recognition checks local catalog before existing selections, producing unknown feedback for a selected identity. Patch: admit already-selected identities to the existing duplicate path. |
+| Blind 6: removed site-wide tag invalidates record | false | Stored identities are validated against renderer-owned site metadata; unknown stored identities are malformed under this implementation. Deployment reconciliation for removed tags is not specified; absent-subtree identities within the site are retained and tested. |
+| Blind 7: persisted chip focus discarded | medium | selected.replaceChildren removes the focused selected chip during persisted pageshow mounting. Patch: retain focused identity and focus its replacement or search without changing scroll. |
+| Blind 8: actual BFCache proof absent | medium | Native history is exercised, but persisted-pageshow evidence is synthetic and does not prove cached-document ordering. Patch: extend existing CDP history proof with actual persisted lifecycle and document identity where the harness permits BFCache. |
+| Blind 9: site metadata build/output costs | maybe-false | Repeated site-wide traversal and metadata are real; no measured slowdown or scale target establishes user harm at this project's hundreds-of-links scope. Low unverified scaling concern rejected rather than introducing another asset or cache. |
+| Blind 10: independent session opener inheritance | false | sessionStorage intentionally follows native tab-session semantics; copied opener/duplicated sessions are not independent sessions. A new independent context starts without this site's record; localStorage is not used. |
+| Edge 1: failed write lost on persisted Back | medium | Same verified defect as Blind 2; patch with shared unsaved-memory restoration guard. |
+| Verification 1: local picker exhaustion with foreign selections untested | medium | Existing tests check local order but not exhaustion in the foreign-selection case; the old size comparison would pass. Patch: assert both local exhaustion states while foreign selections remain. |
 
 ## Design Notes
 

@@ -1,6 +1,6 @@
 (() => {
   const records = new Map();
-  const unsaved = new Set();
+  const unsaved = new Map();
   globalThis.initSearch = (refreshStorage = false) => {
     globalThis.cleanupSearch?.();
     const input = document.querySelector("#link-search");
@@ -45,12 +45,18 @@
     try {
       if (!restored || refreshStorage) {
         const stored = sessionStorage.getItem(key);
-        if (stored === null) {
+        if (
+          unsaved.has(key) &&
+          (unsaved.get(key) === undefined || unsaved.get(key) === stored)
+        ) {
+          // Keep edits whose failed write left storage unchanged, even if empty.
+        } else if (stored === null) {
           restored = undefined;
           unsaved.delete(key);
-        } else if (!unsaved.has(key)) {
+        } else {
           const record = JSON.parse(stored);
           restored = valid(record) ? record : undefined;
+          unsaved.delete(key);
         }
       }
     } catch {}
@@ -80,7 +86,11 @@
         sessionStorage.setItem(key, JSON.stringify(record));
         unsaved.delete(key);
       } catch {
-        unsaved.add(key);
+        try {
+          unsaved.set(key, sessionStorage.getItem(key));
+        } catch {
+          if (!unsaved.has(key)) unsaved.set(key, undefined);
+        }
       }
     };
     selected.replaceChildren();
