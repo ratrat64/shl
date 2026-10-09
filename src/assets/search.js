@@ -110,7 +110,7 @@ globalThis.initSearch = () => {
     button.hidden = false;
     button.setAttribute("aria-label", `Remove ${button.textContent} filter`);
     button.setAttribute("aria-pressed", "true");
-    selected.append(button);
+    selected.querySelector(".tag-track").append(button);
     selections.set(identity, button);
     chips();
   }

@@ -130,11 +130,13 @@ const directoryContents = (
       <div class="directory-actions">
         <div
           id="selected-tags"
-          class="tag-track"
+          class="selected-tags-wrapper"
           role="region"
           aria-label="Selected tags"
           hidden
-        ></div>
+        >
+          <div class="tag-track"></div>
+        </div>
         ${total ? searchableListing() : ""}
         <div class="directory-toggles">
           <button

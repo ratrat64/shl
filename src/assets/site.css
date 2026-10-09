@@ -243,25 +243,43 @@ p {
 }
 .directory-actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(12rem, 1fr) max-content;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
   align-items: center;
   gap: 0.65rem;
   width: min(100%, 43rem);
   min-width: 0;
 }
+.search {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+}
 .directory-toggles {
-  grid-column: 3;
+  grid-column: 2;
+  grid-row: 1;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 0.5rem;
 }
-.search {
-  grid-column: 2;
-  min-width: 0;
-}
 #selected-tags {
-  grid-column: 1;
+  grid-column: 2;
+  grid-row: 2;
+  margin-top: 0.35rem;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) var(--panel);
+}
+#selected-tags .tag-track {
+  display: flex;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.4rem;
+  white-space: nowrap;
+  justify-content: flex-end;
+  width: max-content;
 }
 .tag-track {
   display: flex;
@@ -273,9 +291,13 @@ p {
   scrollbar-color: var(--line) var(--panel);
   white-space: nowrap;
 }
+#available-tags .tag-track {
+  justify-content: flex-start;
+}
 #available-tags,
 #tag-error {
   grid-column: 1 / -1;
+  grid-row: 3;
 }
 .tag-chip {
   flex: 0 0 auto;
@@ -689,13 +711,26 @@ main.minimal-document {
   .directory-actions {
     width: 100%;
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto;
   }
-  #selected-tags,
   .search {
     grid-column: 1;
+    grid-row: 1;
+  }
+  #selected-tags {
+    grid-column: 1;
+    grid-row: 2;
+    justify-content: flex-end;
+    margin-top: 0.35rem;
   }
   .directory-toggles {
     grid-column: 1;
+    grid-row: 3;
+  }
+  #available-tags,
+  #tag-error {
+    grid-column: 1;
+    grid-row: 4;
   }
   .link-row {
     gap: 0.5rem;

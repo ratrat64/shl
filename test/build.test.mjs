@@ -334,9 +334,9 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
       check(selected.scrollWidth > selected.clientWidth && selected.getBoundingClientRect().width > 0, 'Selected scroll track');
       check(!!(selected.compareDocumentPosition(input) & win.Node.DOCUMENT_POSITION_FOLLOWING), 'Selected DOM order must precede search');
       if (width > 740) {
-        check(Math.abs(selected.getBoundingClientRect().top - input.getBoundingClientRect().top) < 15, 'Selected not beside search');
-        check(selected.getBoundingClientRect().right <= input.getBoundingClientRect().left, 'Selected not LEFT of search');
-      } else check(selected.getBoundingClientRect().bottom <= input.getBoundingClientRect().top, 'Selected mobile track must be above search');
+        check(selected.getBoundingClientRect().top >= input.getBoundingClientRect().bottom - 1, 'Selected below search');
+        check(selected.getBoundingClientRect().left >= input.getBoundingClientRect().right - 1, 'Selected right of search');
+      } else check(selected.getBoundingClientRect().top >= input.getBoundingClientRect().bottom - 1, 'Selected mobile track below search');
       check(picker.getBoundingClientRect().top >= input.getBoundingClientRect().bottom, 'Picker not below search'); clear();
       // Disclosure restoration, same-page retention, exactly one mount, stale listeners.
       const details = [...doc.querySelectorAll('details')].find(d => d.querySelector('summary').textContent === (page ? 'deeper' : 'tools')); if (details) {
@@ -809,16 +809,19 @@ test("native track scrolling uses Tab focus and horizontal touch gestures withou
     await visible();
     assert.equal(await evaluate("document.activeElement.dataset.tag"), "shell");
     await evaluate(
-      "for(const b of [...document.querySelectorAll('#selected-tags button')]) b.click()",
+      "for(const b of [...document.querySelectorAll('#selected-tags .tag-track button')]) b.click()",
     );
     await send("Emulation.setTouchEmulationEnabled", { enabled: true });
     for (const id of ["available-tags", "selected-tags"]) {
-      if (id === "selected-tags")
+      if (id === "selected-tags") {
         await evaluate(
           "for(const b of [...document.querySelectorAll('#available-tags button')]) b.click()",
         );
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      const btnSel = id === "selected-tags" ? ".tag-track button" : "button";
       await evaluate(
-        `{const track = document.getElementById(${JSON.stringify(id)}); track.querySelector('button').focus(); track.scrollIntoView({block:'nearest'});}`,
+        `{const track = document.getElementById(${JSON.stringify(id)}); track.querySelector('${btnSel}').focus(); track.scrollIntoView({block:'nearest'});}`,
       );
       const gesture = async (direction) => {
         const point = await evaluate(
@@ -849,7 +852,7 @@ test("native track scrolling uses Tab focus and horizontal touch gestures withou
       };
       const geometry = () =>
         evaluate(
-          `(() => {const t=document.getElementById(${JSON.stringify(id)}), b=t.querySelector('button'), r=b.getBoundingClientRect(), v=t.getBoundingClientRect(); return {scroll:t.scrollLeft,max:t.scrollWidth-t.clientWidth,left:r.left,right:r.right,trackLeft:v.left,trackRight:v.right,width:r.width,client:t.clientWidth,label:b.textContent,whole:b.scrollWidth<=b.clientWidth};})()`,
+          `(() => {const t=document.getElementById(${JSON.stringify(id)}); const b=t.querySelector('${btnSel}'); const r=b.getBoundingClientRect(), v=t.getBoundingClientRect(); return {scroll:t.scrollLeft,max:t.scrollWidth-t.clientWidth,left:r.left,right:r.right,trackLeft:v.left,trackRight:v.right,width:r.width,client:t.clientWidth,label:b.textContent,whole:b.scrollWidth<=b.clientWidth};})()`,
         );
       let start = await geometry();
       assert.equal(start.label, "#" + long);
