@@ -1339,7 +1339,7 @@ test("nested JSON and YAML build themed directory pages and redirects", async (t
     );
   assert.match(
     home,
-    /<nav class="breadcrumbs" aria-label="Breadcrumb">Links<\/nav>/,
+    /<nav class="breadcrumbs" aria-label="Breadcrumb">Home<\/nav>/,
   );
   assert.match(
     tools,
