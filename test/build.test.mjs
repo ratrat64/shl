@@ -267,7 +267,13 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
       check(count() === baseline && choices() === '' && picker.hidden && selected.hidden, 'Fresh mount');
       const catalog = pool(); check(catalog.includes('hidden') && catalog.includes('disabled') && (page ? !catalog.includes('outside') : catalog.includes('outside')), 'Subtree scope');
       toggle.click(); check(!picker.hidden && toggle.getAttribute('aria-expanded') === 'true' && count() === baseline, 'Opening changed results');
+      const availableOrder = [...picker.querySelectorAll('button')];
+      check(availableOrder.every((b, i) => !i || b.getBoundingClientRect().left > availableOrder[i - 1].getBoundingClientRect().left), 'Available visual catalog order');
       pick('shell'); check(doc.activeElement === selected.querySelector('button') && choices() === 'shell' && count() === 4, 'Picker move/focus');
+      const selectedBounds = selected.getBoundingClientRect(), selectedChip = selected.querySelector('button').getBoundingClientRect();
+      check(Math.abs(selectedBounds.right - selectedChip.right - parseFloat(win.getComputedStyle(selected).paddingRight)) < 2, 'Selected tags right alignment');
+      for (const track of [selected, picker]) check(win.getComputedStyle(track).maskImage.includes('linear-gradient'), 'Tag track edge fades');
+      if (width > 740) check(doc.querySelector('.directory-actions').getBoundingClientRect().width > doc.querySelector('#link-count').getBoundingClientRect().width * 2, 'Tools width priority');
       pick('setup'); check(count() === 2 && choices() === 'shell,setup', 'Ordinary AND');
       check(selected.querySelectorAll('button')[1].getAttribute('aria-label') === 'Remove #setup filter' && selected.querySelector('button').getAttribute('aria-pressed') === 'true', 'Removal accessibility');
       type('setup notes'); check(count() === 1 && shown() === 'Both', 'AND with broad title');
@@ -338,6 +344,13 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
         check(selected.getBoundingClientRect().right <= input.getBoundingClientRect().left, 'Selected not LEFT of search');
       } else check(selected.getBoundingClientRect().bottom <= input.getBoundingClientRect().top, 'Selected mobile track must be above search');
       check(picker.getBoundingClientRect().top >= input.getBoundingClientRect().bottom, 'Picker not below search'); clear();
+      for (const button of picker.querySelectorAll('button')) if (!['shell', 'setup'].includes(button.dataset.tag)) button.click();
+      picker.scrollLeft = 0;
+      const remaining = [...picker.querySelectorAll('button')].filter(b => !b.hidden);
+      const bounds = picker.getBoundingClientRect(), last = remaining.at(-1).getBoundingClientRect();
+      check(remaining.map(b => b.dataset.tag).join(',') === 'setup,shell' && remaining[0].getBoundingClientRect().left < last.left, 'Available remaining order');
+      check(Math.abs(bounds.right - last.right - parseFloat(win.getComputedStyle(picker).paddingRight)) < 2, 'Available tags right alignment');
+      clear();
       // Disclosure restoration, same-page retention, exactly one mount, stale listeners.
       const details = [...doc.querySelectorAll('details')].find(d => d.querySelector('summary').textContent === (page ? 'deeper' : 'tools')); if (details) {
         details.open = false; type('deeper'); check(details.open, 'Search did not expand'); type(''); check(!details.open, 'Disclosure restore');
@@ -849,7 +862,7 @@ test("native track scrolling uses Tab focus and horizontal touch gestures withou
       };
       const geometry = () =>
         evaluate(
-          `(() => {const t=document.getElementById(${JSON.stringify(id)}), b=t.querySelector('button'), r=b.getBoundingClientRect(), v=t.getBoundingClientRect(); return {scroll:t.scrollLeft,max:t.scrollWidth-t.clientWidth,left:r.left,right:r.right,trackLeft:v.left,trackRight:v.right,width:r.width,client:t.clientWidth,label:b.textContent,whole:b.scrollWidth<=b.clientWidth};})()`,
+          `(() => {const t=document.getElementById(${JSON.stringify(id)}); if(!t) throw Error('Missing track ${id} at '+location.href); const b=t.querySelector('button'), r=b.getBoundingClientRect(), v=t.getBoundingClientRect(); return {scroll:t.scrollLeft,max:t.scrollWidth-t.clientWidth,left:r.left,right:r.right,trackLeft:v.left,trackRight:v.right,width:r.width,client:t.clientWidth,label:b.textContent,whole:b.scrollWidth<=b.clientWidth};})()`,
         );
       let start = await geometry();
       assert.equal(start.label, "#" + long);
@@ -1278,7 +1291,7 @@ test("homepage lists sorted links safely with project-relative URLs and handles 
   assert.doesNotMatch(html, /<script>title|<img|undefined/);
   assert.match(
     html,
-    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">3<\/span\s*><span class="count-label"> links<\/span>\s*<\/h1>/,
+    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">3<\/span\s*><span class="count-label"> Links<\/span>\s*<\/h1>/,
   );
   const liveHeading = html.match(
     /<h1\b[^>]*aria-live="polite"[^>]*>[\s\S]*?<\/h1>/,
@@ -1299,7 +1312,7 @@ test("homepage lists sorted links safely with project-relative URLs and handles 
   const emptyHtml = await empty.read("index.html");
   assert.match(
     emptyHtml,
-    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">0<\/span\s*><span class="count-label"> links<\/span>\s*<\/h1>/,
+    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">0<\/span\s*><span class="count-label"> Links<\/span>\s*<\/h1>/,
   );
   assert.equal([...emptyHtml.matchAll(/<h1\b/g)].length, 1);
   assert.match(emptyHtml, /id="tag-toggle"[^>]*disabled\s*>\s*Show tags/);
@@ -1339,11 +1352,11 @@ test("nested JSON and YAML build themed directory pages and redirects", async (t
     );
   assert.match(
     home,
-    /<nav class="breadcrumbs" aria-label="Breadcrumb">Links<\/nav>/,
+    /<nav class="breadcrumbs" aria-label="Breadcrumb">Home<\/nav>/,
   );
   assert.match(
     tools,
-    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">2<\/span\s*><span class="count-label"> links<\/span>\s*<\/h1>/,
+    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">2<\/span\s*><span class="count-label"> Links<\/span>\s*<\/h1>/,
   );
   assert.equal([...tools.matchAll(/<h1\b/g)].length, 1);
   assert.doesNotMatch(tools, /<h1>tools<\/h1>/);
@@ -1364,7 +1377,7 @@ test("nested JSON and YAML build themed directory pages and redirects", async (t
   assert.match(editors, /href="\.\.\/\.\.\/assets\/site\.css"/);
   assert.match(
     editors,
-    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">1<\/span\s*><span class="count-label"> link<\/span>\s*<\/h1>/,
+    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">1<\/span\s*><span class="count-label"> Link<\/span>\s*<\/h1>/,
   );
   assert.equal([...editors.matchAll(/<h1\b/g)].length, 1);
   assert.match(editors, /href="\.\.\/\.\.\/" data-app-link>Home<\/a>/);
@@ -2117,7 +2130,7 @@ test("hidden links and hidden-only folders are hidden by default but keep their 
   const home = await f.read("index.html");
   assert.match(
     home,
-    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">4<\/span\s*><span class="count-label"> links<\/span>\s*<\/h1>/,
+    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">4<\/span\s*><span class="count-label"> Links<\/span>\s*<\/h1>/,
   );
   assert.match(home, /href="\.\/tools\/nested\/" data-app-link>nested<\/a>/);
   assert.match(
@@ -2160,7 +2173,7 @@ test("hidden links and hidden-only folders are hidden by default but keep their 
     const html = await f.read(page);
     assert.match(
       html,
-      /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">0<\/span\s*><span class="count-label"> links<\/span>\s*<\/h1>/,
+      /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">0<\/span\s*><span class="count-label"> Links<\/span>\s*<\/h1>/,
     );
     assert.match(html, /<p id="empty-directory">No links listed here\.<\/p>/);
     assert.match(html, /<div hidden><ul class="links">/);
@@ -2187,7 +2200,7 @@ test("hidden links and hidden-only folders are hidden by default but keep their 
   assert.match(await allHidden.read("index.html"), /No links listed here\./);
   assert.match(
     await allHidden.read("index.html"),
-    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">0<\/span\s*><span class="count-label"> links<\/span>\s*<\/h1>/,
+    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">0<\/span\s*><span class="count-label"> Links<\/span>\s*<\/h1>/,
   );
   assert.match(
     await allHidden.read("index.html"),
@@ -3363,7 +3376,7 @@ test("shared shell renders consistently across direct/native loads and app navig
               const themeControl = frame.contentDocument.querySelector('[data-theme-control]');
                const hiddenToggle = frame.contentDocument.querySelector('#tag-toggle');
                const search = frame.contentDocument.querySelector('#link-search');
-               for (const [query, count, label] of [['git', '1', 'link'], ['unmatched', '0', 'links'], ['', '3', 'links']]) {
+               for (const [query, count, label] of [['git', '1', 'Link'], ['unmatched', '0', 'Links'], ['', '3', 'Links']]) {
                  search.value = query;
                  search.dispatchEvent(new frame.contentWindow.Event('input', { bubbles: true }));
                  equal([frame.contentDocument.querySelector('.count-number').textContent, frame.contentDocument.querySelector('.count-label').textContent.trim()], [count, label], 'dynamic page title');
@@ -3475,7 +3488,7 @@ test("script launchers are opt-in, quote URLs, forward arguments and statuses, a
   assert.doesNotMatch(home, /class="download" href="\.\/disabled\.sh"/);
   assert.match(
     home,
-    /<span class="count-number">3<\/span\s*><span class="count-label"> links<\/span>/,
+    /<span class="count-number">3<\/span\s*><span class="count-label"> Links<\/span>/,
   );
   assert.match(home, /class="code" href="\.\/disabled\/">disabled<\/a>/);
   assert.match(await f.read("assets/site.css"), /--script:\s*#c6a36a/);

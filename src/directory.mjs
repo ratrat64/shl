@@ -178,7 +178,7 @@ export const indexPage = ({ raw, links, source }) =>
     "links",
     "./",
     `
-    ${directoryContents(raw, '<nav class="breadcrumbs" aria-label="Breadcrumb">Links</nav>', links.length ? "No links listed here." : `No links available yet. Add your first entry to <code>${esc(source)}</code> and rebuild the site.`)}`,
+    ${directoryContents(raw, '<nav class="breadcrumbs" aria-label="Breadcrumb">Home</nav>', links.length ? "No links listed here." : `No links available yet. Add your first entry to <code>${esc(source)}</code> and rebuild the site.`)}`,
   );
 
 export const directoryPage = ({ path, entries }) => {
