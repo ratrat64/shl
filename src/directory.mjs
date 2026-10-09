@@ -7,7 +7,7 @@ export const tagSlot = (identity) => {
   let hash = 2166136261;
   for (let i = 0; i < identity.length; i++)
     hash = Math.imul(hash ^ identity.charCodeAt(i), 16777619) >>> 0;
-  return hash % 6;
+  return hash % 16;
 };
 // JSON string contents survive HTML's NUL replacement and preserve UTF-16.
 const tagIdentity = (identity) => esc(JSON.stringify(identity).slice(1, -1));
@@ -121,7 +121,6 @@ const directoryContents = (
         ><span class="count-label">${visible === 1 ? " link" : " links"}</span>
       </h1>
       <div class="directory-actions">
-        ${total ? searchableListing() : ""}
         <div
           id="selected-tags"
           class="tag-track"
@@ -129,6 +128,7 @@ const directoryContents = (
           aria-label="Selected tags"
           hidden
         ></div>
+        ${total ? searchableListing() : ""}
         <div class="directory-toggles">
           <button
             id="tag-toggle"

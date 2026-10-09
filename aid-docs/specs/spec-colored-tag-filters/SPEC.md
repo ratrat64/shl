@@ -22,10 +22,10 @@ Give directory visitors a discoverable, reversible way to combine tags and text 
 
 - **CAP-1**
   - **intent:** Visitors can recognize full tag labels consistently across directory surfaces.
-  - **success:** The same case-insensitive tag retains its automatic color identity across folders, reloads, builds, row labels, tag popovers, available tags, selected tags, and disabled rows; full labels are readable without hovering.
+  - **success:** The same case-insensitive tag retains its automatic sixteen-slot theme identity across folders, reloads, builds, row labels, tag popovers, available tags, selected tags, and disabled rows; full labels have color-matched tinted backgrounds/borders and are readable without hovering.
 - **CAP-2**
   - **intent:** Visitors can discover, select, and remove tags in their current directory subtree.
-  - **success:** Show tags reveals one scrollable available-tag row containing the subtree's tags, including hidden leaves, minus selections. Activation moves a tag to the scrollable selected row beside search; removal returns it. Results never shrink the catalog.
+  - **success:** Show tags reveals one scrollable available-tag row containing the subtree's tags, including hidden leaves, minus selections. Activation moves a tag to the scrollable selected row left of search on desktop and above it on mobile, preceding search in DOM/tab order; removal returns it. Results never shrink the catalog.
 - **CAP-3**
   - **intent:** Visitors can narrow links by every selected tag and remaining free text.
   - **success:** Results satisfy selected-tag AND and the existing broad substring search. Hidden leaves appear only when hidden, broken, or disabled is selected and the leaf satisfies every filter; only matching ancestors remain. One live count and the existing no-match state agree with results.
@@ -38,7 +38,7 @@ Give directory visitors a discoverable, reversible way to combine tags and text 
 
 ## Constraints
 
-- Preserve all locked source decisions as detailed in tag-filter-behavior.md; no dots, hover-only row labels, OR filtering, result-dependent tag pool, or grayscale-only disabled tags.
+- Preserve locked source decisions except the user-approved 2026-10-09 visual amendment detailed in tag-filter-behavior.md: sixteen slots, palette-matched tinted tag surfaces/borders and selected tags left of search (above on mobile) in matching DOM/tab order. No dots, hover-only row labels, OR filtering, result-dependent tag pool, or grayscale-only disabled tags.
 - Tag color is independent of link state; disabled codes, destinations, and unavailable actions retain disabled behavior/styling, and hidden opacity remains independent.
 - Keep static GitHub Pages publication, validation-before-output-deletion, public destinations, native browsing, existing routing/launchers, shared component ownership, and the single browser lifecycle. No frontend framework or new dependency.
 - Maintain usable search and one-line, horizontally scrollable full labels at narrow widths; meet existing focus, text contrast, count announcement, and no-JavaScript foundations.

@@ -24,7 +24,9 @@ context:
 
 ## Boundaries & Constraints
 
-**Always:** Preserve all locked decisions, raw valid public values, validation-before-deletion, native browsing, disabled actions, hidden opacity, shared shell, lifecycle ownership, and root/project-prefix routing. Use the fixed UTF-16 hash/palette and reserved slots; browser chips consume renderer-published catalog/color metadata. Require selected-tag AND plus one broad remaining-text substring; only reserved selections admit matching hidden leaves. Keep full labels, scroll tracks, focus behavior, independent token error and one live count.
+**Always:** Preserve all locked decisions except the user-approved visual amendments below, raw valid public values, validation-before-deletion, native browsing, disabled actions, hidden opacity, shared shell, lifecycle ownership, and root/project-prefix routing. Use the fixed UTF-16 hash/palette and reserved slots; browser chips consume renderer-published catalog/color metadata. Require selected-tag AND plus one broad remaining-text substring; only reserved selections admit matching hidden leaves. Keep full labels, scroll tracks, focus behavior, independent token error and one live count.
+
+**Approved visual amendment (2026-10-09):** Expand the automatic palette from six to sixteen stable light/dark slots to reduce collisions; preserve reserved hidden/disabled/broken/script slot identities. Full inline/popover labels and available/selected chips have backgrounds and borders tinted from their own ink palette, including disabled-row tags. Selected tags precede search in DOM/tab order and sit to its left on desktop; stack above search on narrow screens. Preserve full-label scrolling, 50px row geometry, accessible contrast and disabled non-tag styling. This user request supersedes the six-slot, neutral-tag-surface and right-side-selection decisions in the canonical companions and live instructions; synchronize those documents.
 
 **Never:** Add dependencies/frameworks, stored colors/filter state, OR filtering, autocomplete, row-tag filtering, result-dependent catalogs, automatic migration, color dots, grayscale-only disabled tags, or changes to redirects/launchers/copy/download semantics. Historical forge inputs and logs remain historical.
 
@@ -54,7 +56,7 @@ context:
 
 **Execution:**
 - [x] `src/links.mjs`, `links.yaml` -- reject ambiguous raw names and perform the approved explicit rename; preserve valid case/Unicode/order.
-- [x] `src/directory.mjs`, `src/assets/site.css` -- publish deterministic identities/slots/catalog, full colored tags and accessible available/selected tracks with neutral surfaces.
+- [x] `src/directory.mjs`, `src/assets/site.css` -- publish deterministic sixteen-slot identities/catalog, full colored tags with ink-matched tinted fills/borders and accessible available/selected tracks; selected tags precede search (left on desktop, above on mobile).
 - [x] `src/assets/search.js` -- implement selection/focus, fixed catalog, AND/text/hidden predicate, token/error/caret/IME behavior and disclosure/count states.
 - [x] `src/assets/navigation.js` -- verify one mount, resets/retention and outgoing listener isolation through existing lifecycle.
 - [x] `AGENTS.md`, `README.md`, `docs/reference.md`, `src/pages.mjs`, PRODUCT/DESIGN/EXPERIENCE and ARCHITECTURE-SPINE -- rewrite conflicting live rules under the scoped amendment; record the authorized rename in canonical spec without rewriting historical logs.
@@ -67,6 +69,8 @@ context:
 - Given conflicting active instructions, when implementation is delivered, then they express the amended semantics coherently and unrelated adopted invariants remain binding.
 
 ## Implementation Notes
+
+- Follow-up user request reopens the same unmerged feature PR for more colors, color-matched tag surfaces/borders and left-side selected tags. Use sixteen slots and existing CSS color-mix/native grid; no new component or dependency. Verify all sixteen inks/surfaces and selected-track geometry/tab order in the existing browser harness before updating the PR.
 
 - Renderer owns UTF-16 hashing, reserved slots, canonical catalog labels/order and row-label deduplication; the browser clones published chip metadata and never hashes tags independently.
 - Search replaces the old toggle/exact-query branches with one controller. Its cleanup is called by the existing navigation owner before main replacement; same-page fragments retain state.
@@ -121,3 +125,11 @@ context:
 - Completed the three aid-build review layers and recorded every finding above. Patched token URL/paste/native-edit boundaries and lossless JSON-content identities, clarified migration guidance, sorted catalogs once, and strengthened caret/dedup/native Tab/touch regressions. Two follow-ups are recorded in deferred-work.md: pre-existing nested full-path search and unverified screen-reader first-error announcement.
 - Final full verification after review patches: Bun 1.4.2 `bun ci`, `bun run format`, `bun run format:check`, `SHL_REQUIRE_BROWSER=1 bun test --timeout 30000 ./test/build.test.mjs` (**38 passed, 0 failed**, 33.76 seconds, no browser skips), and `bun build.mjs` (**68 short links**) all passed. Native multiline clipboard paste, ordinary editing/undo, NUL/FFFD identities, Tab and horizontal touch gestures executed in Chrome.
 - Final instruction audit also replaced the obsolete hidden-toggle reference in docs/development.md's navigation smoke checklist. Frozen intent remains unchanged.
+
+### Approved visual amendment verification — 2026-10-09
+
+- Implemented modulo-16 UTF-16 assignment with reserved indices unchanged; retained the first six ink pairs and documented ten additional theme pairs in the canonical behavior companion. Slot-level --tag-tone variables feed shared 5%/8% resting/hover fills and 30%/45% borders, including disabled-row labels and popovers.
+- Selected-track DOM order now precedes search; shared grid places it left on desktop and above on mobile. Native forward/reverse Tab proof follows the new order and horizontal touch gestures still reach both ends of oversized labels in both tracks. Corrected the harness's CDP Shift modifier from Alt (1) to Shift (8).
+- Fixed UTF-16 fixture vectors explicitly cover every slot 0–15. Executed rendered checks assert all sixteen on each state row/popover and available/selected surfaces, palette-matched resting/hover fills/borders, ≥4.5:1 actual tinted-surface contrast with hidden opacity and row wash, 50px row heights, destination reserves, full-label overflow, desktop-left/mobile-above geometry and DOM/tab order. Existing lossless NUL/FFFD, token/native-paste/edit/undo, lifecycle, shell, disabled actions and routing gates passed.
+- Bun 1.4.2 `bun ci`, `bun run format`, `bun run format:check`, `SHL_REQUIRE_BROWSER=1 bun test --timeout 30000 ./test/build.test.mjs` (**38 passed, 0 failed**, 24.09 seconds, no browser skips), `bun build.mjs` (**68 short links**) and `git diff --check` passed. Impeccable detector on directory/CSS targets returned `[]`.
+- Canonical SPEC/companions and affected live agent/product/design/experience/architecture/README/reference instructions synchronized. Historical forge inputs, memory logs and earlier evidence retained. Final diff inspection confirmed the scoped visual amendment and preserved filter behavior; delivery updates the existing feature PR.

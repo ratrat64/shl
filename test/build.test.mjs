@@ -18,6 +18,26 @@ import { linkFields, entryTree } from "../src/links.mjs";
 import { scriptString } from "../src/layout.mjs";
 import { tagSlot } from "../src/directory.mjs";
 
+// Fixed vectors cover every slot under the approved UTF-16 modulo-16 mapping.
+const paletteTags = [
+  "color-27",
+  "color-4",
+  "color-9",
+  "color-26",
+  "color-3",
+  "color-8",
+  "color-18",
+  "color-2",
+  "color-7",
+  "color-19",
+  "color-1",
+  "color-6",
+  "color-23",
+  "color-0",
+  "color-5",
+  "color-22",
+];
+
 test("raw ambiguous tag names fail every format before output deletion; valid case and Unicode stay public", async (t) => {
   for (const source of ["links.json", "links.yaml", "links.yml"]) {
     const valid = {
@@ -118,15 +138,19 @@ test("renderer publishes deduplicated lexical catalogs, safe full labels and sta
     let hash = 2166136261;
     for (let i = 0; i < identity.length; i++)
       hash = Math.imul(hash ^ identity.charCodeAt(i), 16777619) >>> 0;
-    return hash % 6;
+    return hash % 16;
   };
   for (const [identity, slot] of [
-    ["shell", 3],
-    ["café", 4],
-    ["emoji-🎉", 1],
+    ["shell", 1],
+    ["café", 12],
+    ["emoji-🎉", 7],
     ["<tag>", 5],
   ])
     assert.equal(tagSlot(identity), slot);
+  assert.deepEqual(
+    paletteTags.map(tagSlot),
+    Array.from({ length: 16 }, (_, i) => i),
+  );
   const catalogs = [];
   for (const [f, path] of [
     [a, "index.html"],
@@ -138,7 +162,9 @@ test("renderer publishes deduplicated lexical catalogs, safe full labels and sta
     assert.doesNotMatch(html, /<tag>/);
     const catalog = html.match(/id="available-tags"[\s\S]*?<\/div>/)[0];
     catalogs.push(catalog);
-    for (const match of html.matchAll(/data-tag="([^"]*)" data-slot="(\d)"/g)) {
+    for (const match of html.matchAll(
+      /data-tag="([^"]*)" data-slot="(\d+)"/g,
+    )) {
       const identity = match[1].replaceAll("&lt;", "<").replaceAll("&gt;", ">");
       assert.equal(
         Number(match[2]),
@@ -295,7 +321,11 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
       for (const button of [...picker.querySelectorAll('button')]) button.click();
       check(!doc.querySelector('#all-tags-selected').hidden && !toggle.disabled && !picker.hidden, 'All-selected state');
       check(selected.scrollWidth > selected.clientWidth && selected.getBoundingClientRect().width > 0, 'Selected scroll track');
-      if (width > 740) check(Math.abs(selected.getBoundingClientRect().top - input.getBoundingClientRect().top) < 15, 'Selected not beside search');
+      check(!!(selected.compareDocumentPosition(input) & win.Node.DOCUMENT_POSITION_FOLLOWING), 'Selected DOM order must precede search');
+      if (width > 740) {
+        check(Math.abs(selected.getBoundingClientRect().top - input.getBoundingClientRect().top) < 15, 'Selected not beside search');
+        check(selected.getBoundingClientRect().right <= input.getBoundingClientRect().left, 'Selected not LEFT of search');
+      } else check(selected.getBoundingClientRect().bottom <= input.getBoundingClientRect().top, 'Selected mobile track must be above search');
       check(picker.getBoundingClientRect().top >= input.getBoundingClientRect().bottom, 'Picker not below search'); clear();
       // Disclosure restoration, same-page retention, exactly one mount, stale listeners.
       const details = [...doc.querySelectorAll('details')].find(d => d.querySelector('summary').textContent === (page ? 'deeper' : 'tools')); if (details) {
@@ -716,12 +746,12 @@ test("native track scrolling uses Tab focus and horizontal touch gestures withou
         "document.querySelector('#available-tags').scrollLeft > 0",
       ),
     );
-    await key("Tab", "Tab", 9, 1);
+    await key("Tab", "Tab", 9, 8);
     await visible();
     // Set up both tracks with the same oversized first label; activation itself
     // has independent native Enter/Space/touch coverage above.
     await evaluate(
-      `for(const b of [...document.querySelectorAll('#available-tags button')]) b.click(); document.querySelector('#link-search').focus();`,
+      `for(const b of [...document.querySelectorAll('#available-tags button')]) b.click(); const h=document.querySelector('h1'); h.tabIndex=-1; h.focus();`,
     );
     await key("Tab", "Tab", 9);
     await visible();
@@ -734,8 +764,39 @@ test("native track scrolling uses Tab focus and horizontal touch gestures withou
     assert.ok(
       await evaluate("document.querySelector('#selected-tags').scrollLeft > 0"),
     );
-    await key("Tab", "Tab", 9, 1);
+    assert.equal(
+      await evaluate("document.activeElement.dataset.tag"),
+      "setup",
+      "Native second selected focus",
+    );
+    await key("Tab", "Tab", 9, 8);
     await visible();
+    assert.equal(
+      await evaluate("document.activeElement.textContent"),
+      "#" + long,
+      "Reverse Tab returns to first selected chip",
+    );
+    await key("Tab", "Tab", 9);
+    assert.equal(
+      await evaluate("document.activeElement.dataset.tag"),
+      "setup",
+      "First selected chip tabs to second",
+    );
+    await key("Tab", "Tab", 9);
+    assert.equal(
+      await evaluate("document.activeElement.dataset.tag"),
+      "shell",
+      "Second selected chip tabs to third",
+    );
+    await key("Tab", "Tab", 9);
+    assert.equal(
+      await evaluate("document.activeElement.id"),
+      "link-search",
+      "Tab follows selected chips into search",
+    );
+    await key("Tab", "Tab", 9, 8);
+    await visible();
+    assert.equal(await evaluate("document.activeElement.dataset.tag"), "shell");
     await evaluate(
       "for(const b of [...document.querySelectorAll('#selected-tags button')]) b.click()",
     );
@@ -3692,12 +3753,7 @@ const stateMap = (script = true) =>
         tags: [
           "docs",
           "release-notes",
-          "color-0",
-          "color-1",
-          "color-2",
-          "color-3",
-          "color-4",
-          "color-5",
+          ...paletteTags,
           ...(script ? ["script"] : []),
           ...["Hidden", "BROKEN", "Disabled"].filter(
             (_, bit) => mask & (1 << bit),
@@ -4134,12 +4190,33 @@ test("state rows, selected filters, all-hidden traversal, disabled native action
           const probe = doc.createElement('div'); probe.style.display = 'none';
           const paint = (value, scope) => { scope.append(probe); probe.style.background = value; const color = win.getComputedStyle(probe).backgroundColor; probe.remove(); return color; };
            const bg = rgb(win.getComputedStyle(doc.body).backgroundColor);
-           if (!native) for (const chip of doc.querySelectorAll('#available-tags button, #selected-tags button')) {
+           const tagSurface = (element, backdrop = bg, opacity = 1) => {
+             const slot = Number(element.dataset.slot);
              for (const hovered of [false, true]) {
-               chip.classList.toggle('verify-hover', hovered);
-               readable(win, chip, bg, bg);
+               element.classList.toggle('verify-hover', hovered);
+               const s = win.getComputedStyle(element);
+               check(JSON.stringify(rgb(s.color)) === JSON.stringify(rgb(win.getComputedStyle(doc.documentElement).getPropertyValue('--tag-' + slot))), 'Tag ink slot mismatch: ' + slot);
+               check(s.backgroundColor === paint('color-mix(in srgb, var(--tag-tone) ' + (hovered ? 8 : 5) + '%, var(--panel))', element), 'Tag tint mismatch: ' + slot);
+               check(s.borderTopWidth === '1px' && s.borderTopStyle === 'solid' && s.borderTopColor === paint('color-mix(in srgb, var(--tag-tone) ' + (hovered ? 45 : 30) + '%, var(--panel))', element), 'Tag border mismatch: ' + slot);
+               readable(win, element, backdrop, backdrop, opacity);
              }
-             chip.classList.remove('verify-hover');
+             element.classList.remove('verify-hover');
+           };
+           const allSlots = Array.from({length:16}, (_,i)=>i).join(',');
+           const slots = elements => [...new Set([...elements].map(e => Number(e.dataset.slot)))].sort((a,b)=>a-b).join(',');
+           if (!native) {
+             check(slots(doc.querySelectorAll('#available-tags button')) === allSlots, 'Available fixture must cover sixteen slots');
+             const selectedSlots = new Set();
+             for (const chip of doc.querySelectorAll('#available-tags button')) {
+               tagSurface(chip);
+               if (chip.hidden) continue;
+               chip.click();
+               const moved = [...doc.querySelectorAll('#selected-tags button')].find(b => b.dataset.tag === chip.dataset.tag);
+               tagSurface(moved); selectedSlots.add(Number(moved.dataset.slot)); moved.click();
+             }
+             check([...selectedSlots].sort((a,b)=>a-b).join(',') === allSlots, 'Selected fixture must cover sixteen slots');
+             for (const li of doc.querySelectorAll('li[hidden]')) li.hidden = false;
+             for (const details of doc.querySelectorAll('details')) details.open = true;
            }
           for (const script of [true, false]) for (let mask = 0; mask < 8; mask++) {
             const r = row(doc, (script ? '' : 'Plain') + 'State' + mask), style = win.getComputedStyle(r), code = r.querySelector('.code');
@@ -4168,15 +4245,27 @@ test("state rows, selected filters, all-hidden traversal, disabled native action
             hoveredDestination.classList.remove('verify-hover');
             check(win.getComputedStyle(hoveredDestination).color === restingColor, 'Destination hover palette restoration');
             r.classList.remove('verify-hover'); visit.classList.remove('verify-hover');
-             for (const element of [code, ...r.querySelectorAll('.tag-label'), r.querySelector('.destination')]) {
+              for (const element of [code, r.querySelector('.destination')]) {
               for (const background of [bg, rgb(rowWash)]) check(contrast(blend(rgb(win.getComputedStyle(element).color), bg, Number(style.opacity)), blend(background, bg, Number(style.opacity))) >= 4.5, 'Dimmed contrast failed: ' + theme + '/' + mask + '/' + element.className);
             }
             code.focus(); check(win.getComputedStyle(r).opacity === '1', 'Focus opacity');
             check(win.getComputedStyle(r).backgroundColor === rowWash, 'Row focus palette');
             check(contrast(rgb(win.getComputedStyle(visit).color), rgb(win.getComputedStyle(visit).backgroundColor)) >= 4.5, 'Open contrast');
             check(win.getComputedStyle(code).outlineWidth === '2px', 'Focus outline'); code.blur();
-            const dest = r.querySelector('.destination');
-            check(dest.getBoundingClientRect().width >= (width < 500 ? 48 : 64), 'Destination reserve');
+             const dest = r.querySelector('.destination');
+             check(dest.getBoundingClientRect().width >= (width < 500 ? 48 : 64), 'Destination reserve');
+             const labelBackdrop = mask & 4 ? rgb(win.getComputedStyle(r.parentElement).backgroundColor) : bg;
+             check(slots(r.querySelectorAll('.tag-label')) === allSlots, 'Row fixture must cover sixteen slots');
+             for (const hovered of [false, true]) {
+               r.classList.toggle('verify-hover', hovered);
+               for (const label of r.querySelectorAll('.tag-label')) tagSurface(label, labelBackdrop, Number(style.opacity));
+             }
+             r.classList.remove('verify-hover');
+             const tagsPanel = r.nextElementSibling;
+             tagsPanel.showPopover();
+             check(slots(tagsPanel.querySelectorAll('.tag-label')) === allSlots, 'Popover fixture must cover sixteen slots');
+             for (const label of tagsPanel.querySelectorAll('.tag-label')) tagSurface(label);
+             tagsPanel.hidePopover();
             if (mask & 4) {
               const elements = [r, ...r.querySelectorAll('a, button')];
               const backdrop = rgb(win.getComputedStyle(r.parentElement).backgroundColor);

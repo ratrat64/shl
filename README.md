@@ -60,13 +60,14 @@ it after the next deployment.
 
 Tags can be combined; special tags match exactly, ignoring case. Tag names must
 not contain whitespace or commas; explicitly rename invalid names. Valid raw
-case and Unicode remain intact. Full labels have stable automatic colors in both
-themes, including disabled rows.
+case and Unicode remain intact. Full labels use sixteen stable automatic theme
+colors with matching tinted backgrounds and borders, including disabled rows.
 
 Show tags offers all tags in the current subtree, including hidden leaves.
 Select tags to require every selection (AND), plus one broad substring of remaining
 search text. Commit `#tag` with space, comma or Enter; unknown tokens remain with
-“Tag not found”. Remove selected tags individually to return them to the picker.
+“Tag not found”. Selected tags appear left of search on desktop and above it on
+mobile, preceding search in keyboard order. Remove them individually to return to the picker.
 Opening or hiding the picker and clearing text retain selections. Only selected
 hidden, broken or disabled tags admit matching hidden leaves; script alone does not.
 

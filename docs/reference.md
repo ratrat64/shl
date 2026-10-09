@@ -89,8 +89,8 @@ literal `#hidden` are descriptive, not states.
 Tags can be combined. Hidden opacity applies independently of broken/disabled
 styling. Labels stay readable on one line; crowded rows scroll horizontally.
 Selecting the labels opens an informational popover with all tags. Full labels use
-stable automatic colors in both themes, including disabled tags; other disabled
-row content remains neutral.
+sixteen stable automatic theme colors and palette-matched tinted backgrounds and
+borders, including disabled tags; other disabled row content remains neutral.
 
 ### Migrating legacy properties
 
@@ -116,7 +116,8 @@ destination to copy its full URL, or use Open to visit an enabled destination.
 Plain search is one broad, case-insensitive substring across code/folder path,
 title, destination and tags. Show tags reveals a horizontal catalog of every tag
 in the current subtree, including hidden descendants, minus selected tags. It
-does not shrink with results. Available tags move to a selected track beside search;
+does not shrink with results. Available tags move to a selected track left of search
+on desktop and above it on mobile, preceding search in DOM/keyboard order;
 remove them individually to restore catalog order. Every selected tag must match
 (AND), together with remaining text. Labels retain full text and stable colors.
 

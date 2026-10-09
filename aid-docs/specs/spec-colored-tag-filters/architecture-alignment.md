@@ -4,13 +4,15 @@
 
 The user's locked forge decisions authorize replacing the hidden toggle/exact-query interaction and the disabled-tag grayscale rule. This SPEC's tag-filter-behavior.md is authoritative for those feature responsibilities; adopted architecture/design/experience documents still govern everything outside the scope below. This amendment does not permit page-specific chrome overrides or relax shared ownership/rendered verification.
 
+The user's explicit 2026-10-09 visual follow-up supersedes the earlier six-slot palette, neutral tag surfaces and right-side selected track: use sixteen stable automatic theme slots while retaining reserved indices; tint every tag label/chip background and border from its own ink through shared `--tag-tone`/color-mix declarations; place selections left of search on desktop and above search on mobile with matching DOM/tab order. All filtering, lossless identity, row geometry, overflow, native lifecycle and disabled non-tag contracts remain binding.
+
 | Existing contract | Replacement |
 | --- | --- |
 | AD-2 accepts nonblank tags and omits hidden leaves until toggled/exact state query. | Additionally reject raw whitespace/commas. Selected reserved tags admit matching hidden leaves; every selected tag and broad remaining text still constrain them. Public raw data and leaf state derivation remain single-owner. |
 | AD-5 initial # means whole-tag query; spaces can belong to names; ordinary search respects hidden toggle. | Commit #tokens into AND selections with space/comma/Enter, reject ambiguous names, retain unknown input/error; uncommitted text is broad search. Show tags replaces hidden toggle; invariant hidden-inclusive subtree catalog minus selections. |
 | AD-9 cross-page mount resets search/hidden visibility/disclosures. | Reset text, selections, token error, picker visibility and disclosures together; same-page/fragment retains. Preserve one mount, outgoing-work cleanup, history/focus/scroll, and shell/theme lifetime. |
-| DESIGN/EXPERIENCE require muted inline tags and entirely grayscale disabled row/popover. | Full tags use deterministic per-tag ink on every surface, including disabled rows/popovers; disabled codes/destinations/actions/wash remain neutral, hidden opacity independent. |
-| DESIGN/EXPERIENCE tools and flows use Show hidden links / Hide hidden links. | Show tags / Hide tags exposes available row below search/button, selected horizontal row beside search; reserved selections own hidden discovery. |
+| DESIGN/EXPERIENCE require muted inline tags and entirely grayscale disabled row/popover. | Full tags use sixteen-slot per-tag ink plus matched tinted backgrounds/borders on every label/chip, including disabled rows/popovers; disabled codes/destinations/actions/wash remain neutral, hidden opacity independent. |
+| DESIGN/EXPERIENCE tools and flows use Show hidden links / Hide hidden links. | Show tags / Hide tags exposes available row below search/button, selected horizontal row left of search on desktop and above on mobile, preceding search in DOM/tab order; reserved selections own hidden discovery. |
 
 ## Implementation ownership
 
