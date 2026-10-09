@@ -228,6 +228,7 @@ p {
   margin: 0;
 }
 .count {
+  flex-shrink: 0;
   font-variant-numeric: tabular-nums;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   display: inline-flex;
@@ -247,7 +248,7 @@ p {
   grid-template-columns: minmax(0, 1fr) minmax(12rem, 1fr) max-content;
   align-items: center;
   gap: 0.65rem;
-  width: min(100%, 43rem);
+  flex: 1;
   min-width: 0;
 }
 .directory-toggles {
@@ -268,15 +269,27 @@ p {
   display: flex;
   gap: 0.5rem;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   min-width: 0;
   padding: 0.4rem;
   scrollbar-width: thin;
   scrollbar-color: var(--line) var(--panel);
   white-space: nowrap;
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 0.4rem,
+    #000 calc(100% - 0.4rem),
+    transparent
+  );
 }
 #available-tags,
 #tag-error {
   grid-column: 1 / -1;
+}
+#selected-tags > :nth-child(1 of :not([hidden])),
+#available-tags > :nth-child(1 of :not([hidden])) {
+  margin-inline-start: auto;
 }
 .tag-chip {
   flex: 0 0 auto;
