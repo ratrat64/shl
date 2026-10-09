@@ -9,8 +9,10 @@ export const tagSlot = (identity) => {
     hash = Math.imul(hash ^ identity.charCodeAt(i), 16777619) >>> 0;
   return hash % 6;
 };
+// JSON string contents survive HTML's NUL replacement and preserve UTF-16.
+const tagIdentity = (identity) => esc(JSON.stringify(identity).slice(1, -1));
 const tagLabel = (label) =>
-  `<span class="tag-label" data-tag="${esc(label.toLowerCase())}" data-slot="${tagSlot(label.toLowerCase())}">#${esc(label)}</span>`;
+  `<span class="tag-label" data-tag="${tagIdentity(label.toLowerCase())}" data-slot="${tagSlot(label.toLowerCase())}">#${esc(label)}</span>`;
 const tagCatalog = (nodes, catalog = new Map()) => {
   for (const node of nodes) {
     if (node.isDirectory) tagCatalog(node.children, catalog);
@@ -21,7 +23,7 @@ const tagCatalog = (nodes, catalog = new Map()) => {
           catalog.set(identity, label);
       }
   }
-  return [...catalog].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return catalog;
 };
 
 const renderDirectoryNode = ({ code, children, href, visible }) => /* HTML */ `
@@ -109,7 +111,9 @@ const directoryContents = (
 ) => {
   const nodes = entryTree(entries);
   const { visible, total } = entryCounts(nodes);
-  const catalog = tagCatalog(nodes);
+  const catalog = [...tagCatalog(nodes)].sort(([a], [b]) =>
+    a < b ? -1 : a > b ? 1 : 0,
+  );
   return /* HTML */ `<section aria-label="Links">
     <div class="directory-tools">
       <h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">
@@ -144,7 +148,7 @@ const directoryContents = (
           aria-label="Available tags"
           hidden
         >
-          ${catalog.map(([identity, label]) => `<button type="button" class="tag-chip" data-tag="${esc(identity)}" data-slot="${tagSlot(identity)}" aria-label="Filter by #${esc(label)}">#${esc(label)}</button>`).join("")}<span
+          ${catalog.map(([identity, label]) => `<button type="button" class="tag-chip" data-tag="${tagIdentity(identity)}" data-slot="${tagSlot(identity)}" aria-label="Filter by #${esc(label)}">#${esc(label)}</button>`).join("")}<span
             id="all-tags-selected"
             hidden
             >All tags selected.</span

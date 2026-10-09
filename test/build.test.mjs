@@ -91,6 +91,21 @@ test("renderer publishes deduplicated lexical catalogs, safe full labels and sta
   });
   const c = await fixture(t, { folder: entries.folder });
   for (const f of [a, b, c]) assert.equal(f.build().status, 0);
+  assert.deepEqual(JSON.parse(await a.read("links.json")), entries);
+  const first = await a.read("index.html");
+  const inline = first.match(
+    /aria-label="[^"]*Show all tags for first">([\s\S]*?)<\/button>/,
+  )[1];
+  const popover = first.match(
+    /aria-label="Tags for first">([\s\S]*?)<\/div>/,
+  )[1];
+  assert.equal(inline, popover);
+  assert.deepEqual(
+    [...inline.matchAll(/class="tag-label"[^>]*>(.*?)<\/span>/g)].map(
+      (match) => match[1],
+    ),
+    ["#shell", "#café", "#&lt;tag&gt;", "#emoji-🎉"],
+  );
   for (const [identity, slot] of [
     ["hidden", 3],
     ["disabled", 3],
@@ -249,6 +264,10 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
       clear(); type('setup #shell tail', 13); check(input.value === 'setup tail' && input.selectionStart === 6 && choices() === 'shell', 'Mid-input caret/prose');
       clear(); type('prefix#shell '); check(!choices() && input.value === 'prefix#shell ', 'Inside-word token');
       type('https://example.com/#shell '); check(!choices() && input.value === 'https://example.com/#shell ', 'URL fragment token');
+      type('https://example.com/a,#shell '); enter(); check(!choices() && input.value === 'https://example.com/a,#shell ', 'Comma inside URL span');
+      type('https://example.com/a,#shell #setup '); check(choices() === 'setup' && input.value === 'https://example.com/a,#shell ', 'URL retained alongside real token'); clear();
+      type('prose #shell', 2); enter(); check(!choices() && input.value === 'prose #shell', 'Enter outside unfinished candidate');
+      input.setSelectionRange(9, 9); enter(); check(choices() === 'shell' && input.value === 'prose ' && input.selectionStart === 6, 'Enter inside unfinished candidate'); clear();
       type('#'); check(count() === 0 && !choices(), 'Bare prefix');
       type('#shell'); check(count() === 4 && !choices(), 'Pending token uses broad recorded text');
       type('##literal '); check(choices() === '#literal' && input.value === '', 'Exactly one prefix'); clear();
@@ -448,7 +467,7 @@ async function browserControls(t, chrome, cwd) {
     );
     return result.result.value;
   };
-  const key = async (key, code, virtualKey) => {
+  const key = async (key, code, virtualKey, modifiers = 0) => {
     for (const type of ["keyDown", "keyUp"])
       await send("Input.dispatchKeyEvent", {
         type,
@@ -456,6 +475,7 @@ async function browserControls(t, chrome, cwd) {
         code,
         windowsVirtualKeyCode: virtualKey,
         nativeVirtualKeyCode: virtualKey,
+        modifiers,
         ...(type === "keyDown" && ["Enter", " "].includes(key)
           ? {
               text: key === "Enter" ? "\r" : " ",
@@ -628,6 +648,348 @@ async function fixture(t, links, source = "links.json") {
     read: (path) => readFile(join(cwd, "dist", path), "utf8"),
   };
 }
+
+test("legacy migration guidance requires explicit maintainer renaming before publication", async (t) => {
+  for (const property of ["script", "hidden"]) {
+    const f = await fixture(t, {
+      code: {
+        url: "https://example.com/",
+        [property]: true,
+        tags: [" SHELL ", "a,b", "Valid"],
+      },
+    });
+    const result = f.build();
+    assert.equal(result.status, 1);
+    assert.match(
+      result.stderr,
+      /Explicitly rename existing padded, whitespace-containing or comma-containing tags to maintainer-chosen valid names; preserve all other valid raw values\. No automatic renaming is performed\./,
+    );
+  }
+});
+
+test("native track scrolling uses Tab focus and horizontal touch gestures without truncating oversized labels", async (t) => {
+  const chrome = availableChrome(t);
+  if (!chrome) return;
+  const long = "a-long-label-that-remains-completely-readable-".repeat(3);
+  const f = await fixture(t, {
+    tools: {
+      code: { url: "https://example.com/", tags: [long, "shell", "setup"] },
+    },
+  });
+  assert.equal(f.build().status, 0);
+  const origin = await browserServer(t, f.cwd);
+  const { send, evaluate, key, navigate } = await browserControls(
+    t,
+    chrome,
+    f.cwd,
+  );
+  const visible = async () =>
+    assert.equal(
+      await evaluate(`(() => {
+    const b = document.activeElement, track = b.parentElement, r = b.getBoundingClientRect(), t = track.getBoundingClientRect();
+    return b.matches(':focus-visible') && getComputedStyle(b).whiteSpace === 'nowrap' && b.scrollWidth <= b.clientWidth &&
+      (r.width > track.clientWidth ? r.left < t.right && r.right > t.left : r.left >= t.left-1 && r.right <= t.right+1);
+  })()`),
+      true,
+    );
+  for (const width of [320, 1440]) {
+    await send("Emulation.setDeviceMetricsOverride", {
+      width,
+      height: 900,
+      deviceScaleFactor: 1,
+      mobile: width === 320,
+    });
+    await navigate(origin + "/tools/");
+    await evaluate("document.querySelector('#tag-toggle').focus()");
+    await key("Enter", "Enter", 13);
+    await key("Tab", "Tab", 9);
+    await visible();
+    assert.equal(
+      await evaluate("document.activeElement.textContent"),
+      "#" + long,
+    );
+    await key("Tab", "Tab", 9);
+    await visible();
+    assert.equal(await evaluate("document.activeElement.dataset.tag"), "setup");
+    assert.ok(
+      await evaluate(
+        "document.querySelector('#available-tags').scrollLeft > 0",
+      ),
+    );
+    await key("Tab", "Tab", 9, 1);
+    await visible();
+    // Set up both tracks with the same oversized first label; activation itself
+    // has independent native Enter/Space/touch coverage above.
+    await evaluate(
+      `for(const b of [...document.querySelectorAll('#available-tags button')]) b.click(); document.querySelector('#link-search').focus();`,
+    );
+    await key("Tab", "Tab", 9);
+    await visible();
+    assert.equal(
+      await evaluate("document.activeElement.textContent"),
+      "#" + long,
+    );
+    await key("Tab", "Tab", 9);
+    await visible();
+    assert.ok(
+      await evaluate("document.querySelector('#selected-tags').scrollLeft > 0"),
+    );
+    await key("Tab", "Tab", 9, 1);
+    await visible();
+    await evaluate(
+      "for(const b of [...document.querySelectorAll('#selected-tags button')]) b.click()",
+    );
+    await send("Emulation.setTouchEmulationEnabled", { enabled: true });
+    for (const id of ["available-tags", "selected-tags"]) {
+      if (id === "selected-tags")
+        await evaluate(
+          "for(const b of [...document.querySelectorAll('#available-tags button')]) b.click()",
+        );
+      await evaluate(
+        `{const track = document.getElementById(${JSON.stringify(id)}); track.querySelector('button').focus(); track.scrollIntoView({block:'nearest'});}`,
+      );
+      const gesture = async (direction) => {
+        const point = await evaluate(
+          `(() => {const r=document.getElementById(${JSON.stringify(id)}).getBoundingClientRect(); return {x:r.left+(r.width*( ${direction} < 0 ? .8 : .2)), y:r.top+r.height/2, distance:r.width*.6};})()`,
+        );
+        await send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: [{ x: point.x, y: point.y, id: 1 }],
+        });
+        for (let step = 1; step <= 6; step++) {
+          await send("Input.dispatchTouchEvent", {
+            type: "touchMove",
+            touchPoints: [
+              {
+                x: point.x + (direction * point.distance * step) / 6,
+                y: point.y,
+                id: 1,
+              },
+            ],
+          });
+          await new Promise((resolve) => setTimeout(resolve, 12));
+        }
+        await send("Input.dispatchTouchEvent", {
+          type: "touchEnd",
+          touchPoints: [],
+        });
+        await new Promise((resolve) => setTimeout(resolve, 80));
+      };
+      const geometry = () =>
+        evaluate(
+          `(() => {const t=document.getElementById(${JSON.stringify(id)}), b=t.querySelector('button'), r=b.getBoundingClientRect(), v=t.getBoundingClientRect(); return {scroll:t.scrollLeft,max:t.scrollWidth-t.clientWidth,left:r.left,right:r.right,trackLeft:v.left,trackRight:v.right,width:r.width,client:t.clientWidth,label:b.textContent,whole:b.scrollWidth<=b.clientWidth};})()`,
+        );
+      let start = await geometry();
+      assert.equal(start.label, "#" + long);
+      assert.ok(start.whole && start.width > start.client);
+      for (
+        let i = 0;
+        i < 12 && (await geometry()).scroll < (await geometry()).max - 1;
+        i++
+      )
+        await gesture(-1);
+      const end = await geometry();
+      assert.ok(
+        end.scroll > start.scroll &&
+          end.right <= end.trackRight + 1 &&
+          end.right > end.trackLeft,
+        "Touch reaches oversized label's end: " + JSON.stringify(end),
+      );
+      for (let i = 0; i < 12 && (await geometry()).scroll > 1; i++)
+        await gesture(1);
+      start = await geometry();
+      assert.ok(
+        start.left >= start.trackLeft - 1 && start.left < start.trackRight,
+        "Touch returns to oversized label's start: " + JSON.stringify(start),
+      );
+    }
+    await send("Emulation.setTouchEmulationEnabled", { enabled: false });
+  }
+});
+
+test("native tag edit ranges, multiline clipboard paste and lossless NUL identities regressions", async (t) => {
+  const chrome = availableChrome(t);
+  if (!chrome) return;
+  const links = {
+    nul: {
+      url: "https://example.com/nul",
+      tags: ["a\u0000b", "shell", "setup"],
+    },
+    replacement: { url: "https://example.com/replacement", tags: ["a\ufffdb"] },
+  };
+  for (const source of ["links.json", "links.yaml", "links.yml"]) {
+    const f = await fixture(
+      t,
+      source === "links.json" ? links : stringify(links),
+      source,
+    );
+    assert.equal(f.build().status, 0);
+    assert.deepEqual(JSON.parse(await f.read("links.json")), links);
+  }
+  const f = await fixture(t, links);
+  assert.equal(f.build().status, 0);
+  const origin = await browserServer(t, f.cwd);
+  const { send, evaluate, key, navigate } = await browserControls(
+    t,
+    chrome,
+    f.cwd,
+  );
+  await navigate(origin + "/");
+  await evaluate(`
+    window.input = document.querySelector('#link-search');
+    window.identity = b => JSON.parse(String.fromCharCode(34) + b.dataset.tag + String.fromCharCode(34));
+    window.selected = () => [...document.querySelectorAll('#selected-tags button')].map(identity);
+    window.setText = (value, start = value.length, end = start) => { input.value = value; input.setSelectionRange(start,end); input.dispatchEvent(new Event('input')); input.focus(); };
+    window.clear = () => { for(const b of document.querySelectorAll('#selected-tags button')) b.click(); setText(''); };
+  `);
+  const set = (text, start = text.length, end = start) =>
+    evaluate(`setText(${JSON.stringify(text)},${start},${end})`);
+  const invalid = () =>
+    evaluate("!document.querySelector('#tag-error').hidden");
+  await set("#missing");
+  await key("Enter", "Enter", 13);
+  assert.equal(await invalid(), true);
+  await evaluate("input.setSelectionRange(0,0)");
+  await send("Input.insertText", { text: "#shell " });
+  assert.deepEqual(
+    await evaluate("[input.value,selected(),input.selectionStart]"),
+    ["#missing", ["shell"], 0],
+  );
+  assert.equal(
+    await invalid(),
+    true,
+    "prepend known syntax retains the same attempted occurrence",
+  );
+  await evaluate("clear()");
+  await set("#missing #missing", 0, 9);
+  await key("Backspace", "Backspace", 8);
+  assert.equal(await evaluate("input.value"), "#missing");
+  assert.equal(
+    await invalid(),
+    false,
+    "deleting attempted occurrence must not transfer its error",
+  );
+  await key("Enter", "Enter", 13); // caret is before the remaining candidate: inside its range
+  assert.equal(await invalid(), true);
+  await evaluate("input.setSelectionRange(1,8)");
+  await send("Input.insertText", { text: "shell" });
+  assert.equal(await evaluate("input.value"), "#shell");
+  assert.equal(
+    await invalid(),
+    true,
+    "pending corrected candidate remains attempted",
+  );
+  await key("Enter", "Enter", 13);
+  assert.equal(await invalid(), false);
+  assert.deepEqual(await evaluate("selected()"), ["shell"]);
+  await evaluate("clear()");
+  await set("#missing");
+  await key("Enter", "Enter", 13);
+  await evaluate("input.setSelectionRange(0,input.value.length)");
+  await key("Backspace", "Backspace", 8);
+  assert.deepEqual(
+    await evaluate(
+      "[input.value, document.querySelector('#tag-error').hidden]",
+    ),
+    ["", true],
+  );
+
+  // Ordinary native edits should never invoke the JS value setter or selection API.
+  await evaluate(`
+    window.writes = 0; window.ranges = 0;
+    const value = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');
+    Object.defineProperty(input,'value',{configurable:true,get(){return value.get.call(this)},set(v){writes++;value.set.call(this,v)}});
+    const range = input.setSelectionRange;
+    input.setSelectionRange = function(...args){ranges++;return range.apply(this,args)};
+  `);
+  await send("Input.insertText", { text: "ordinary" });
+  await key("Backspace", "Backspace", 8);
+  assert.deepEqual(await evaluate("[writes,ranges,input.value]"), [
+    0,
+    0,
+    "ordinar",
+  ]);
+  for (const type of ["keyDown", "keyUp"])
+    await send("Input.dispatchKeyEvent", {
+      type,
+      modifiers: 2,
+      key: "z",
+      code: "KeyZ",
+      windowsVirtualKeyCode: 90,
+    });
+  assert.equal(
+    await evaluate("input.value"),
+    "ordinary",
+    "ordinary native deletion remains undoable",
+  );
+  assert.deepEqual(await evaluate("[writes,ranges]"), [0, 0]);
+  await evaluate("delete input.value; delete input.setSelectionRange; clear()");
+
+  // Native paste must expose the unsanitized multiline clipboard event.
+  await send("Browser.grantPermissions", {
+    origin,
+    permissions: ["clipboardReadWrite", "clipboardSanitizedWrite"],
+  });
+  await evaluate(
+    "input.addEventListener('paste',e => {window.pasteProof = [e.isTrusted,e.clipboardData.getData('text/plain')];})",
+  );
+  await set("left REPLACE right", 5, 12);
+  const clipboard = "#shell\n#setup\nextra\nwords";
+  await evaluate(`navigator.clipboard.writeText(${JSON.stringify(clipboard)})`);
+  for (const type of ["keyDown", "keyUp"])
+    await send("Input.dispatchKeyEvent", {
+      type,
+      modifiers: 2,
+      key: "v",
+      code: "KeyV",
+      windowsVirtualKeyCode: 86,
+    });
+  assert.deepEqual(await evaluate("pasteProof"), [true, clipboard]);
+  assert.deepEqual(
+    await evaluate(
+      "[input.value,input.selectionStart,input.selectionEnd,selected()]",
+    ),
+    ["left extra words right", 16, 16, ["shell", "setup"]],
+  );
+  await evaluate(
+    "clear(); input.dispatchEvent(new CompositionEvent('compositionstart'))",
+  );
+  await evaluate(
+    `{ const data = new DataTransfer(); data.setData('text/plain', ${JSON.stringify("#shell\n#setup\n")}); input.dispatchEvent(new ClipboardEvent('paste',{clipboardData:data,cancelable:true})); }`,
+  );
+  assert.deepEqual(await evaluate("[input.value,selected()]"), [
+    "#shell #setup ",
+    [],
+  ]);
+  await evaluate("input.dispatchEvent(new CompositionEvent('compositionend'))");
+  assert.deepEqual(await evaluate("[input.value,selected()]"), [
+    "",
+    ["shell", "setup"],
+  ]);
+  await evaluate("clear(); document.querySelector('#tag-toggle').click()");
+  for (const [tag, code] of [
+    ["a\u0000b", "nul"],
+    ["a\ufffdb", "replacement"],
+  ]) {
+    await evaluate(
+      `{ const button = [...document.querySelectorAll('#available-tags button')].find(b => identity(b) === ${JSON.stringify(tag)}); button.click(); }`,
+    );
+    assert.deepEqual(await evaluate("selected()"), [tag]);
+    assert.deepEqual(
+      await evaluate(
+        "[...document.querySelectorAll('.link-row')].filter(r => !r.closest('li').hidden).map(r => r.querySelector('.code').textContent)",
+      ),
+      [code],
+    );
+    assert.equal(
+      await evaluate(
+        `identity(document.querySelector('li:not([hidden]) .tag-label'))`,
+      ),
+      tag,
+    );
+    await evaluate("clear()");
+  }
+});
 
 const behaviorScript = (html, name) => {
   const matches = [

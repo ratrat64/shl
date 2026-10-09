@@ -184,12 +184,12 @@ export async function loadLinks() {
       }
       if (typeof value === "object" && value && "script" in value) {
         problems.push(
-          `"${name}" — The script property is no longer supported; remove it. Only for script: true, append script to tags unless a trimmed case-insensitive equivalent already exists; preserve all other tags, fields and order. False must not remove an independently configured script tag.`,
+          `"${name}" — The script property is no longer supported; remove it. Only for script: true, append script to tags unless a trimmed case-insensitive equivalent already exists; preserve all other tags, fields and order. False must not remove an independently configured script tag. Explicitly rename existing padded, whitespace-containing or comma-containing tags to maintainer-chosen valid names; preserve all other valid raw values. No automatic renaming is performed.`,
         );
       }
       if (typeof value === "object" && value && "hidden" in value) {
         problems.push(
-          `"${name}" — The hidden property is no longer supported; remove it. Only for hidden: true, append hidden to tags unless already present (case-insensitive); preserve all existing tags.`,
+          `"${name}" — The hidden property is no longer supported; remove it. Only for hidden: true, append hidden to tags unless already present (case-insensitive); preserve all existing tags. Explicitly rename existing padded, whitespace-containing or comma-containing tags to maintainer-chosen valid names; preserve all other valid raw values. No automatic renaming is performed.`,
         );
       }
       if (

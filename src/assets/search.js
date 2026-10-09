@@ -12,15 +12,17 @@ globalThis.initSearch = () => {
   const error = document.querySelector("#tag-error");
   const notice = document.querySelector("#tag-notice");
   if (!list || !status || !countLabel || !available || !selected) return;
+  const identity = (button) => JSON.parse(`"${button.dataset.tag}"`);
   const catalog = new Map(
     [...available.querySelectorAll("button")].map((button) => [
-      button.dataset.tag,
+      identity(button),
       button,
     ]),
   );
   const selections = new Map();
   let unknown = [];
   let previousInput = "";
+  let edit;
   const opened = new Map();
   const listeners = [];
   let composing = false;
@@ -119,16 +121,16 @@ globalThis.initSearch = () => {
   listen(available, "click", (event) => {
     const button = event.target.closest("button[data-tag]");
     if (!button) return;
-    select(button.dataset.tag);
+    select(identity(button));
     update();
-    focusChip(selections.get(button.dataset.tag));
+    focusChip(selections.get(identity(button)));
   });
   listen(selected, "click", (event) => {
     const button = event.target.closest("button[data-tag]");
     if (!button) return;
     const next = button.nextElementSibling || button.previousElementSibling;
-    selections.delete(button.dataset.tag);
-    catalog.get(button.dataset.tag).hidden = false;
+    selections.delete(identity(button));
+    catalog.get(identity(button)).hidden = false;
     button.remove();
     chips();
     update();
@@ -146,16 +148,23 @@ globalThis.initSearch = () => {
     toggle.textContent = available.hidden ? "Show tags" : "Hide tags";
   });
 
-  function tokens(enter = false) {
-    if (composing) return;
+  function tokens(enter = false, defer = composing) {
     const value = input.value;
     const start = input.selectionStart ?? value.length;
     const end = input.selectionEnd ?? start;
     const removals = [];
     notice.textContent = "";
-    const candidates = [...value.matchAll(/(?<![^\s,])#([^\s,]+)([\s,]|$)/g)];
-    // Carry attempted-token errors through edits, until that token is removed
-    // or its corrected known syntax is committed (not merely left pending).
+    const urls = [...value.matchAll(/https?:\/\/[^\s]+/gi)];
+    const candidates = [
+      ...value.matchAll(/(?<![^\s,])#([^\s,]+)([\s,]|$)/g),
+    ].filter(
+      (match) =>
+        !urls.some(
+          (url) =>
+            match.index >= url.index && match.index < url.index + url[0].length,
+        ),
+    );
+    // Synthetic inputs/history without edit ranges retain string-diff fallback.
     let prefix = 0,
       suffix = 0;
     while (
@@ -170,21 +179,38 @@ globalThis.initSearch = () => {
       previousInput.at(-1 - suffix) === value.at(-1 - suffix)
     )
       suffix++;
-    const oldEnd = previousInput.length - suffix;
+    let from = prefix,
+      oldEnd = previousInput.length - suffix;
     const delta = value.length - previousInput.length;
+    const nativeEdit = edit?.value === previousInput;
+    if (nativeEdit) {
+      from = edit.start;
+      oldEnd = edit.end;
+      if (from === oldEnd && delta < 0) {
+        if (edit.type.endsWith("Backward")) from += delta;
+        else if (edit.type.endsWith("Forward")) oldEnd -= delta;
+        else {
+          from = prefix;
+          oldEnd = previousInput.length - suffix;
+        }
+      }
+    }
+    edit = null;
+    const inserted = value.length - previousInput.length + oldEnd - from;
     const attempted = new Set();
     for (const [a, b] of unknown) {
-      if (prefix <= a && oldEnd >= b && value.length - suffix === prefix)
-        continue;
-      const start = a >= oldEnd ? a + delta : a < prefix ? a : prefix;
+      if (from <= a && oldEnd >= b && inserted === 0) continue;
+      const start = a >= oldEnd ? a + delta : a < from ? a : from;
       const candidate = candidates.find((match) => match.index === start);
       if (
         candidate &&
-        !(a + 1 < oldEnd && candidate.index + 1 >= value.length - suffix)
+        (nativeEdit ||
+          !(a + 1 < oldEnd && candidate.index + 1 >= value.length - suffix))
       )
         attempted.add(candidate.index);
     }
     for (const match of candidates) {
+      if (defer) continue;
       const identity = match[1].toLowerCase();
       const tokenEnd = match.index + 1 + match[1].length;
       const atCaret = enter && start >= match.index && start <= tokenEnd;
@@ -206,8 +232,10 @@ globalThis.initSearch = () => {
     let remaining = value;
     for (const [a, b] of removals.reverse())
       remaining = remaining.slice(0, a) + remaining.slice(b);
-    input.value = remaining;
-    input.setSelectionRange(position(start), position(end));
+    if (removals.length) {
+      input.value = remaining;
+      input.setSelectionRange(position(start), position(end));
+    }
     unknown = candidates
       .filter((match) => attempted.has(match.index))
       .map((match) => [
@@ -220,9 +248,38 @@ globalThis.initSearch = () => {
     input.setAttribute("aria-invalid", String(!!unknown.length));
     update();
   }
-  listen(input, "input", (event) => {
-    if (!event.isComposing) tokens();
+  listen(input, "beforeinput", (event) => {
+    edit = /^(insert|delete)/.test(event.inputType)
+      ? {
+          value: input.value,
+          start: input.selectionStart,
+          end: input.selectionEnd,
+          type: event.inputType,
+        }
+      : null;
   });
+  listen(input, "paste", (event) => {
+    const text = event.clipboardData?.getData("text/plain");
+    if (!text || !/[\r\n]/.test(text)) return;
+    event.preventDefault();
+    edit = {
+      value: input.value,
+      start: input.selectionStart,
+      end: input.selectionEnd,
+      type: "insertFromPaste",
+    };
+    // Keep whitespace boundaries before type=search strips line breaks.
+    input.setRangeText(
+      text.replace(/[\r\n]/g, " "),
+      edit.start,
+      edit.end,
+      "end",
+    );
+    tokens();
+  });
+  listen(input, "input", (event) =>
+    tokens(false, composing || event.isComposing),
+  );
   listen(input, "keydown", (event) => {
     if (event.key === "Enter" && !event.isComposing && !composing) {
       event.preventDefault();

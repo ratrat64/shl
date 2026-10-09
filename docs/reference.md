@@ -98,7 +98,9 @@ For each legacy `hidden` or `script` property:
 
 1. If its value is `true`, append the equivalent tag unless a trimmed,
    case-insensitive equivalent already exists.
-2. Preserve all other tags, fields, and their order.
+2. Explicitly rename existing tags containing whitespace (including padding) or
+   commas to maintainer-chosen valid names. Preserve all other valid raw tags,
+   fields, and their order. The build never trims or automatically renames tags.
 3. Remove the property for both `true` and `false`. A `false` value must not remove
    an independently configured tag.
 
