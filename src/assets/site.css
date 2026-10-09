@@ -148,6 +148,7 @@ button {
 .theme-toggle {
   color: var(--ink);
   padding: 0.35rem 0.7rem;
+  min-width: 9ch;
 }
 .theme-toggle,
 .visit,
