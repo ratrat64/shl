@@ -91,10 +91,11 @@ context:
 
 - Bun `1.4.2`; `bun ci` installed the locked two packages.
 - `bun run format` and `bun run format:check` passed.
-- `SHL_REQUIRE_BROWSER=1 bun test --timeout 30000 ./test/build.test.mjs`: **35 passed, 0 failed**, no browser skips (26.88 seconds, final run).
+- `SHL_REQUIRE_BROWSER=1 bun test --timeout 30000 ./test/build.test.mjs`: **35 passed, 0 failed**, no browser skips (27.02 seconds, including oversized-label regression).
 - New executed filter matrix: root/nested × light/dark × 320px/1440px × root/project hosting; catalog/AND/text/hidden, token/error/caret/IME, full-label tracks/focus, all-selected/untagged/all-hidden, same-page retention, Back/Forward reset, one mount and outgoing listener isolation.
 - Chrome DevTools native input checks: root/nested × light/dark × 320px/1440px; Enter/Space select/remove, typed space/comma/Enter commits, native popover open/Escape dismissal, touch activation and coarse-pointer destination visibility.
 - Existing rendered matrices passed for shell native/app loads, 16 script/non-script state combinations, all six tag inks on dimmed/wash backgrounds and disabled popovers, neutral disabled actions, copies, download cancellation, minimal foundations and root/project-prefix 404 recovery.
 - `bun build.mjs`: **68 short links** generated successfully.
 - Impeccable detector over directory/search/styles/navigation/Guide UI targets: `[]` (no findings).
 - Implementation committed and pushed on `feat/colored-tag-filters`; [PR #77](https://github.com/ratrat64/shl/pull/77) targets `main`. GitHub reported `MERGEABLE` against `34a55f3b0d88d98b339238b5b6c46ff8a5669254`; PR validation was running at the initial mergeability check. No unresolved merge conflicts or known incomplete implementation tasks.
+- Initial CI exposed a font-dependent test assumption that every full chip fits a 320px track. The rendered gate now requires fitting chips to be fully revealed, oversized chips to intersect the focused track, and both ends of oversized labels to remain reachable by scrolling; labels remain uncapped as required.

@@ -161,7 +161,7 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
         "script",
         "café",
         "#literal",
-        "a-very-long-label-that-must-scroll-fully",
+        "a-very-long-label-that-must-scroll-fully".repeat(3),
       ],
       "setup notes",
     ),
@@ -261,7 +261,16 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
       for (const chip of picker.querySelectorAll('button')) {
         check(win.getComputedStyle(chip).whiteSpace === 'nowrap' && chip.scrollWidth <= chip.clientWidth, 'Wrapped/truncated chip');
         chip.focus(); check(win.getComputedStyle(chip).outlineWidth === '2px', 'Chip focus');
-        const a = chip.getBoundingClientRect(), track = picker.getBoundingClientRect(); check(a.right <= track.right + 1 && a.left >= track.left - 1, 'Focused chip not scrolled');
+        const a = chip.getBoundingClientRect(), track = picker.getBoundingClientRect();
+        if (a.width <= picker.clientWidth) check(a.right <= track.right + 1 && a.left >= track.left - 1, 'Focused chip not scrolled: ' + chip.textContent + '/' + JSON.stringify([a.left, a.right, track.left, track.right]));
+        else {
+          check(a.right > track.left && a.left < track.right, 'Oversized focused chip not revealed');
+          const offset = picker.scrollLeft + a.left - track.left;
+          picker.scrollLeft = offset;
+          check(chip.getBoundingClientRect().left >= track.left - 1, 'Long label start unreachable');
+          picker.scrollLeft = offset + a.width - picker.clientWidth;
+          check(chip.getBoundingClientRect().right <= track.right + 1, 'Long label end unreachable');
+        }
         for (const span of doc.querySelectorAll('.tag-label')) if (span.dataset.tag === chip.dataset.tag) check(span.dataset.slot === chip.dataset.slot && win.getComputedStyle(span).color === win.getComputedStyle(chip).color, 'Surface slot/color mismatch');
       }
       for (const button of [...picker.querySelectorAll('button')]) button.click();
