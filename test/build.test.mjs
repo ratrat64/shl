@@ -424,7 +424,11 @@ test("session filters preserve exact restoration, absent chips, native history, 
   });
   assert.equal(f.build().status, 0);
   const origin = await browserServer(t, f.cwd);
-  const { send, evaluate, navigate } = await browserControls(t, chrome, f.cwd);
+  const { send, evaluate, navigate, traverse } = await browserControls(
+    t,
+    chrome,
+    f.cwd,
+  );
   for (const prefix of ["/", "/project/"])
     for (const width of [390, 1440])
       for (const theme of ["light", "dark"]) {
@@ -455,6 +459,13 @@ test("session filters preserve exact restoration, absent chips, native history, 
       check(JSON.stringify([...document.querySelectorAll('#selected-tags button')].map(b=>[b.textContent,b.getAttribute('style'),getComputedStyle(b).color]))===JSON.stringify(colors),'Absent labels/colors');
       check(document.querySelector('.count-number').textContent==='0','Absent AND');
       check([...document.querySelectorAll('#available-tags button')].filter(b=>!b.hidden).map(b=>b.dataset.tag).join(',')==='script,setup','Local order');
+      check(document.querySelector('#all-tags-selected').hidden,'Foreign selections exhausted local picker');
+      for(const b of document.querySelectorAll('#available-tags button'))b.click();
+      check(!document.querySelector('#all-tags-selected').hidden&&tags().join(',')==='shell,café,script,setup','Local exhaustion with foreign selections');
+      for(const b of [...document.querySelectorAll('#selected-tags button')].slice(2))b.click();
+      type('#SHELL, #café ');
+      check(document.querySelector('#link-search').value===' '&&tags().join(',')==='shell,café'&&document.querySelector('#tag-error').hidden&&document.querySelector('#tag-notice').textContent==='Tag already selected.','Absent duplicate consumption/idempotence');
+      check([...document.querySelectorAll('#available-tags button')].map(b=>b.dataset.tag).join(',')==='script,setup','Absent duplicate changed local catalog');
       type(''); check(tags().length===2&&JSON.parse(sessionStorage.getItem(key)).text==='','Clear save');
       for(const b of [...document.querySelectorAll('#selected-tags button')])b.click();
       check(document.querySelector('.count-number').textContent==='2'&&JSON.parse(sessionStorage.getItem(key)).tags.length===0,'Absent removal/save');
@@ -472,11 +483,12 @@ test("session filters preserve exact restoration, absent chips, native history, 
       globalThis.fetch=(url,options)=>new Promise(resolve=>{release=()=>nativeFetch(url).then(resolve)});
       const liveInput=document.querySelector('#link-search'), liveMain=document.querySelector('main');
       document.querySelector('[data-nav=guide]').click(); await wait(()=>release);
+      check(liveInput.readOnly,'Paused input remains natively editable');
       liveInput.value='obsolete';liveInput.dispatchEvent(new Event('input'));
       check(sessionStorage.getItem(key)===saved,'Pending outgoing save');
-      liveInput.value='#missing, ';
       const fragment=document.createElement('a');fragment.href='#link-count';fragment.dataset.appLink='';liveMain.append(fragment);fragment.click();
       check(document.querySelector('#link-search')===liveInput,'Superseding fragment remounted');
+      check(!liveInput.readOnly&&liveInput.value==='#missing, '&&sessionStorage.getItem(key)===saved&&document.querySelector('.count-number').textContent==='0','Suppressed input not restored consistently');
       type('resumed');const resumed=sessionStorage.getItem(key);
       check(JSON.parse(resumed).text==='resumed','Superseding fragment did not resume');
       globalThis.fetch=nativeFetch;release();await new Promise(r=>setTimeout(r,30));
@@ -490,7 +502,16 @@ test("session filters preserve exact restoration, absent chips, native history, 
       Storage.prototype.setItem=()=>{throw Error('quota')};
       type('quota fallback'); await go('beta/');
       check(document.querySelector('#link-search').value==='quota fallback','Readable stale storage overrode memory');
+      initSearch(true);
+      check(document.querySelector('#link-search').value==='quota fallback','Persisted refresh lost unsaved memory');
+      sessionStorage.removeItem(key);initSearch(true);
+      check(document.querySelector('#link-search').value===''&&tags().length===0,'Removed record retained unsaved memory');
       Storage.prototype.setItem=set;
+      type('saved again');sessionStorage.removeItem(key);initSearch(true);
+      check(document.querySelector('#link-search').value===''&&tags().length===0&&document.querySelector('#available-tags').hidden,'Removed record resurrected memory');
+      type('read failure');Object.defineProperty(window,'sessionStorage',{configurable:true,get(){throw Error('denied')}});initSearch(true);
+      check(document.querySelector('#link-search').value==='read failure','Unavailable refresh lost memory');
+      Object.defineProperty(window,'sessionStorage',storageDescriptor);
     })()`);
         const key = "shl:filters:v1:" + prefix;
         for (const bad of [
@@ -548,22 +569,32 @@ test("session filters preserve exact restoration, absent chips, native history, 
           await evaluate(`document.querySelector('#link-search').value`),
           record.text,
         );
-        await navigate(origin + prefix + "Off/");
+        await evaluate(
+          `window.cachedDocument=document;window.cachedRoot=document.documentElement;window.cachedHeader=document.querySelector('header');window.cachedChip=document.querySelector('#selected-tags button');window.persistedShows=[];window.restorationMounts=0;const originalSearch=initSearch;window.initSearch=(...args)=>{restorationMounts++;return originalSearch(...args)};window.addEventListener('pageshow',event=>persistedShows.push(event.persisted));document.querySelector('main').style.minHeight='3000px';cachedChip.focus({preventScroll:true});scrollTo({top:300,behavior:'instant'});window.cachedScroll=scrollY`,
+        );
+        await navigate(origin + prefix + "Off/", true);
         assert.equal(
           await evaluate(`!!document.querySelector('#link-search')`),
           false,
         );
         await evaluate(
-          `sessionStorage.setItem(${JSON.stringify(key)},JSON.stringify({version:1,text:'latest',tags:['hidden'],picker:true}));history.back()`,
+          `sessionStorage.setItem(${JSON.stringify(key)},JSON.stringify({version:1,text:'',tags:['café','hidden'],picker:true}))`,
         );
+        await traverse(-1);
         await evaluate(
-          `(async()=>{for(let n=0;!document.querySelector('#link-search')&&n<200;n++)await new Promise(r=>setTimeout(r,10));if(document.querySelector('#link-search')?.value!=='latest')throw Error('Native Back used stale filters')})()`,
+          `if(document!==window.cachedDocument||document.documentElement!==cachedRoot||document.querySelector('header')!==cachedHeader||persistedShows.join(',')!=='true')throw Error('Native Back did not restore actual BFCache document');if(restorationMounts!==1||document.querySelector('#link-search').value!==''||document.querySelector('.count-number').textContent!=='1')throw Error('BFCache latest filters/single mount');if(document.activeElement===cachedChip||document.activeElement.dataset.tag!=='café'||scrollY!==cachedScroll)throw Error('BFCache chip focus/scroll lost');document.querySelector('#tag-toggle').click();if(document.querySelector('#tag-toggle').getAttribute('aria-expanded')!=='false')throw Error('BFCache duplicate listeners')`,
         );
-        await evaluate(
-          `sessionStorage.setItem(${JSON.stringify(key)},JSON.stringify({version:1,text:'',tags:['hidden'],picker:true}));dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));if(document.querySelector('#link-search').value!==''||document.querySelector('.count-number').textContent!=='1')throw Error('Persisted Back mount');document.querySelector('#tag-toggle').click();if(document.querySelector('#tag-toggle').getAttribute('aria-expanded')!=='false')throw Error('Persisted Back duplicate listeners');history.forward()`,
-        );
+        await evaluate(`window.cachedScroll=scrollY`);
+        await traverse(1);
         await evaluate(
           `(async()=>{for(let n=0;document.querySelector('h1')?.textContent!=='Link disabled'&&n<200;n++)await new Promise(r=>setTimeout(r,10));if(document.querySelector('#link-search'))throw Error('Native Forward minimal boundary')})()`,
+        );
+        await evaluate(
+          `sessionStorage.setItem(${JSON.stringify(key)},JSON.stringify({version:1,text:'',tags:['hidden'],picker:true}))`,
+        );
+        await traverse(-1);
+        await evaluate(
+          `if(document!==cachedDocument||restorationMounts!==2||persistedShows.join(',')!=='true,true'||document.activeElement.id!=='link-search'||scrollY!==cachedScroll)throw Error('BFCache removed-chip focus fallback/scroll '+JSON.stringify([document===cachedDocument,restorationMounts,persistedShows,document.activeElement.outerHTML,scrollY,cachedScroll]))`,
         );
       }
   await evaluate(
@@ -783,15 +814,27 @@ async function browserControls(t, chrome, cwd) {
       });
   };
   await send("Page.enable");
-  const navigate = async (url) => {
+  const navigate = async (url, native = false) => {
     const loaded = new Promise((resolve) =>
       events.set("Page.loadEventFired", resolve),
     );
-    await send("Page.navigate", { url });
+    if (native)
+      await send("Runtime.evaluate", {
+        expression: `location.assign(${JSON.stringify(url)})`,
+      });
+    else await send("Page.navigate", { url });
     await loaded;
     await send("Page.bringToFront");
   };
-  return { send, evaluate, key, navigate };
+  const traverse = async (delta) => {
+    const changed = new Promise((resolve) =>
+      events.set("Page.frameNavigated", resolve),
+    );
+    await send("Runtime.evaluate", { expression: `history.go(${delta})` });
+    await changed;
+    await send("Page.bringToFront");
+  };
+  return { send, evaluate, key, navigate, traverse };
 }
 
 test("native Enter/Space chip and popover activation, typed delimiters, touch and scrolling execute in Chrome", async (t) => {

@@ -1,5 +1,6 @@
 (() => {
   const records = new Map();
+  const unsaved = new Set();
   globalThis.initSearch = (refreshStorage = false) => {
     globalThis.cleanupSearch?.();
     const input = document.querySelector("#link-search");
@@ -43,8 +44,14 @@
     let restored = records.get(key);
     try {
       if (!restored || refreshStorage) {
-        const stored = JSON.parse(sessionStorage.getItem(key));
-        if (valid(stored)) restored = stored;
+        const stored = sessionStorage.getItem(key);
+        if (stored === null) {
+          restored = undefined;
+          unsaved.delete(key);
+        } else if (!unsaved.has(key)) {
+          const record = JSON.parse(stored);
+          restored = valid(record) ? record : undefined;
+        }
       }
     } catch {}
     if (!valid(restored))
@@ -53,8 +60,11 @@
     let active = true;
     globalThis.pauseSearch = () => {
       active = false;
+      input.readOnly = true;
     };
     globalThis.resumeSearch = () => {
+      if (input.value !== previousInput) input.value = previousInput;
+      input.readOnly = false;
       active = true;
     };
     const save = () => {
@@ -68,11 +78,15 @@
       records.set(key, record);
       try {
         sessionStorage.setItem(key, JSON.stringify(record));
-      } catch {}
+        unsaved.delete(key);
+      } catch {
+        unsaved.add(key);
+      }
     };
     selected.replaceChildren();
     for (const button of catalog.values()) button.hidden = false;
     input.value = restored.text;
+    input.readOnly = false;
     let unknown = [];
     let previousInput = input.value;
     let edit;
@@ -290,7 +304,7 @@
         const tokenEnd = match.index + 1 + match[1].length;
         const atCaret = enter && start >= match.index && start <= tokenEnd;
         if (!match[2] && !atCaret) continue;
-        if (!catalog.has(identity)) {
+        if (!catalog.has(identity) && !selections.has(identity)) {
           attempted.add(match.index);
           continue;
         }

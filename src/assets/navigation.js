@@ -185,6 +185,13 @@
   });
   window.addEventListener("pageshow", (event) => {
     if (!event.persisted) return;
+    const focusedTag = document.activeElement.closest("#selected-tags button")
+      ?.dataset.tag;
+    const position = {
+      left: window.scrollX,
+      top: window.scrollY,
+      behavior: "instant",
+    };
     ++request;
     pending?.abort();
     cleanup();
@@ -192,6 +199,15 @@
       details.open = false;
     displayed = location.href;
     mount(true);
+    if (focusedTag !== undefined) {
+      const chip = [...document.querySelectorAll("#selected-tags button")].find(
+        (button) => button.dataset.tag === focusedTag,
+      );
+      (chip || document.querySelector("#link-search"))?.focus({
+        preventScroll: true,
+      });
+      window.scrollTo(position);
+    }
   });
   rebase(document.querySelector("main"), location.href);
   mount();
