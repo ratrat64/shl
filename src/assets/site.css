@@ -278,6 +278,9 @@ p {
 #tag-error {
   grid-column: 1 / -1;
 }
+#available-tags > :nth-child(1 of :not([hidden])) {
+  margin-inline-start: auto;
+}
 .tag-chip {
   flex: 0 0 auto;
   padding: 0.35rem 0.6rem;
