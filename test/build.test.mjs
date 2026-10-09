@@ -1475,6 +1475,9 @@ for (const prefix of ["/", "/project/"])
       assign(url) {
         this.assigned = url;
       },
+      replace(url) {
+        this.replaced = url;
+      },
     };
     const makeLink = (href, base, app = true) => ({
       app,
@@ -1566,6 +1569,13 @@ for (const prefix of ["/", "/project/"])
         },
       });
       const elements = {};
+      if (html.includes('data-app-page="not-found"')) {
+        elements["#head"] = heading;
+        elements["#msg"] = {};
+        elements["#home[data-app-link]"] = content.includes('id="home"')
+          ? links.find((link) => link.app)
+          : null;
+      }
       if (content.includes('id="link-search"')) {
         elements["#link-search"] = control({
           value: "",
@@ -1673,6 +1683,10 @@ for (const prefix of ["/", "/project/"])
       },
     };
     const history = {
+      replaceState(_state, _unused, url) {
+        location.href = url;
+        this.replaced = (this.replaced || 0) + 1;
+      },
       pushState(_state, _unused, url) {
         location.href = url;
         this.pushed = (this.pushed || 0) + 1;
@@ -1730,11 +1744,13 @@ for (const prefix of ["/", "/project/"])
       DOMParser,
       URL,
       AbortSignal: {
+        any: AbortSignal.any,
         timeout(ms) {
           assert.equal(ms, 10000);
           return AbortSignal.timeout(shortTimeout ? 10 : ms);
         },
       },
+      AbortController,
       localStorage: { getItem: () => "dark" },
       navigator: {
         clipboard: { writeText: async (text) => copied.push(text) },
@@ -1759,12 +1775,17 @@ for (const prefix of ["/", "/project/"])
           const input = document.querySelector("#link-search");
           if (input) input.addEventListener("input", () => {});
         };
+      if (asset === "assets/recovery.js")
+        context.initRecovery = (navigate) => {
+          context.recoveryNavigate = navigate;
+        };
     }
     assert.deepEqual(assetOrder, [
       "assets/theme.js",
       "assets/search.js",
       "assets/copy.js",
       "assets/download.js",
+      "assets/recovery.js",
       "assets/navigation.js",
     ]);
     assert.equal(themeButton.textContent, "Theme: dark");
@@ -2020,6 +2041,55 @@ for (const prefix of ["/", "/project/"])
     fetchOverrides.delete(base + "tools/");
 
     const valid = pages.get(base + "hidden/");
+    const notFound = await f.read("404.html");
+    const unknown = base + "unknown/";
+    fetchOverrides.set(unknown, () => ({
+      ok: false,
+      status: 404,
+      text: async () => notFound,
+    }));
+    location.assigned = undefined;
+    await click(makeLink(unknown));
+    assert.equal(document.currentMain.dataset.appPage, "not-found");
+    assert.equal(document.title, "Link not found · shl");
+    assert.equal(document.currentMain.heading.focused, true);
+    assert.equal(linksNav["aria-current"], undefined);
+    assert.equal(guide["aria-current"], undefined);
+    assert.equal(location.assigned, undefined);
+    await click(guide);
+    const guideBeforeError = document.currentMain;
+    for (const html of [
+      "<html><title>Server error</title><main><h1>Missing</h1></main></html>",
+      valid,
+      notFound.replace('id="home"', 'id="unrelated"'),
+    ]) {
+      fetchOverrides.set(unknown, () => ({
+        ok: false,
+        status: 404,
+        text: async () => html,
+      }));
+      await click(makeLink(unknown));
+      assert.equal(location.assigned, unknown);
+      assert.equal(document.currentMain, guideBeforeError);
+    }
+    fetchOverrides.delete(unknown);
+    const pushedBeforeRecovery = history.pushed;
+    await context.recoveryNavigate(base + "tools/", false, true);
+    assert.equal(location.href, base + "tools/");
+    assert.equal(history.replaced, 1);
+    assert.equal(
+      history.pushed,
+      pushedBeforeRecovery,
+      "recovery replaces rather than pushes",
+    );
+    const beforeRecoveryFailure = document.currentMain;
+    await context.recoveryNavigate(base + "tools/git/", false, true);
+    assert.equal(
+      location.replaced,
+      base + "tools/git/",
+      "recovery load failure retains native replacement fallback",
+    );
+    assert.equal(document.currentMain, beforeRecoveryFailure);
     for (const [name, html] of [
       ["missing-title", valid.replace(/<title>[\s\S]*?<\/title>/, "")],
       ["missing-heading", valid.replace(/<h1\b[^>]*>[\s\S]*?<\/h1>/, "")],
@@ -3743,6 +3813,250 @@ test("invalid input fails before replacing an existing build", async (t) => {
   assert.match(f.build().stderr, /Build stopped\. Fix links.json/);
 });
 
+async function runRecovery(script, context) {
+  const document = context.document;
+  document.querySelector = () => ({
+    querySelector: (selector) => document.getElementById(selector.slice(1)),
+  });
+  context.location.href = "https://short.example" + context.location.pathname;
+  document.getElementById("home").href = new URL(
+    "./",
+    context.location.href,
+  ).pathname;
+  return runInNewContext(
+    script +
+      "\nglobalThis.initRecovery((url, push, replace) => { if (push || !replace) throw Error('Recovery must replace'); location.replace(new URL(url).pathname); });",
+    { URL, AbortController, ...context },
+  );
+}
+
+test("404 recovery aborts pending maps and suppresses stale bodies, rebasing and forwarding", async (t) => {
+  const f = await fixture(t, {});
+  assert.equal(f.build().status, 0);
+  const script = behaviorScript(await f.read("404.html"), "recovery");
+  for (const stage of ["fetch", "body"]) {
+    for (const entry of [
+      { Mixed: "https://example.com/" },
+      { Mixed: {} },
+      {},
+    ]) {
+      const elements = { home: {}, head: {}, msg: {} };
+      const shell = { dataset: { sitePath: "guide/" } };
+      let release, signal;
+      const held = new Promise((resolve) => {
+        release = resolve;
+      });
+      const context = createContext({
+        URL,
+        AbortController,
+        location: {
+          pathname: "/project/mixed/",
+          href: "https://short.example/project/mixed/",
+          replace() {
+            assert.fail("stale forwarding");
+          },
+        },
+        document: {
+          querySelector: () => ({
+            querySelector: (selector) => elements[selector.slice(1)],
+          }),
+          querySelectorAll: () => [shell],
+        },
+        fetch: async (_url, options) => {
+          signal = options.signal;
+          if (stage === "fetch") await held;
+          return {
+            ok: true,
+            json: async () => {
+              if (stage === "body") await held;
+              return entry;
+            },
+          };
+        },
+      });
+      runInContext(script, context);
+      const work = context.initRecovery(() =>
+        assert.fail("stale directory navigation"),
+      );
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.equal(
+        elements.head.textContent,
+        undefined,
+        "no premature not-found completion",
+      );
+      context.cleanupRecovery();
+      assert.equal(signal.aborted, true);
+      release();
+      await work;
+      assert.equal(shell.href, undefined);
+      assert.equal(elements.home.href, undefined);
+      assert.equal(elements.head.textContent, undefined);
+      assert.equal(elements.msg.textContent, undefined);
+    }
+  }
+});
+
+test("Chrome 404 browsing and history preserve document/shell identity at both prefixes, themes and sizes", async (t) => {
+  const chrome = availableChrome(t);
+  if (!chrome) return;
+  const f = await fixture(t, {
+    tools: {
+      Git: { url: "https://example.com/setup.sh", tags: ["script", "shell"] },
+    },
+  });
+  assert.equal(f.build().status, 0);
+  const origin = await browserServer(t, f.cwd);
+  const { send, evaluate, navigate } = await browserControls(t, chrome, f.cwd);
+  await send("Page.addScriptToEvaluateOnNewDocument", {
+    source: `
+    globalThis.original = { doc: document, root: document.documentElement };
+    const observe = new MutationObserver(() => {
+      original.root ||= document.documentElement;
+      original.header ||= document.querySelector('header');
+      original.footer ||= document.querySelector('footer');
+      original.theme ||= document.querySelector('[data-theme-control]');
+      if (original.header && original.footer && original.theme) observe.disconnect();
+    });
+    observe.observe(document, { childList: true, subtree: true });
+  `,
+  });
+  for (const prefix of ["/", "/project/"]) {
+    for (const width of [390, 1440]) {
+      await send("Emulation.setDeviceMetricsOverride", {
+        width,
+        height: 900,
+        deviceScaleFactor: 1,
+        mobile: width === 390,
+      });
+      for (const theme of ["light", "dark"]) {
+        await navigate(origin + prefix);
+        await evaluate(
+          `localStorage.setItem('shortlink-theme', ${JSON.stringify(theme)})`,
+        );
+        // Canonical directory recovery must replace the URL through the same controller.
+        await navigate(origin + prefix + "TOOLS/");
+        await evaluate(`(async () => {
+          for (let n = 0; location.pathname !== ${JSON.stringify(prefix + "tools/")} && n < 200; n++) await new Promise(r => setTimeout(r, 10));
+          if (location.pathname !== ${JSON.stringify(prefix + "tools/")} || document !== original.doc || document.documentElement !== original.root || document.querySelector('header') !== original.header || document.querySelector('footer') !== original.footer || document.querySelector('[data-theme-control]') !== original.theme) throw Error('Directory recovery replaced document/shell');
+        })()`);
+        await navigate(origin + prefix + "deep/unknown/");
+        const result = await evaluate(`(async () => {
+          const prefix = ${JSON.stringify(prefix)}, theme = ${JSON.stringify(theme)};
+          const wait = async predicate => {
+            for (let n = 0; !predicate() && n < 200; n++) await new Promise(r => setTimeout(r, 10));
+            if (!predicate()) throw Error('Transition did not complete: ' + location.href);
+          };
+          const check = (value, label) => { if (!value) throw Error(label); };
+          await wait(() => document.querySelector('#head')?.textContent === 'Link not found');
+          const identity = () => {
+            check(document === original.doc && document.documentElement === original.root && document.querySelector('header') === original.header && document.querySelector('footer') === original.footer && document.querySelector('[data-theme-control]') === original.theme, 'Document/shell identity lost');
+            check(document.documentElement.dataset.theme === theme, 'Theme lost');
+          };
+          const appearance = () => ['header', 'footer', '[data-theme-control]'].map(selector => {
+            const node = document.querySelector(selector), style = getComputedStyle(node), rect = node.getBoundingClientRect();
+            return [rect.width, rect.height, style.fontSize, style.color, style.backgroundColor, style.borderWidth, style.padding];
+          });
+          const baseline = JSON.stringify(appearance());
+          const verify = (path, page, title) => {
+            identity();
+            check(location.pathname === prefix + path, 'URL mismatch');
+            check(document.querySelector('main').dataset.appPage === page && document.title === title + ' · shl', 'Content/title mismatch');
+            check(document.querySelector('[data-nav][aria-current]')?.dataset.nav === (page === 'not-found' ? undefined : page), 'Current nav mismatch');
+            check(document.activeElement === document.querySelector('h1'), 'Heading focus missing');
+            check(JSON.stringify(appearance()) === baseline, 'Shell appearance changed');
+          };
+          const transition = async (activate, path, page, title) => {
+            const outgoing = document.querySelector('main');
+            activate();
+            await wait(() => location.pathname === prefix + path && document.querySelector('main') !== outgoing);
+            if (page === 'not-found') await wait(() => document.querySelector('#head')?.textContent === 'Link not found');
+            verify(path, page, title);
+          };
+          identity();
+          check(document.querySelector('#home').pathname === prefix, 'Home did not rebase');
+          await transition(() => document.querySelector('#home').click(), '', 'links', 'Links');
+          await transition(() => document.querySelector('[data-nav=guide]').click(), 'guide/', 'guide', 'Guide');
+          const guideMain = document.querySelector('main');
+          document.querySelector('a[href$="#how-to-use"]').click();
+          await wait(() => location.hash === '#how-to-use');
+          check(document.querySelector('main') === guideMain && document.activeElement.id === 'how-to-use', 'Fragment remounted or failed focus');
+          history.back();
+          await wait(() => !location.hash);
+          check(document.querySelector('main') === guideMain, 'Fragment history remounted');
+          await transition(() => document.querySelector('[data-nav=links]').click(), '', 'links', 'Links');
+          const main = document.querySelector('main'), input = document.querySelector('#link-search');
+          document.querySelector('#tag-toggle').click();
+          document.querySelector('#available-tags button').click();
+          input.value = '#missing ';
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          check(document.querySelector('#selected-tags button') && !document.querySelector('#tag-error').hidden, 'Filters did not initialize');
+          const fragment = document.createElement('a'); fragment.href = '#link-count'; fragment.dataset.appLink = ''; main.append(fragment); fragment.click();
+          await wait(() => location.hash === '#link-count');
+          check(document.querySelector('main') === main && input.value === '#missing ' && document.querySelector('#selected-tags button'), 'Directory fragment reset state');
+          history.back(); await wait(() => !location.hash);
+          await transition(() => document.querySelector('summary a[data-app-link]').click(), 'tools/', 'links', 'tools');
+          check(document.querySelector('#link-search').value === '' && document.querySelector('#selected-tags').hidden && document.querySelector('#available-tags').hidden && document.querySelector('#tag-error').hidden, 'Cross-page controls did not reset');
+          // One mount owns each control: a duplicate listener would toggle twice.
+          document.querySelector('#tag-toggle').click();
+          check(document.querySelector('#tag-toggle').getAttribute('aria-expanded') === 'true', 'Controls mounted more than once');
+          document.querySelector('#tag-toggle').click();
+          for (const step of [['', 'links', 'Links'], ['guide/', 'guide', 'Guide'], ['', 'links', 'Links'], ['deep/unknown/', 'not-found', 'Link not found']])
+            await transition(() => history.back(), ...step);
+          for (const step of [['', 'links', 'Links'], ['guide/', 'guide', 'Guide'], ['', 'links', 'Links'], ['tools/', 'links', 'tools']])
+            await transition(() => history.forward(), ...step);
+          // Pending local actions cannot complete after a newer history intent,
+          // even before the new page's HTML arrives.
+          const status = document.querySelector('#copy-status'), downloadStatus = document.querySelector('#download-status');
+          let copied, downloaded, loaded;
+          Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: () => new Promise(r => { copied = r; }) } });
+          const nativeFetch = fetch;
+          globalThis.fetch = (url, options) => String(url).startsWith('https://example.com/')
+            ? Promise.resolve({ ok: true, blob: () => new Promise(r => { downloaded = r; }) })
+            : new Promise(r => { loaded = () => nativeFetch(url, options).then(r); });
+          let saves = 0;
+          const createURL = URL.createObjectURL;
+          URL.createObjectURL = blob => { saves++; return createURL(blob); };
+          document.querySelector('a.code').click();
+          document.querySelector('button[data-download-url]').click();
+          await wait(() => copied && downloaded);
+          const oldMain = document.querySelector('main');
+          document.querySelector('[data-nav=guide]').click();
+          await wait(() => loaded);
+          copied(); downloaded(new Blob(['stale']));
+          await new Promise(r => setTimeout(r, 30));
+          check(document.querySelector('main') === oldMain && status.textContent === '' && downloadStatus.textContent === '' && saves === 0, 'Stale local action completed before replacement');
+          globalThis.fetch = nativeFetch; URL.createObjectURL = createURL; loaded();
+          await wait(() => location.pathname === prefix + 'guide/');
+          verify('guide/', 'guide', 'Guide');
+          // Leave an enhanced 404 while its recovery body is still pending.
+          let mapBody, recoverySignal;
+          globalThis.fetch = async (url, options) => {
+            if (String(url).endsWith('links.json')) {
+              recoverySignal = options.signal;
+              return { ok: true, json: () => new Promise(r => { mapBody = r; }) };
+            }
+            return nativeFetch(url, options);
+          };
+          history.pushState(null, '', prefix + 'tools/GIT/');
+          dispatchEvent(new PopStateEvent('popstate'));
+          await wait(() => mapBody);
+          const staleHead = document.querySelector('#head');
+          const hrefs = [...document.querySelectorAll('[data-site-path]')].map(a => a.href);
+          await transition(() => document.querySelector('[data-nav=guide]').click(), 'guide/', 'guide', 'Guide');
+          check(recoverySignal.aborted, 'Recovery was not aborted');
+          mapBody({ Git: 'https://example.com/stale-forward' });
+          await new Promise(r => setTimeout(r, 30));
+          verify('guide/', 'guide', 'Guide');
+          check(staleHead.textContent === 'Checking that link' && JSON.stringify([...document.querySelectorAll('[data-site-path]')].map(a => a.href)) === JSON.stringify(hrefs), 'Stale recovery mutated or rebased links');
+          globalThis.fetch = nativeFetch;
+          return 'passed';
+        })()`);
+        assert.equal(result, "passed", `${prefix}/${width}/${theme}`);
+      }
+    }
+  }
+});
+
 test("404 resolves root and nested paths under user and project sites", async (t) => {
   const map = {
     tools: {
@@ -3775,7 +4089,7 @@ test("404 resolves root and nested paths under user and project sites", async (t
       );
       const requests = [];
       let destination;
-      await runInNewContext(script, {
+      await runRecovery(script, {
         location: {
           pathname: prefix + path,
           replace: (url) => {
@@ -3828,10 +4142,10 @@ test("404 resolves root and nested paths under user and project sites", async (t
       const { elements, destination } = await visit(path, offline);
       assert.equal(destination, undefined);
       assert.equal(elements.head.textContent, "Link not found");
-      assert.equal(elements.home.href, prefix);
+      assert.equal(elements.home.href, offline ? prefix + path : prefix);
     }
     const offline = await visit("tools/missing/", true);
-    assert.equal(offline.elements.home.href, prefix + "tools/");
+    assert.equal(offline.elements.home.href, prefix + "tools/missing/");
     assert.ok(
       offline.shellLinks.every((link) => link.href === undefined),
       "no invented base without a map",
@@ -3846,7 +4160,7 @@ test("404 stops at the first readable ancestor map, even when the entry is missi
   for (const prefix of ["/", "/project/"]) {
     const requests = [];
     const elements = { home: {}, head: {}, msg: {} };
-    await runInNewContext(script, {
+    await runRecovery(script, {
       location: {
         pathname: prefix + "tools/missing/",
         replace() {
@@ -3883,7 +4197,7 @@ test("404 defensively interprets malformed and uppercase fetched tags without pr
       const requests = [];
       const elements = { home: {}, head: {}, msg: {} };
       let destination;
-      await runInNewContext(script, {
+      await runRecovery(script, {
         location: {
           pathname: prefix + "tools/mixed/",
           replace(url) {

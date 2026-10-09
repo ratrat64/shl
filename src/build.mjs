@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { loadLinks } from "./links.mjs";
 import { indexPage, directoryPage } from "./directory.mjs";
 import { GUIDE_NAV } from "./layout.mjs";
+import { recoveryScript } from "./browser.mjs";
 import {
   redirectPage,
   scriptLauncher,
@@ -35,6 +36,7 @@ await mkdir(OUT, { recursive: true });
 await cp(new URL("./assets/", import.meta.url), join(OUT, "assets"), {
   recursive: true,
 });
+await writeFile(join(OUT, "assets/recovery.js"), recoveryScript);
 
 for (const link of links) {
   await mkdir(join(OUT, link.code), { recursive: true });
