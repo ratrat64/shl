@@ -14,6 +14,12 @@
   --disabled-bg: #f7f7f7;
   --disabled-wash: #ebebeb;
   --wash: #e8eeeb;
+  --tag-0: #006b60;
+  --tag-1: #895400;
+  --tag-2: #a33d20;
+  --tag-3: #606060;
+  --tag-4: #7044a3;
+  --tag-5: #245e9b;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -31,6 +37,12 @@
     --disabled-bg: #000;
     --disabled-wash: #181818;
     --wash: #111b16;
+    --tag-0: #64b6a4;
+    --tag-1: #c6a36a;
+    --tag-2: #ee967b;
+    --tag-3: #a3a3a3;
+    --tag-4: #c4a1ec;
+    --tag-5: #90b9ed;
   }
 }
 :root[data-theme="dark"] {
@@ -48,6 +60,12 @@
   --disabled-bg: #000;
   --disabled-wash: #181818;
   --wash: #111b16;
+  --tag-0: #64b6a4;
+  --tag-1: #c6a36a;
+  --tag-2: #ee967b;
+  --tag-3: #a3a3a3;
+  --tag-4: #c4a1ec;
+  --tag-5: #90b9ed;
 }
 
 * {
@@ -243,14 +261,14 @@ p {
 }
 .directory-actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 9rem;
+  grid-template-columns: minmax(12rem, 1fr) minmax(0, 1fr) max-content;
   align-items: center;
   gap: 0.65rem;
-  width: min(100%, 30rem);
+  width: min(100%, 43rem);
   min-width: 0;
 }
 .directory-toggles {
-  grid-column: 2;
+  grid-column: 3;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -259,6 +277,56 @@ p {
 .search {
   grid-column: 1;
   min-width: 0;
+}
+.tag-track {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  min-width: 0;
+  padding: 0.4rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) var(--panel);
+  white-space: nowrap;
+}
+#available-tags,
+#tag-error {
+  grid-column: 1 / -1;
+}
+.tag-chip {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  padding: 0.35rem 0.6rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.tag-chip:hover {
+  background: var(--wash);
+}
+.tag-chip[aria-pressed="true"]::after {
+  content: " ×";
+}
+.tag-label {
+  white-space: nowrap;
+}
+[data-slot="0"] {
+  color: var(--tag-0);
+}
+[data-slot="1"] {
+  color: var(--tag-1);
+}
+[data-slot="2"] {
+  color: var(--tag-2);
+}
+[data-slot="3"] {
+  color: var(--tag-3);
+}
+[data-slot="4"] {
+  color: var(--tag-4);
+}
+[data-slot="5"] {
+  color: var(--tag-5);
 }
 .search input {
   width: 100%;
@@ -644,6 +712,9 @@ main.minimal-document {
   .directory-actions {
     width: 100%;
     grid-template-columns: minmax(0, 1fr);
+  }
+  #selected-tags {
+    grid-column: 1;
   }
   .directory-toggles {
     grid-column: 1;

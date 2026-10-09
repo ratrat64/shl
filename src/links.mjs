@@ -44,7 +44,7 @@ export const linkFields = (value) => ({
   url: linkUrl(value),
   title: typeof value === "string" ? "" : (value.title ?? ""),
   ...linkStates(value),
-  tags: (value?.tags ?? []).map((tag) => tag.trim()),
+  tags: value?.tags ?? [],
 });
 
 export const entryCounts = (nodes) => ({
@@ -202,6 +202,12 @@ export async function loadLinks() {
         problems.push(`"${name}" — tags must be an array of nonblank strings`);
       }
       const urlError = validateUrl(url, name);
+      if (Array.isArray(value?.tags))
+        for (const tag of value.tags)
+          if (typeof tag === "string" && /[\s,]/.test(tag))
+            problems.push(
+              `"${name}" — ${JSON.stringify(tag)}: Tag names must not contain whitespace or commas; rename this tag explicitly. No automatic renaming is performed.`,
+            );
       if (urlError) problems.push(urlError);
       if (linkStates(value).script) launchers.push(code);
       if (problems.length === before)

@@ -30,7 +30,7 @@ Use an existing pure helper or a minimal shared leaf for identity/color only if 
 
 During implementation rewrite conflicting live rules in `AGENTS.md`, `README.md`, `docs/reference.md`, Guide content, PRODUCT.md, DESIGN.md, EXPERIENCE.md, and ARCHITECTURE-SPINE.md. Replace the affected semantics; do not leave local exceptions that contradict the active contract. Keep original forge inputs and historical logs unchanged.
 
-Audit link maps and relevant fixtures explicitly. The checked-in `release notes` tag needs a maintainer-approved rename; do not rewrite it merely to make validation pass. Tests demonstrating old padded or multiword tags must reflect the new rejection rule or an explicit fixture rename. Validation checks syntax, not reachability; disabled/hidden destinations remain public.
+Audit link maps and relevant fixtures explicitly. The user authorized the checked-in `release notes` tag's rename to `release-notes` on 2026-10-09. Tests demonstrating old padded or multiword tags must reflect the new rejection rule or an explicit fixture rename. Validation checks syntax, not reachability; disabled/hidden destinations remain public.
 
 ## Locked-source preservation map
 

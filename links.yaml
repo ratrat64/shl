@@ -274,7 +274,7 @@ projects:
 search-test-exact:
   url: https://example.com/search-exact
   title: Exact tag search test
-  tags: [release notes, documentation]
+  tags: [release-notes, documentation]
 
 search-test-partial:
   url: https://example.com/search-partial

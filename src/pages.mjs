@@ -149,9 +149,12 @@ docs:
           entries for folders.
         </p>
         <p>
-          Plain text searches broadly; <code>#tag</code> matches a whole tag,
-          including <code>#release notes</code>. A bare <code>#</code> matches
-          nothing; <code>#broken #disabled</code> is one literal tag, not two.
+          Plain text searches as one broad substring. Use Show tags to select
+          filters, or commit <code>#tag</code> with space, comma or Enter. Every
+          selected tag and the remaining text must match. Remove a selected tag
+          to return it to the picker. Unknown tokens remain with “Tag not
+          found”. Tag names must not contain whitespace or commas; rename them
+          explicitly.
         </p>
         <p>
           Add <code>script</code> to <code>tags</code> for a
@@ -182,20 +185,19 @@ docs:
           </li>
         </ul>
         <p>
-          State names match exactly, ignoring case and surrounding whitespace.
-          The old <code>hidden</code> and <code>script</code> properties are
-          rejected.
+          State names match exactly, ignoring case. The old
+          <code>hidden</code> and <code>script</code> properties are rejected.
         </p>
         <p>
-          Show hidden links reveals hidden entries. <code>#hidden</code>,
-          <code>#broken</code> and <code>#disabled</code> also reveal matching
-          hidden links, even in all-hidden folders. Clearing search restores the
-          toggle-selected view. <code>#script</code> is ordinary exact-tag
-          search and respects Show hidden links.
+          Selecting hidden, broken or disabled admits only matching hidden links
+          and their ancestors, still constrained by all filters. Selecting
+          script alone never reveals hidden links. Show tags includes all
+          subtree tags, even at zero results. Clearing text or hiding the picker
+          retains selections.
         </p>
         <p>
-          Search, copying and Show hidden links need JavaScript. Without it,
-          enabled visible links still open normally.
+          Search, copying and tag filters need JavaScript. Without it, enabled
+          visible links still open normally.
         </p>
       </section>
       <section id="how-it-works">

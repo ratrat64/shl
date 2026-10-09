@@ -8,7 +8,7 @@ Derived from the spec memory and source decisions; applies to every directory pa
 - Use `tag.toLowerCase()` as identity, matching existing case-insensitive search/states; do not add Unicode normalization. Exact reserved identities are `hidden`, `broken`, `disabled`, and `script`; descriptive lookalikes derive no state. Existing defensive trimmed state interpretation can remain for fetched recovery metadata.
 - Deduplicate identities per leaf/catalog/selection without mutating raw data. Row labels preserve configured case. For a catalog identity with case variants, choose the raw label smallest by JavaScript UTF-16 lexical comparison; sort the catalog by canonical identity with the same comparison. Selected tags use insertion order; returned tags rejoin catalog order.
 - Validation messages name source/entry path and offending value and explain: “Tag names must not contain whitespace or commas; rename this tag explicitly. No automatic renaming is performed.” Retain existing type/nonblank guidance where applicable. Every format fails before `dist/` deletion.
-- `links.yaml` currently contains `[release notes, documentation]` on `search-test-exact`. Require the maintainer's explicit replacement; `release-notes` is a proposal only. Existing tests for padded state tags and multiword tags must become intentional rejection fixtures or explicitly updated valid fixtures, not silently transformed data.
+- The user authorized `release notes` → `release-notes` on `search-test-exact` on 2026-10-09. Existing tests for padded state tags and multiword tags must become intentional rejection fixtures or explicitly updated valid fixtures, not silently transformed data.
 
 ## Automatic color assignment — CAP-1
 

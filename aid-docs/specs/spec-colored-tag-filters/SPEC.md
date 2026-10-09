@@ -61,6 +61,6 @@ Give directory visitors a discoverable, reversible way to combine tags and text 
 - Uncommitted #tokens use live broad text search, with no hidden reveal; the previous initial-# exact-query mode is replaced by committed selections.
 - Duplicate commits are idempotent. Filters and picker visibility reset on cross-page mounts, matching current navigation; same-page/fragment navigation retains them. Clearing text or collapsing the picker retains selected tags.
 
-## Open Questions
+## Approved data decision
 
-- Which explicit replacement should the maintainer use for `links.yaml`'s `search-test-exact` tag `release notes`? `release-notes` is suggested, not authorized. This blocks an implementation release, not the completed spec; validation must not choose a name.
+- On 2026-10-09 the user explicitly authorized renaming `links.yaml`'s `search-test-exact` tag `release notes` to `release-notes`. No other automatic renaming is authorized.

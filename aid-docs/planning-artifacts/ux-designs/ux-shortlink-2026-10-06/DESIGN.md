@@ -58,7 +58,9 @@ Teal is reserved for standard links and focus; amber marks enabled-script entrie
 
 The frontmatter roles map to shared CSS tokens in `src/assets/site.css`: paper → `--bg`, surface → `--panel`, ink → `--ink`, secondary → `--muted`, rule → `--line`, action → `--accent`, script → `--script`, broken → `--broken`, disabled → `--disabled`, and wash → `--wash`, with light/dark variants above. `src/styles.mjs` loads the same CSS for embedded documents.
 
-Disabled link rows and their tag popovers use only neutral grayscale: text and focus use disabled ink, resting surfaces use #f7f7f7 light / #000 dark, and hover/focus wash uses #ebebeb light / #181818 dark. Destinations, tags, selection, and unavailable Open/Download fills and borders remain grayscale in every interaction state, overriding the usual teal/amber and green-tinted neutral roles.
+Disabled codes, destinations, focus, selection and unavailable Open/Download remain grayscale: resting surfaces use #f7f7f7 light / #000 dark and wash #ebebeb light / #181818 dark. Only full tag labels retain independent automatic colored ink in rows/popovers and chips. Tag surfaces are neutral and hidden opacity remains independent.
+
+Tag identity is toLowerCase without Unicode normalization. Reserve hidden/disabled slot 3, broken slot 2, script slot 1; other identities use UTF-16 FNV-1a (seed 2166136261, Math.imul(hash ^ charCode, 16777619) >>> 0), modulo six. Light/dark ink pairs: 0 #006b60/#64b6a4, 1 #895400/#c6a36a, 2 #a33d20/#ee967b, 3 #606060/#a3a3a3, 4 #7044a3/#c4a1ec, 5 #245e9b/#90b9ed. Browser chips consume renderer metadata. Verify ≥4.5:1 including hidden opacity and actual wash; labels carry identity, collisions are allowed.
 
 Disabled short codes keep their resting text appearance on hover; do not add an underline.
 
@@ -68,7 +70,7 @@ The site uses the system sans for reading and modest headings. Codes and code sa
 
 ## Layout & Spacing
 
-A centered 1160px container carries the directory across its full width. On the homepage and in nested folders, a prominent live count ("N links", including "0 links") is the sole heading on the left, at the same size. A single-line search sits on the right, followed by a compact grouped area for Show hidden links and any future toggles. Nested pages use breadcrumbs below the count for folder orientation, without a separate folder-name heading. Home reserves the same one-line breadcrumb space, keeping the list in place across navigation; long paths scroll horizontally rather than wrapping. Entries put code and destination side by side. On narrow layouts, search and controls wrap beneath the count; below 740px the layout stacks. The guide uses a narrower 740px column.
+A centered 1160px container carries the directory across its full width. Root/nested pages use one prominent live count on the left; search, a separate selected horizontal track and Show tags sit on the right. The available horizontal track is below them. Below 740px tools stack beneath the count, with usable search and separate chip tracks; full labels never wrap. Nested breadcrumbs reserve the same one-line space as home and scroll on long paths. Entries retain code/destination pairing. The Guide uses a narrower 740px column.
 
 The page shell fills at least the viewport height and lets main content grow: the footer sits at the bottom on short pages and follows long content in normal flow, never fixed over it.
 
@@ -90,13 +92,13 @@ Follow AD-7–AD-9 in the [architecture spine](../../architecture/architecture-s
 
 ### Navigation
 
-The header brand reads `/shl/`: `shl` uses ink, the leading slash uses teal action, and the trailing slash uses amber script. The header has only Links and Guide navigation. Current links are underlined. Buttons have subdued edges mixed from 25% of their action color and the page background; keep the visible keyboard focus outline. Theme, hidden-toggle and Open controls have a subtle teal background; broken enabled rows use orange-red for Open text, edges, and fills. Download uses amber. Mix 10% of the action color into the page background, increasing to 18% on hover; broken Open uses 12% on hover to preserve hidden-row text contrast. Disabled controls retain the muted wash.
+The header brand reads `/shl/`: `shl` uses ink, the leading slash uses teal action, and the trailing slash uses amber script. The header has only Links and Guide navigation. Current links are underlined. Buttons have subdued edges mixed from 25% of their action color and the page background; keep the visible keyboard focus outline. Theme, Show tags and Open controls have a subtle teal background; broken enabled rows use orange-red for Open text, edges, and fills. Download uses amber. Mix 10% of the action color into the page background, increasing to 18% on hover; broken Open uses 12% on hover to preserve hidden-row text contrast. Disabled controls retain the muted wash.
 
 ### Directory tools
 
-The count is every directory page's visual heading, not a small aside or a second search-result number. Keep the search label accessible but visually hidden; the visible placeholder is "Search link, title or tag". Reserve the same search and toggle columns on every directory page so the search size and position do not shift. The toggle stays visible but muted and disabled when there are no hidden links; otherwise it sits beside search on desktop and below it, right-aligned, on mobile. The same count responds to searching and to the hidden-links toggle; see EXPERIENCE.md for states and announcements.
+The count is the sole heading and polite result count. Keep the accessible search label visually hidden and placeholder "Search link, title or tag". Show tags / Hide tags exposes expanded state and its controlled available region, changing only visibility. Disable it for no-tag catalogs. Selected chips appear beside search in insertion order; available chips retain canonical catalog order. Native buttons name Filter by #tag / Remove #tag filter and selected state. Empty selected tracks hide; all-selected pickers remain open with "All tags selected.". Focus moves to the selected chip on activation and next/previous/search on removal; tracks reveal focused chips. Independent polite Tag not found feedback is associated with search.
 
-Column consistency applies when interactive tools are shown. An empty site has no search; enhanced search is available in every nonempty subtree, including all-hidden pages with initial 0 links and No links listed here. State queries reveal only matching hidden leaves and ancestors without changing the toggle; zero-result queries show the no-match message and clearing restores the selected pool. With JavaScript disabled, search and enabled hidden toggles remain hidden; disabled toggles remain visible.
+An empty site has no search; every nonempty subtree has enhanced search, including all-hidden/untagged pages. Filters require selected-tag AND plus broad text; only selected reserved hidden/broken/disabled tags admit matching hidden leaves. Zero filtered results retain tools and show the no-match message; initial all-hidden pages show 0 links and No links listed here. Without JavaScript, search and usable picker controls stay hidden; disabled no-tag controls may remain visible.
 
 ### Directory rows
 
@@ -108,7 +110,7 @@ Only in hover-capable, fine-pointer mode with no coarse input available, destina
 
 Copy feedback appears as a small, flat floating panel near the viewport edge and never displaces directory content.
 
-Tags sit inline between the code and destination in muted text at the existing metadata size. Show full labels on one line with no width cap or ellipsis, without increasing row height. Let the tag track fit its actual label width so the gap to destinations stays consistent. Reserve at least 3rem for the labels; let crowded rows scroll horizontally instead of wrapping tags or reducing either target to zero. Horizontal scrollbar chrome must not add row height. Retain the native tag-button popover as an optional convenient view of all tags, not a requirement for reading shortened labels. Its flat floating panel uses existing surface, rule, ink, and control-radius roles. Place it near the labels where CSS anchor positioning is supported; otherwise use the browser's centered popover. See EXPERIENCE.md for unchanged keyboard and dismissal behavior.
+Tags sit inline between code/destination at the existing metadata size, with each full #label independently colored by its slot. No cap, ellipsis or added row height. The track fits actual label width; preserve 3rem label and destination reserves, horizontally scrolling crowded rows. Scrollbar chrome must not add row height. Row tags remain informational native-popover triggers, never filter controls. Popovers use neutral theme surfaces/rules and individually colored full labels; retain native keyboard/dismissal behavior and existing positioning.
 
 Folder summaries stay on one line and scroll horizontally for long names, preserving the full name and disclosure marker without ellipsis or wrapping. Their height remains 50px; scrollbar chrome must not increase it.
 

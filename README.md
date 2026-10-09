@@ -53,15 +53,22 @@ it after the next deployment.
 
 | Tag | Effect |
 | --- | --- |
-| `hidden` | Omit from default listings and search; Show hidden links reveals it. The short URL still works. |
+| `hidden` | Omit from default listings and search; selecting hidden, broken or disabled admits only matching hidden links. The short URL still works. |
 | `broken` | Show a warning without blocking actions. |
 | `disabled` | Stop forwarding and script execution; Open and Download are unavailable, but both URLs remain copyable. |
 | `script` | Generate a `<path>.sh` Bash launcher and show Download. |
 
-Tags can be combined; special tags match exactly, ignoring case and surrounding
-whitespace. Other tags are descriptive. Search plain text broadly or use `#tag`
-for an exact tag. `#hidden`, `#broken`, and `#disabled` also reveal matching hidden
-links temporarily.
+Tags can be combined; special tags match exactly, ignoring case. Tag names must
+not contain whitespace or commas; explicitly rename invalid names. Valid raw
+case and Unicode remain intact. Full labels have stable automatic colors in both
+themes, including disabled rows.
+
+Show tags offers all tags in the current subtree, including hidden leaves.
+Select tags to require every selection (AND), plus one broad substring of remaining
+search text. Commit `#tag` with space, comma or Enter; unknown tokens remain with
+“Tag not found”. Remove selected tags individually to return them to the picker.
+Opening or hiding the picker and clearing text retain selections. Only selected
+hidden, broken or disabled tags admit matching hidden leaves; script alone does not.
 
 Use absolute HTTP(S) destinations. Codes start with an ASCII letter or number and
 contain only letters, numbers, `.`, `_`, or `-`; reserved names and case-insensitive
@@ -111,7 +118,7 @@ See [contributor guidance](docs/development.md) for browser checks, PR rules, an
 - Redirects happen in the browser, not through HTTP 301/302 responses. `curl -L`
   does not follow them; use `.sh` URLs for launchers.
 - Validation checks URL syntax, not destination reachability.
-- Search, copying, hidden-link controls, and Download require JavaScript. Enabled
+- Search, copying, tag filters, and Download require JavaScript. Enabled
   visible links remain navigable without it.
 - No anonymous link submission or built-in click tracking.
 
