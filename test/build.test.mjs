@@ -270,6 +270,10 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
       const availableOrder = [...picker.querySelectorAll('button')];
       check(availableOrder.every((b, i) => !i || b.getBoundingClientRect().left > availableOrder[i - 1].getBoundingClientRect().left), 'Available visual catalog order');
       pick('shell'); check(doc.activeElement === selected.querySelector('button') && choices() === 'shell' && count() === 4, 'Picker move/focus');
+      const selectedBounds = selected.getBoundingClientRect(), selectedChip = selected.querySelector('button').getBoundingClientRect();
+      check(Math.abs(selectedBounds.right - selectedChip.right - parseFloat(win.getComputedStyle(selected).paddingRight)) < 2, 'Selected tags right alignment');
+      for (const track of [selected, picker]) check(win.getComputedStyle(track).maskImage.includes('linear-gradient'), 'Tag track edge fades');
+      if (width > 740) check(doc.querySelector('.directory-actions').getBoundingClientRect().width > doc.querySelector('#link-count').getBoundingClientRect().width * 2, 'Tools width priority');
       pick('setup'); check(count() === 2 && choices() === 'shell,setup', 'Ordinary AND');
       check(selected.querySelectorAll('button')[1].getAttribute('aria-label') === 'Remove #setup filter' && selected.querySelector('button').getAttribute('aria-pressed') === 'true', 'Removal accessibility');
       type('setup notes'); check(count() === 1 && shown() === 'Both', 'AND with broad title');
@@ -858,7 +862,7 @@ test("native track scrolling uses Tab focus and horizontal touch gestures withou
       };
       const geometry = () =>
         evaluate(
-          `(() => {const t=document.getElementById(${JSON.stringify(id)}), b=t.querySelector('button'), r=b.getBoundingClientRect(), v=t.getBoundingClientRect(); return {scroll:t.scrollLeft,max:t.scrollWidth-t.clientWidth,left:r.left,right:r.right,trackLeft:v.left,trackRight:v.right,width:r.width,client:t.clientWidth,label:b.textContent,whole:b.scrollWidth<=b.clientWidth};})()`,
+          `(() => {const t=document.getElementById(${JSON.stringify(id)}); if(!t) throw Error('Missing track ${id} at '+location.href); const b=t.querySelector('button'), r=b.getBoundingClientRect(), v=t.getBoundingClientRect(); return {scroll:t.scrollLeft,max:t.scrollWidth-t.clientWidth,left:r.left,right:r.right,trackLeft:v.left,trackRight:v.right,width:r.width,client:t.clientWidth,label:b.textContent,whole:b.scrollWidth<=b.clientWidth};})()`,
         );
       let start = await geometry();
       assert.equal(start.label, "#" + long);
