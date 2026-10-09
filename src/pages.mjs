@@ -6,7 +6,6 @@ import {
   GUIDE_NAV,
   pageTitle,
 } from "./layout.mjs";
-import { isDirectory, linkUrl, linkStates } from "./links.mjs";
 
 const shellString = (value) => "'" + value.replace(/'/g, "'\\''") + "'";
 
@@ -252,7 +251,7 @@ export const notFoundPage = () =>
     /* HTML */ `<article class="prose">
       <h1 id="head">Checking that link</h1>
       <p class="lead" id="msg">One moment.</p>
-      <p><a class="code" id="home" href="./">Home</a></p>
+      <p><a class="code" id="home" href="./" data-app-link>Home</a></p>
       <noscript
         ><p>
           This link could not be found. Enable JavaScript to check for a
@@ -262,43 +261,5 @@ export const notFoundPage = () =>
     </article>`,
     {
       embedded: true,
-      scripts: `<script data-behavior="recovery">
-(async () => {
-  const isDirectory = ${isDirectory.toString()};
-  const linkUrl = ${linkUrl.toString()};
-  const linkStates = ${linkStates.toString()};
-  const parts = location.pathname.split('/').filter(Boolean);
-  const seg = parts.at(-1) || '';
-  const home = document.getElementById('home');
-  home.href = '/' + parts.slice(0, -1).join('/') + (parts.length > 1 ? '/' : '');
-  for (let depth = parts.length - 1; depth >= 0; depth--) {
-    const base = '/' + parts.slice(0, depth).join('/') + (depth ? '/' : '');
-    try {
-      const res = await fetch(base + 'links.json', { cache: 'no-cache' });
-      if (!res.ok) continue;
-      let entry = await res.json();
-      const canonical = [];
-      for (const segment of parts.slice(depth)) {
-        const hit = isDirectory(entry)
-          ? Object.entries(entry).find(([c]) => c.toLowerCase() === segment.toLowerCase()) : null;
-        if (!hit) { entry = null; break; }
-        canonical.push(hit[0]);
-        entry = hit[1];
-      }
-      home.href = base;
-      for (const link of document.querySelectorAll('[data-site-path]'))
-        link.href = base + link.dataset.sitePath;
-      if (isDirectory(entry)) {
-        location.replace(base + canonical.join('/') + '/');
-        return;
-      }
-      if (entry) { location.replace(linkStates(entry).disabled ? base + canonical.join('/') + '/' : linkUrl(entry)); return; }
-      break;
-    } catch (e) { /* try next */ }
-  }
-  document.getElementById('head').textContent = 'Link not found';
-  document.getElementById('msg').textContent = seg ? '"' + seg + '" is not a short link here.' : 'That address does not exist.';
-})();
-</script>`,
     },
   );

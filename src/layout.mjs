@@ -1,5 +1,5 @@
 import { styles } from "./styles.mjs";
-import { themeScript } from "./browser.mjs";
+import { themeScript, APP_ASSETS, appScripts } from "./browser.mjs";
 
 export const esc = (s) =>
   String(s).replace(
@@ -111,14 +111,20 @@ export const page = (
     embedded,
     head: embedded
       ? ""
-      : ["search", "copy", "download", "navigation"]
-          .map(
-            (name) =>
-              `<script src="${esc(depth)}assets/${name}.js" defer></script>`,
-          )
-          .join(""),
+      : APP_ASSETS.map(
+          (name) =>
+            `<script src="${esc(depth)}assets/${name}.js" defer></script>`,
+        ).join(""),
     body: /* HTML */ `${header(active, depth)}
       <main class="wrap" data-app-page="${active}">${content}</main>
       ${footer(depth)}`,
-    scripts,
+    scripts:
+      (embedded
+        ? appScripts
+            .map(
+              ([name, code]) =>
+                `<script data-behavior="${name}">${code}</script>`,
+            )
+            .join("")
+        : "") + scripts,
   });
