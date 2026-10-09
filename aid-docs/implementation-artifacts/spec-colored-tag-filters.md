@@ -2,7 +2,7 @@
 title: 'Implement colored tag filters'
 type: 'feature'
 created: '2026-10-09'
-status: 'in-review'
+status: 'done'
 baseline_commit: '34a55f3b0d88d98b339238b5b6c46ff8a5669254'
 route: 'dispatch'
 review_loop_iteration: 0
@@ -78,6 +78,25 @@ context:
 
 ## Review Triage Log
 
+| Finding | Verdict | Evidence and route |
+| --- | --- | --- |
+| Blind: comma-containing URL fragments consumed | medium | The token regex admits a comma boundary inside a URL and consumes its fragment. Patch candidate exclusion for URL spans; preserve plain URL text. |
+| Blind: multiline paste loses delimiters | medium | Native search inputs sanitize line breaks before input handling; newline-separated tokens merge. Patch paste handling before sanitization, preserving token separation and prose. |
+| Blind: repeated unknown deletion transfers error | medium | Prefix/suffix comparison cannot locate the edited occurrence of identical tokens. Patch using the native edit range, with a regression for deleting the attempted occurrence. |
+| Blind: NUL identity corrupts in HTML | medium | Validation accepts NUL, HTML attributes replace it, but JSON leaf identities retain it. Patch lossless identity publication without adding prohibited validation restrictions. |
+| Blind: native undo does not reverse token-to-chip conversion | low | Filter conversion is reversed through selected chip removal under the locked contract; adding native selection-history undo would add unrequested state/behavior and is rejected. The incidental ordinary-edit undo disruption was directly corrected and now has native keyboard proof. |
+| Blind: nested page omits its own folder path | medium | Existing traversal also began at the current subtree root; this pre-existing limitation is not introduced by the feature. Defer full-path search enhancement; preserve existing broad-search scope. |
+| Blind: first live-region error might not announce | maybe-false | The independent role=status/aria-live region is synchronously revealed and populated; no screen-reader evidence establishes the claimed missed announcement. Defer unverified accessibility concern pending an executed screen-reader check. |
+| Blind: legacy migration guidance preserves invalid tags | low | Existing instructions preserve raw tags while the new validation rejects padded names. Directly clarify that invalid names require explicit maintainer renaming in migration guidance. Patch. |
+| Blind: native track scrolling proof missing | medium | Real browser checks use programmatic focus/scroll and a fitting touch target. Add native Tab and horizontal touch-track scrolling acceptance checks. Patch verification. |
+| Blind: recursive catalog sorts discarded results | low | Each recursive call sorts the accumulated map before its parent ignores that result. Directly collect once and sort only the final catalog. Patch. |
+| Edge: prepend known token clears existing unknown error | medium | Prefix matching can map the existing attempted range to the inserted candidate or none. Patch actual edit-range mapping and test native prepend. |
+| Edge: NUL/FFFD identities conflate | medium | Same confirmed HTML identity boundary defect as the blind finding; share its lossless publication patch. |
+| Edge claim: unrelated commit clears unresolved token error | medium | The unchanged unknown token can lose its tracked range after prepend. Share the edit-range patch and regression. |
+| Edge claim: renderer identities disagree with leaf identities | medium | Same confirmed NUL replacement defect; share the lossless publication patch. |
+| Verification: Enter outside unfinished candidate untested | medium | Existing Enter checks all place caret inside the candidate; mutation dropping bounds would survive. Add inside/outside caret assertions. Patch verification. |
+| Verification: per-leaf dedup not asserted | medium | Existing duplicate fixture asserts catalog uniqueness only. Add inline/popover identity, casing/order and raw-public-preservation assertions. Patch verification. |
+
 ## Verification
 
 - `bun ci` -- Bun 1.4.2 installs locked dependencies.
@@ -99,3 +118,6 @@ context:
 - Impeccable detector over directory/search/styles/navigation/Guide UI targets: `[]` (no findings).
 - Implementation committed and pushed on `feat/colored-tag-filters`; [PR #77](https://github.com/ratrat64/shl/pull/77) targets `main`. GitHub reported `MERGEABLE` against `34a55f3b0d88d98b339238b5b6c46ff8a5669254`; PR validation was running at the initial mergeability check. No unresolved merge conflicts or known incomplete implementation tasks.
 - Initial CI exposed a font-dependent test assumption that every full chip fits a 320px track. The rendered gate now requires fitting chips to be fully revealed, oversized chips to intersect the focused track, and both ends of oversized labels to remain reachable by scrolling; labels remain uncapped as required.
+- Completed the three aid-build review layers and recorded every finding above. Patched token URL/paste/native-edit boundaries and lossless JSON-content identities, clarified migration guidance, sorted catalogs once, and strengthened caret/dedup/native Tab/touch regressions. Two follow-ups are recorded in deferred-work.md: pre-existing nested full-path search and unverified screen-reader first-error announcement.
+- Final full verification after review patches: Bun 1.4.2 `bun ci`, `bun run format`, `bun run format:check`, `SHL_REQUIRE_BROWSER=1 bun test --timeout 30000 ./test/build.test.mjs` (**38 passed, 0 failed**, 33.76 seconds, no browser skips), and `bun build.mjs` (**68 short links**) all passed. Native multiline clipboard paste, ordinary editing/undo, NUL/FFFD identities, Tab and horizontal touch gestures executed in Chrome.
+- Final instruction audit also replaced the obsolete hidden-toggle reference in docs/development.md's navigation smoke checklist. Frozen intent remains unchanged.
