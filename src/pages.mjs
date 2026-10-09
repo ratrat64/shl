@@ -64,8 +64,12 @@ export const guidePage = (source) =>
     "Guide",
     "guide",
     "../",
-    /* HTML */ `<article class="prose">
-      <h1>Guide</h1>
+    /* HTML */ `<div class="directory-tools">
+      <h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">
+        <span class="count-label">Guide</span>
+      </h1>
+    </div>
+    <article class="prose">
       <nav aria-label="On this page">
         <a href="#about" data-app-link>Features</a> ·
         <a href="#how-to-use" data-app-link>How to use</a> ·

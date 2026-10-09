@@ -149,6 +149,9 @@ button {
   color: var(--ink);
   padding: 0.35rem 0.7rem;
 }
+#tag-toggle {
+  min-width: 7rem;
+}
 .theme-toggle,
 .visit,
 .download {
@@ -228,7 +231,6 @@ p {
 }
 .count {
   font-variant-numeric: tabular-nums;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
@@ -243,25 +245,30 @@ p {
 }
 .directory-actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(12rem, 1fr) max-content;
+  grid-template-columns: minmax(0, 1fr) max-content;
   align-items: center;
   gap: 0.65rem;
   width: min(100%, 43rem);
   min-width: 0;
 }
 .directory-toggles {
-  grid-column: 3;
+  grid-column: 2;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 0.5rem;
 }
-.search {
-  grid-column: 2;
+.search-tags {
+  grid-column: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
 }
 #selected-tags {
-  grid-column: 1;
+  justify-content: flex-end;
+  width: 100%;
+  min-width: 100%;
 }
 .tag-track {
   display: flex;
@@ -690,10 +697,7 @@ main.minimal-document {
     width: 100%;
     grid-template-columns: minmax(0, 1fr);
   }
-  #selected-tags,
-  .search {
-    grid-column: 1;
-  }
+  .search-tags,
   .directory-toggles {
     grid-column: 1;
   }
