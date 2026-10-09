@@ -41,6 +41,8 @@ const tagCatalog = (nodes, catalog = new Map()) => {
   }
   return catalog;
 };
+const tagChip = ([identity, label]) =>
+  `<button type="button" class="tag-chip" data-tag="${tagIdentity(identity)}" ${tagStyle(identity)} aria-label="Filter by #${esc(label)}">#${esc(label)}</button>`;
 
 const renderDirectoryNode = ({ code, children, href, visible }) => /* HTML */ `
   <li${visible ? "" : ' data-hidden="true" hidden'}><details><summary><a href="${esc(href)}" data-app-link>${esc(code)}</a></summary>
@@ -124,6 +126,7 @@ const directoryContents = (
   entries,
   breadcrumbs = "",
   emptyMessage = "No links listed here.",
+  siteEntries = entries,
 ) => {
   const nodes = entryTree(entries);
   const { visible, total } = entryCounts(nodes);
@@ -163,9 +166,7 @@ const directoryContents = (
           aria-label="Available tags"
           hidden
         >
-          ${catalog.map(([identity, label]) => `<button type="button" class="tag-chip" data-tag="${tagIdentity(identity)}" ${tagStyle(identity)} aria-label="Filter by #${esc(label)}">#${esc(label)}</button>`).join("")}<span
-            id="all-tags-selected"
-            hidden
+          ${catalog.map(tagChip).join("")}<span id="all-tags-selected" hidden
             >All tags selected.</span
           >
         </div>
@@ -180,6 +181,7 @@ const directoryContents = (
        <div${visible ? "" : " hidden"}>${listing(nodes)}</div>`
         : `<p>${emptyMessage}</p>`
     }
+    ${total ? `<template id="restoration-tags">${[...tagCatalog(entryTree(siteEntries))].map(tagChip).join("")}</template>` : ""}
   </section>`;
 };
 
@@ -192,7 +194,7 @@ export const indexPage = ({ raw, links, source }) =>
     ${directoryContents(raw, '<nav class="breadcrumbs" aria-label="Breadcrumb">Home</nav>', links.length ? "No links listed here." : `No links available yet. Add your first entry to <code>${esc(source)}</code> and rebuild the site.`)}`,
   );
 
-export const directoryPage = ({ path, entries }) => {
+export const directoryPage = ({ path, entries, raw }) => {
   const depth = "../".repeat(path.length);
   const breadcrumbs = `<nav class="breadcrumbs" aria-label="Breadcrumb"><a href="${depth}" data-app-link>Home</a>${path.map((code, i) => ` / ${i < path.length - 1 ? `<a href="${"../".repeat(path.length - i - 1)}" data-app-link>${esc(code)}</a>` : esc(code)}`).join("")}</nav>`;
   return page(
@@ -200,6 +202,6 @@ export const directoryPage = ({ path, entries }) => {
     "links",
     depth,
     `
-    ${directoryContents(entries, breadcrumbs)}`,
+    ${directoryContents(entries, breadcrumbs, undefined, raw)}`,
   );
 };

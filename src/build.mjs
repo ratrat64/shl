@@ -50,7 +50,7 @@ for (const directory of directories.slice(1)) {
   await mkdir(join(OUT, ...directory.path), { recursive: true });
   await writeFile(
     join(OUT, ...directory.path, "index.html"),
-    directoryPage(directory),
+    directoryPage({ ...directory, raw }),
   );
 }
 for (const [name, page] of [

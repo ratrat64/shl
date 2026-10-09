@@ -146,9 +146,15 @@ zero filtered results show “No links match your search.” No-tag pickers are 
 
 With JavaScript, Links, Guide, folder links, breadcrumbs, and Guide section anchors
 navigate without reloading the shared shell. Back/Forward restores content and
-the latest saved scroll position per URL. Text, selected tags, token error, picker
-visibility and expanded folders reset on cross-page transitions; same-page fragments
-retain them. Direct loads and refreshes use generated pages.
+the latest saved scroll position per URL. Exact text, insertion-ordered selected tags
+and picker visibility persist in sessionStorage for this browser-tab session, isolated
+by canonical site base. History uses the latest filters, not historical snapshots.
+Absent-subtree selections remain removable colored chips and still constrain results.
+Cross-page mounts clear transient token feedback and reset disclosures; filtering
+expands matching groups. Restoration does not commit pending tokens. Same-page
+fragments retain live controls. Searchless pages preserve the record. Malformed or
+inaccessible storage is tolerated, with document-memory fallback for app navigation.
+Direct loads and refreshes use generated pages and restore the session record.
 Without JavaScript, enabled visible links remain navigable and hidden links stay hidden.
 
 Destinations appear on row hover or keyboard focus on hover-capable fine-pointer

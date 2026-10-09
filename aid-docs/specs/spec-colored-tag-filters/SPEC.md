@@ -47,7 +47,7 @@ Give directory visitors a discoverable, reversible way to combine tags and text 
 ## Non-goals
 
 - Manual tag-color configuration, unique colors for every tag, a stored color registry, or a backend/indexing service.
-- OR filters, tag suggestions/autocomplete, filter URL sharing or persistence, row-tag filter activation, or automatic renaming.
+- OR filters, tag suggestions/autocomplete, filter URL sharing or history snapshots, row-tag filter activation, or automatic renaming. Session-scoped filter persistence follows the approved persistent-filters amendment.
 - Changes to destination access, redirect/recovery semantics, launchers, copying, script downloads, or shared shell design.
 
 ## Success signal
@@ -59,7 +59,7 @@ Give directory visitors a discoverable, reversible way to combine tags and text 
 
 - Deterministic seeded HSL generation plus the four fixed-state exceptions fulfills persistent color assignment without storage or unique-color promises; light/dark use corresponding readable inks rather than identical RGB values.
 - Uncommitted #tokens use live broad text search, with no hidden reveal; the previous initial-# exact-query mode is replaced by committed selections.
-- Duplicate commits are idempotent. Filters and picker visibility reset on cross-page mounts, matching current navigation; same-page/fragment navigation retains them. Clearing text or collapsing the picker retains selected tags.
+- Duplicate commits are idempotent. Exact text, ordered selections and picker visibility persist for the browser-tab session by canonical site base, including reload and latest-state Back/Forward. Cross-page mounts reset transient feedback/disclosures; same-page fragments retain live controls. Clearing text or collapsing the picker retains selected tags.
 
 ## Approved data decision
 

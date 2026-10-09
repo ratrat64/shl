@@ -115,6 +115,12 @@ routing. Local preview servers may serve 404 pages differently from GitHub Pages
 3. Select the current navigation link and Guide section links, then use Back/Forward.
    Content, fragments, and saved scroll should match, with instant history restoration.
 4. Check search, Show tags, tag selection/removal, and both URL copy actions after returning from Guide.
-   Each interaction should run once; controls reset after leaving and returning.
+    Each interaction should run once; exact text, ordered tags and picker visibility
+    persist for the tab session. Only transient token feedback and disclosures reset.
+    Check reload, native Back/Forward, absent-subtree chips, root/project isolation,
+    and document-memory fallback when sessionStorage throws. Restore tokens without
+    committing them; searchless pages must never overwrite filters. Canonical base
+    metadata and inert site-wide chip metadata are renderer-owned; available tags
+    remain local to the subtree. Cleanup must suppress outgoing filter writes.
 5. Repeat with JavaScript disabled for native links, and on a deployed project-prefix
    URL such as `/<repo>/guide/#about`.
