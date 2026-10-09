@@ -58,14 +58,18 @@ it after the next deployment.
 | `disabled` | Stop forwarding and script execution; Open and Download are unavailable, but both URLs remain copyable. |
 | `script` | Generate a `<path>.sh` Bash launcher and show Download. |
 
-Tags can be combined; special tags match exactly, ignoring case. Tag names must
-not contain whitespace or commas; explicitly rename invalid names. Valid raw
-case and Unicode remain intact. Full labels use sixteen stable automatic theme
-colors with matching tinted backgrounds and borders, including disabled rows.
+Tags can be combined; configured names must contain no whitespace, commas,
+Unicode uppercase/titlecase characters or emojis. Explicitly rename invalid names;
+the build never silently lowercases or strips them. Lowercase/uncased international
+text, digits and ordinary punctuation (including bare `#` and `*`) stay intact.
+Every full label has stable HSL theme inks generated from its string seed, with
+matched tinted backgrounds/borders, including disabled rows. There is no finite
+palette or unique-color promise; row-state colors remain separate.
 
 Show tags offers all tags in the current subtree, including hidden leaves.
 Select tags to require every selection (AND), plus one broad substring of remaining
-search text. Commit `#tag` with space, comma or Enter; unknown tokens remain with
+search text. Commit `#tag` with space, comma or Enter; uppercase input still
+resolves known lowercase tags. Unknown tokens remain with
 “Tag not found”. Selected tags appear left of search on desktop and above it on
 mobile, preceding search in keyboard order. Remove them individually to return to the picker.
 Opening or hiding the picker and clearing text retain selections. Only selected

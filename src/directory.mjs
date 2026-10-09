@@ -1,18 +1,25 @@
 import { esc, page } from "./layout.mjs";
 import { entryTree, entryCounts } from "./links.mjs";
 
-export const tagSlot = (identity) => {
-  const reserved = { hidden: 3, disabled: 3, broken: 2, script: 1 };
-  if (Object.hasOwn(reserved, identity)) return reserved[identity];
+export const tagColors = (identity) => {
   let hash = 2166136261;
   for (let i = 0; i < identity.length; i++)
     hash = Math.imul(hash ^ identity.charCodeAt(i), 16777619) >>> 0;
-  return hash % 16;
+  const hue = (hash % 3600) / 10;
+  const saturation = 55 + ((hash >>> 16) % 21);
+  return {
+    light: `hsl(${hue} ${saturation}% ${20 + ((hash >>> 24) % 3)}%)`,
+    dark: `hsl(${hue} ${saturation}% ${80 + ((hash >>> 24) % 5)}%)`,
+  };
+};
+const tagStyle = (identity) => {
+  const { light, dark } = tagColors(identity);
+  return `style="--tag-light:${light};--tag-dark:${dark}"`;
 };
 // JSON string contents survive HTML's NUL replacement and preserve UTF-16.
 const tagIdentity = (identity) => esc(JSON.stringify(identity).slice(1, -1));
 const tagLabel = (label) =>
-  `<span class="tag-label" data-tag="${tagIdentity(label.toLowerCase())}" data-slot="${tagSlot(label.toLowerCase())}">#${esc(label)}</span>`;
+  `<span class="tag-label" data-tag="${tagIdentity(label.toLowerCase())}" ${tagStyle(label.toLowerCase())}>#${esc(label)}</span>`;
 const tagCatalog = (nodes, catalog = new Map()) => {
   for (const node of nodes) {
     if (node.isDirectory) tagCatalog(node.children, catalog);
@@ -148,7 +155,7 @@ const directoryContents = (
           aria-label="Available tags"
           hidden
         >
-          ${catalog.map(([identity, label]) => `<button type="button" class="tag-chip" data-tag="${tagIdentity(identity)}" data-slot="${tagSlot(identity)}" aria-label="Filter by #${esc(label)}">#${esc(label)}</button>`).join("")}<span
+          ${catalog.map(([identity, label]) => `<button type="button" class="tag-chip" data-tag="${tagIdentity(identity)}" ${tagStyle(identity)} aria-label="Filter by #${esc(label)}">#${esc(label)}</button>`).join("")}<span
             id="all-tags-selected"
             hidden
             >All tags selected.</span

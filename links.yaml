@@ -168,21 +168,21 @@ descriptive-tags:
       disabled_feature,
     ]
 
-# Mixed case state tags (should match case-insensitively)
+# State tags explicitly renamed to valid lowercase names
 mixed-case-hidden:
   url: https://example.com/mixed-case-hidden
   title: Hidden with mixed case tag
-  tags: [HiDdEn, documentation]
+  tags: [hidden, documentation]
 
 mixed-case-broken:
   url: https://example.com/mixed-case-broken
   title: Broken with mixed case tag
-  tags: [BrOkEn, test]
+  tags: [broken, test]
 
 mixed-case-disabled:
   url: https://example.com/mixed-case-disabled
   title: Disabled with mixed case tag
-  tags: [DiSaBlEd, test]
+  tags: [disabled, test]
 
 # Multiple descriptive tags
 many-tags:
@@ -206,7 +206,7 @@ no-title:
 unicode-tags:
   url: https://example.com/unicode-tags
   title: Unicode tag test
-  tags: [café, naïve, résumé, 日本語, 中文, emoji-🎉]
+  tags: [café, naïve, résumé, 日本語, 中文, emoji-party]
 
 # Trailing slash in URL (should be preserved)
 trailing-slash:

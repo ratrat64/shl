@@ -153,8 +153,19 @@ docs:
           filters, or commit <code>#tag</code> with space, comma or Enter. Every
           selected tag and the remaining text must match. Remove a selected tag
           to return it to the picker. Unknown tokens remain with “Tag not
-          found”. Tag names must not contain whitespace or commas; rename them
-          explicitly.
+          found”. Configured tags must not contain whitespace, commas, Unicode
+          uppercase/titlecase characters or emoji (including flags and keycaps).
+          Explicitly rename invalid names; the build never lowercases or strips
+          them automatically. Lowercase/uncased languages, digits and ordinary
+          punctuation remain valid. Uppercase search tokens still match known
+          lowercase names.
+        </p>
+        <p>
+          Every tag label and filter chip uses stable light/dark HSL inks
+          generated from its string seed, with matching tinted backgrounds and
+          borders. There is no fixed palette or unique-color promise.
+          State-label colors are generated too; link-state warning and disabled
+          styling remain separate.
         </p>
         <p>
           Add <code>script</code> to <code>tags</code> for a

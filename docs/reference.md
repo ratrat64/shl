@@ -29,8 +29,10 @@ root. Missing or multiple sources fail the build. Both formats accept:
 
 - A URL string for a simple link.
 - An object with `url`, an optional string `title`, and an optional `tags` array of
-  nonblank strings without whitespace or commas anywhere. Invalid names require
-  explicit renaming; no automatic migration occurs. Titles appear on code hover and redirect fallback pages and
+  nonblank strings without whitespace, commas, Unicode uppercase/titlecase or emoji
+  characters anywhere. Lowercase/uncased languages, digits and punctuation remain
+  valid. Invalid names require explicit renaming; no silent lowercase/strip/migration
+  occurs. Titles appear on code hover and redirect fallback pages and
   remain searchable.
 - A nonempty nested object for a directory. A path cannot be both a directory and
   a redirect; folder names are their display labels.
@@ -89,8 +91,16 @@ literal `#hidden` are descriptive, not states.
 Tags can be combined. Hidden opacity applies independently of broken/disabled
 styling. Labels stay readable on one line; crowded rows scroll horizontally.
 Selecting the labels opens an informational popover with all tags. Full labels use
-sixteen stable automatic theme colors and palette-matched tinted backgrounds and
-borders, including disabled tags; other disabled row content remains neutral.
+deterministic HSL light/dark inks generated from the tag string's UTF-16 FNV-1a
+seed, with matched tinted backgrounds/borders. Every tag, including hidden,
+broken, disabled and script labels, uses the same generator; row-state emphasis
+remains separate. No finite palette, storage or unique-color promise. Other
+disabled row content remains neutral.
+
+Unicode validation uses Uppercase and titlecase categories, not ASCII-only checks.
+Emoji detection covers pictographs, emoji-presentation symbols, ZWJ/modifier
+sequences, flags/regional indicators and U+20E3 keycaps. Bare digits, `#` and `*`
+are allowed; they are not rejected just for being possible keycap bases.
 
 ### Migrating legacy properties
 
@@ -98,9 +108,10 @@ For each legacy `hidden` or `script` property:
 
 1. If its value is `true`, append the equivalent tag unless a trimmed,
    case-insensitive equivalent already exists.
-2. Explicitly rename existing tags containing whitespace (including padding) or
-   commas to maintainer-chosen valid names. Preserve all other valid raw tags,
-   fields, and their order. The build never trims or automatically renames tags.
+2. Explicitly rename existing tags containing whitespace (including padding),
+   commas, Unicode uppercase/titlecase or emoji to maintainer-chosen valid names.
+   Preserve all other valid raw tags, fields and order. The build never silently
+   trims, lowercases, strips or automatically renames tags.
 3. Remove the property for both `true` and `false`. A `false` value must not remove
    an independently configured tag.
 
@@ -121,7 +132,8 @@ on desktop and above it on mobile, preceding search in DOM/keyboard order;
 remove them individually to restore catalog order. Every selected tag must match
 (AND), together with remaining text. Labels retain full text and stable colors.
 
-Commit known `#tag` tokens with whitespace, comma or Enter. Duplicates consume
+Commit known `#tag` tokens with whitespace, comma or Enter; uppercase input can
+still resolve known lowercase identities. Duplicates consume
 syntax without toggling; unknown tokens remain with “Tag not found”. Uncommitted
 tokens are ordinary text and bare `#` matches nothing. URL fragments are not tokens.
 Only selected hidden/broken/disabled tags admit hidden leaves satisfying all

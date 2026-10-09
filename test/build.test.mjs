@@ -13,43 +13,45 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawn, spawnSync } from "node:child_process";
 import { createContext, runInContext, runInNewContext } from "node:vm";
-import { stringify } from "yaml";
+import { stringify, parse } from "yaml";
 import { linkFields, entryTree } from "../src/links.mjs";
 import { scriptString } from "../src/layout.mjs";
-import { tagSlot } from "../src/directory.mjs";
+import { tagColors } from "../src/directory.mjs";
 
-// Fixed vectors cover every slot under the approved UTF-16 modulo-16 mapping.
-const paletteTags = [
-  "color-27",
-  "color-4",
-  "color-9",
-  "color-26",
-  "color-3",
-  "color-8",
-  "color-18",
-  "color-2",
-  "color-7",
-  "color-19",
-  "color-1",
-  "color-6",
-  "color-23",
-  "color-0",
-  "color-5",
-  "color-22",
-];
+// Actual generated identities cover every degree of the hue spectrum.
+const hueSamples = new Map();
+for (let n = 0; n < 10000 && hueSamples.size < 360; n++) {
+  const tag = `spectrum-${n}`;
+  const hue = Math.floor(
+    Number(tagColors(tag).light.match(/hsl\(([\d.]+)/)[1]),
+  );
+  if (!hueSamples.has(hue)) hueSamples.set(hue, tag);
+}
+const spectrumTags = [...hueSamples]
+  .sort(([a], [b]) => a - b)
+  .map(([, tag]) => tag);
+const representativeTags = spectrumTags.filter((_, i) => i % 10 === 0);
 
-test("raw ambiguous tag names fail every format before output deletion; valid case and Unicode stay public", async (t) => {
+test("raw invalid tag names fail every format before output deletion; valid lowercase and uncased Unicode stay public", async (t) => {
   for (const source of ["links.json", "links.yaml", "links.yml"]) {
     const valid = {
       folder: {
         code: {
           url: "https://example.com/",
           tags: [
-            "SHELL",
             "shell",
             "café",
             "日本語",
-            "emoji-🎉",
+            "emoji-party",
+            "ελληνικά",
+            "русский",
+            "ａｂｃ",
+            "𐐨",
+            "123",
+            "#",
+            "*",
+            "a._-:;!/?&='\"\\",
+            "a\u0000b",
             "#literal",
             "<img/onerror=alert(1)>",
           ],
@@ -71,6 +73,25 @@ test("raw ambiguous tag names fail every format before output deletion; valid ca
       "a\u00a0b",
       "a\u2028b",
       "a\ufeffb",
+      "SHELL",
+      "sHeLl",
+      "café-É",
+      "Αλφα",
+      "Журнал",
+      "Ａｂｃ",
+      "ǅuro",
+      "Ⅳ",
+      "emoji-🎉",
+      "👩‍💻",
+      "👍🏽",
+      "🏽",
+      "🇬🇧",
+      "1️⃣",
+      "#️⃣",
+      "*️⃣",
+      "a\u20e3b",
+      "☀️",
+      "⌚",
     ]) {
       const map = {
         folder: { code: { url: "https://example.com/", tags: [tag] } },
@@ -88,19 +109,19 @@ test("raw ambiguous tag names fail every format before output deletion; valid ca
       );
       assert.match(
         result.stderr,
-        /Tag names must not contain whitespace or commas; rename this tag explicitly\. No automatic renaming is performed\./,
+        /Tag names must not contain whitespace, commas, Unicode uppercase\/titlecase characters or emoji \(pictographs, emoji-presentation symbols, flags or keycaps\); rename this tag explicitly\. No automatic renaming is performed\./,
       );
       assert.equal(await f.read("marker"), "preserved");
     }
   }
 });
 
-test("renderer publishes deduplicated lexical catalogs, safe full labels and stable UTF-16 color slots", async (t) => {
+test("renderer publishes deduplicated lexical catalogs, safe full labels and stable UTF-16 seeded colors", async (t) => {
   const leaf = (tags) => ({ url: "https://example.com/", tags });
   const entries = {
-    first: leaf(["shell", "SHELL", "shell", "café", "<tag>", "emoji-🎉"]),
+    first: leaf(["shell", "shell", "shell", "café", "<tag>", "emoji-party"]),
     folder: {
-      hidden: leaf(["hidden", "broken", "disabled", "script", "Shell"]),
+      hidden: leaf(["hidden", "broken", "disabled", "script", "shell"]),
     },
   };
   const a = await fixture(t, entries);
@@ -124,33 +145,23 @@ test("renderer publishes deduplicated lexical catalogs, safe full labels and sta
     [...inline.matchAll(/class="tag-label"[^>]*>(.*?)<\/span>/g)].map(
       (match) => match[1],
     ),
-    ["#shell", "#café", "#&lt;tag&gt;", "#emoji-🎉"],
+    ["#shell", "#café", "#&lt;tag&gt;", "#emoji-party"],
   );
-  for (const [identity, slot] of [
-    ["hidden", 3],
-    ["disabled", 3],
-    ["broken", 2],
-    ["script", 1],
-  ])
-    assert.equal(tagSlot(identity), slot);
-  // Fixed non-reserved vectors exercise UTF-16 (including a surrogate pair).
-  const reference = (identity) => {
-    let hash = 2166136261;
-    for (let i = 0; i < identity.length; i++)
-      hash = Math.imul(hash ^ identity.charCodeAt(i), 16777619) >>> 0;
-    return hash % 16;
-  };
-  for (const [identity, slot] of [
-    ["shell", 1],
-    ["café", 12],
-    ["emoji-🎉", 7],
-    ["<tag>", 5],
-  ])
-    assert.equal(tagSlot(identity), slot);
-  assert.deepEqual(
-    paletteTags.map(tagSlot),
-    Array.from({ length: 16 }, (_, i) => i),
+  assert.equal(
+    new Set(representativeTags.map((tag) => tagColors(tag).light)).size,
+    36,
   );
+  for (const [tag, light, dark] of [
+    ["hidden", "hsl(55.3 55% 20%)", "hsl(55.3 55% 81%)"],
+    ["disabled", "hsl(288.5 61% 20%)", "hsl(288.5 61% 81%)"],
+    ["broken", "hsl(80 56% 20%)", "hsl(80 56% 80%)"],
+    ["script", "hsl(153 56% 22%)", "hsl(153 56% 82%)"],
+    ["shell", "hsl(238.5 75% 22%)", "hsl(238.5 75% 82%)"],
+    ["café", "hsl(146.8 57% 20%)", "hsl(146.8 57% 81%)"],
+    ["𐐨", "hsl(223.6 69% 21%)", "hsl(223.6 69% 80%)"],
+    ["a\u0000b", "hsl(109 68% 21%)", "hsl(109 68% 81%)"],
+  ])
+    assert.deepEqual(tagColors(tag), { light, dark });
   const catalogs = [];
   for (const [f, path] of [
     [a, "index.html"],
@@ -162,20 +173,20 @@ test("renderer publishes deduplicated lexical catalogs, safe full labels and sta
     assert.doesNotMatch(html, /<tag>/);
     const catalog = html.match(/id="available-tags"[\s\S]*?<\/div>/)[0];
     catalogs.push(catalog);
+    assert.doesNotMatch(html, /data-slot=/);
     for (const match of html.matchAll(
-      /data-tag="([^"]*)" data-slot="(\d+)"/g,
+      /data-tag="([^"]*)" style="--tag-light:([^;]+);--tag-dark:([^"]+)"/g,
     )) {
       const identity = match[1].replaceAll("&lt;", "<").replaceAll("&gt;", ">");
-      assert.equal(
-        Number(match[2]),
-        { hidden: 3, disabled: 3, broken: 2, script: 1 }[identity] ??
-          reference(identity),
+      assert.deepEqual(
+        { light: match[2], dark: match[3] },
+        tagColors(identity),
       );
     }
   }
   assert.match(
     catalogs[0],
-    /data-tag="shell"[^>]*aria-label="Filter by #SHELL">#SHELL/,
+    /data-tag="shell"[^>]*aria-label="Filter by #shell">#shell/,
   );
   assert.equal([...catalogs[0].matchAll(/data-tag="shell"/g)].length, 1);
   assert.ok(
@@ -183,7 +194,7 @@ test("renderer publishes deduplicated lexical catalogs, safe full labels and sta
       catalogs[0].indexOf('data-tag="shell"'),
   );
   for (const catalog of catalogs)
-    assert.match(catalog, /data-tag="hidden" data-slot="3"/);
+    assert.match(catalog, /data-tag="hidden" style="--tag-light:hsl\(/);
 });
 
 test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle and rendered root/nested matrix", async (t) => {
@@ -206,7 +217,7 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
       ],
       "setup notes",
     ),
-    Shell: leaf(["SHELL"]),
+    Shell: leaf(["shell"]),
     Setup: leaf(["setup"]),
     Hidden: leaf(["hidden", "shell", "setup"]),
     Broken: leaf(["hidden", "broken", "shell"]),
@@ -299,8 +310,8 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
       type('##literal '); check(choices() === '#literal' && input.value === '', 'Exactly one prefix'); clear();
       input.dispatchEvent(new win.CompositionEvent('compositionstart')); type('#shell '); enter(); check(!choices() && input.value === '#shell ', 'IME premature');
       input.dispatchEvent(new win.CompositionEvent('compositionend')); check(choices() === 'shell' && input.value === '', 'IME completion'); clear();
-      type('#café '); check(choices() === 'café', 'Unicode token'); clear();
-      // Every surface consumes the same slot; full labels/neutral surfaces and geometry.
+      type('#CAFÉ '); check(choices() === 'café', 'Uppercase Unicode input resolves lowercase source'); clear();
+      // Every surface consumes the same generated theme pair and tinted treatment.
       toggle.click();
       check(doc.documentElement.scrollWidth <= doc.documentElement.clientWidth && input.getBoundingClientRect().width >= 150, 'Viewport/search collapse');
       for (const chip of picker.querySelectorAll('button')) {
@@ -316,7 +327,7 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
           picker.scrollLeft = offset + a.width - picker.clientWidth;
           check(chip.getBoundingClientRect().right <= track.right + 1, 'Long label end unreachable');
         }
-        for (const span of doc.querySelectorAll('.tag-label')) if (span.dataset.tag === chip.dataset.tag) check(span.dataset.slot === chip.dataset.slot && win.getComputedStyle(span).color === win.getComputedStyle(chip).color, 'Surface slot/color mismatch');
+        for (const span of doc.querySelectorAll('.tag-label')) if (span.dataset.tag === chip.dataset.tag) check(span.getAttribute('style') === chip.getAttribute('style') && win.getComputedStyle(span).color === win.getComputedStyle(chip).color, 'Surface seed/color mismatch');
       }
       for (const button of [...picker.querySelectorAll('button')]) button.click();
       check(!doc.querySelector('#all-tags-selected').hidden && !toggle.disabled && !picker.hidden, 'All-selected state');
@@ -692,7 +703,7 @@ test("legacy migration guidance requires explicit maintainer renaming before pub
     assert.equal(result.status, 1);
     assert.match(
       result.stderr,
-      /Explicitly rename existing padded, whitespace-containing or comma-containing tags to maintainer-chosen valid names; preserve all other valid raw values\. No automatic renaming is performed\./,
+      /Explicitly rename existing tags containing whitespace, commas, Unicode uppercase\/titlecase characters or emoji to maintainer-chosen valid names; preserve all other valid raw values\. No automatic renaming is performed\./,
     );
   }
 });
@@ -3598,7 +3609,7 @@ test("404 resolves root and nested paths under user and project sites", async (t
     Stopped: {
       Deep: {
         url: "https://example.com/disabled",
-        tags: ["Hidden", "DISABLED", "broken", "script"],
+        tags: ["hidden", "disabled", "broken", "script"],
       },
     },
     plain: "https://example.org/",
@@ -3706,12 +3717,18 @@ test("404 stops at the first readable ancestor map, even when the entry is missi
   }
 });
 
-test("404 forwards matching URLs despite malformed tags without probing a parent map", async (t) => {
+test("404 defensively interprets malformed and uppercase fetched tags without probing a parent map", async (t) => {
   const f = await fixture(t, {});
   assert.equal(f.build().status, 0);
   const script = behaviorScript(await f.read("404.html"), "recovery");
   for (const prefix of ["/", "/project/"]) {
-    for (const tags of ["invalid", [null], [42]]) {
+    for (const [tags, disabled] of [
+      ["invalid", false],
+      [[null], false],
+      [[42], false],
+      [[" DISABLED ", "HiDdEn", "SCRIPT"], true],
+      [["BROKEN"], false],
+    ]) {
       const requests = [];
       const elements = { home: {}, head: {}, msg: {} };
       let destination;
@@ -3736,14 +3753,17 @@ test("404 forwards matching URLs despite malformed tags without probing a parent
           };
         },
       });
-      assert.equal(destination, "https://example.com/valid");
+      assert.equal(
+        destination,
+        disabled ? prefix + "tools/Mixed/" : "https://example.com/valid",
+      );
       assert.deepEqual(requests, [prefix + "tools/links.json"]);
       assert.equal(elements.home.href, prefix + "tools/");
     }
   }
 });
 
-const stateMap = (script = true) =>
+const stateMap = (script = true, samples = representativeTags) =>
   Object.fromEntries(
     Array.from({ length: 8 }, (_, mask) => [
       `${script ? "" : "Plain"}State${mask}`,
@@ -3753,9 +3773,9 @@ const stateMap = (script = true) =>
         tags: [
           "docs",
           "release-notes",
-          ...paletteTags,
+          ...samples,
           ...(script ? ["script"] : []),
-          ...["Hidden", "BROKEN", "Disabled"].filter(
+          ...["hidden", "broken", "disabled"].filter(
             (_, bit) => mask & (1 << bit),
           ),
         ],
@@ -3772,7 +3792,7 @@ test("all eight states share interpretation, raw JSON/YAML publication, counts a
     },
     duplicate: {
       url: "https://example.com/",
-      tags: ["Hidden", "hidden", "HIDDEN", "DISABLED"],
+      tags: ["hidden", "hidden", "hidden", "disabled"],
     },
     plain: "https://example.com/",
   };
@@ -3940,7 +3960,7 @@ test("disabled Bash launchers exit 1 with exact stderr and invoke no downloader,
     folder: {
       Run: {
         url: "https://example.com/setup.sh",
-        tags: ["hidden", "broken", "DISABLED", "script"],
+        tags: ["hidden", "broken", "disabled", "script"],
       },
     },
   });
@@ -4088,6 +4108,115 @@ test("disabled copy-only controls keep full values, rejection feedback, timer re
   assert.equal(list.click, null);
 });
 
+test("seeded colors cover the hue spectrum, current map and conservative bounds on real tinted state surfaces", async (t) => {
+  const chrome = availableChrome(t);
+  if (!chrome) return;
+  const collectTags = (nodes) =>
+    nodes.flatMap((node) =>
+      node.isDirectory ? collectTags(node.children) : node.tags,
+    );
+  const current = [
+    ...new Set(
+      collectTags(
+        entryTree(
+          parse(
+            await readFile(new URL("../links.yaml", import.meta.url), "utf8"),
+          ),
+        ),
+      ),
+    ),
+  ];
+  const samples = [
+    ...new Set([
+      "docs",
+      ...spectrumTags,
+      ...current.filter(
+        (tag) => !["hidden", "broken", "disabled", "script"].includes(tag),
+      ),
+    ]),
+  ];
+  const colors = Object.fromEntries(
+    [...samples, "hidden", "broken", "disabled", "script"].map((tag) => [
+      tag,
+      tagColors(tag),
+    ]),
+  );
+  assert.equal(hueSamples.size, 360);
+  assert.ok(new Set(samples.map((tag) => colors[tag].light)).size > 16);
+  const f = await fixture(t, { folder: stateMap(true, samples) });
+  assert.equal(f.build().status, 0);
+  const origin = await browserServer(t, f.cwd);
+  await writeFile(
+    join(f.cwd, "dist", "spectrum-check.html"),
+    `<!doctype html><html><body><iframe style="height:900px;border:0"></iframe><script>
+  (async () => {try {
+    const frame = document.querySelector('iframe');
+    const load = path => new Promise(resolve => {frame.onload = resolve; frame.src = path;});
+    const check = (ok,message) => {if(!ok) throw Error(message)};
+    const colors = ${scriptString(colors)}, current = ${scriptString(current)};
+    const blend = (a,b,o) => a.map((v,i)=>v*o+b[i]*(1-o));
+    const rgb = value => {const v=value.match(/[\\d.]+/g).slice(0,3).map(Number);return value.startsWith('color(srgb ') ? v.map(c=>c*255) : v;};
+    const lum = a => a.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4}).reduce((n,v,i)=>n+v*[.2126,.7152,.0722][i],0);
+    const contrast = (a,b) => (Math.max(lum(a),lum(b))+.05)/(Math.min(lum(a),lum(b))+.05);
+    const identity = e => JSON.parse(String.fromCharCode(34)+e.dataset.tag+String.fromCharCode(34));
+    let minimum = Infinity, generated = 0, boundary = 0;
+    for(const width of [390,1440]) for(const path of ['/', '/folder/']) {
+      frame.style.width = width+'px'; await load(path);
+      const doc=frame.contentDocument, win=frame.contentWindow;
+      const rules=[...doc.styleSheets].flatMap(s=>[...s.cssRules]);
+      for(const rule of rules.filter(r=>r.selectorText?.includes(':hover'))) rule.selectorText=rule.selectorText.replaceAll(':hover',':is(:hover,.verify-hover)');
+      for(const li of doc.querySelectorAll('li[hidden]')) li.hidden=false;
+      for(const d of doc.querySelectorAll('details')) d.open=true;
+      for(const theme of ['light','dark']) {
+        doc.documentElement.dataset.theme=theme;
+        const bg=rgb(win.getComputedStyle(doc.body).backgroundColor);
+        const readable = (label,row,kind) => {
+          const style=win.getComputedStyle(label), opacity=Number(win.getComputedStyle(row).opacity);
+          const backdrop=row.classList.contains('disabled-row') ? rgb(win.getComputedStyle(row.parentElement).backgroundColor) : bg;
+          const ratio=contrast(blend(rgb(style.color),backdrop,opacity),blend(rgb(style.backgroundColor),backdrop,opacity));
+          minimum=Math.min(minimum,ratio); check(ratio>=4.5,kind+' contrast '+ratio+' '+theme+' '+label.getAttribute('style'));
+        };
+        const available = [...doc.querySelectorAll('#available-tags button')];
+        check(current.every(tag=>available.some(e=>identity(e)===tag)),'Current-map tag coverage');
+        const catalog=new Map(available.map(e=>[identity(e),e.getAttribute('style')]));
+        for(const row of doc.querySelectorAll('.link-row')) {
+          check(row.getBoundingClientRect().height===50,'Hue fixture row height');
+          for(const hovered of [false,true]) {
+            row.classList.toggle('verify-hover',hovered);
+            for(const label of row.querySelectorAll('.tag-label')) {
+              const tag=identity(label), expected=colors[tag];
+              check(label.style.getPropertyValue('--tag-light')===expected.light && label.style.getPropertyValue('--tag-dark')===expected.dark,'Seed vector metadata');
+              check(label.getAttribute('style')===catalog.get(tag),'Root/nested/catalog metadata stability');
+              label.classList.toggle('verify-hover',hovered); readable(label,row,'Generated'); generated++;
+            }
+          }
+          row.classList.remove('verify-hover');
+        }
+        // Verify the fixed HSL envelope's hue/saturation/lightness endpoints
+        // through native CSS, not a competing JS HSL conversion.
+        const row=doc.querySelector('.link-row.disabled-row').cloneNode(false);
+        const li=doc.createElement('li'); li.dataset.hidden='true'; li.append(row); doc.querySelector('.links').append(li);
+        const probe=doc.createElement('span'); probe.className='tag-label';probe.textContent='#bounds';row.append(probe);
+        for(let hue=0;hue<360;hue++) for(const sat of [55,75]) for(const light of [20,22]) for(const dark of [80,84]) {
+          probe.style.setProperty('--tag-light','hsl('+hue+' '+sat+'% '+light+'%)');probe.style.setProperty('--tag-dark','hsl('+hue+' '+sat+'% '+dark+'%)');
+          for(const hover of [false,true]) {probe.classList.toggle('verify-hover',hover);readable(probe,row,'Bounds');boundary++;}
+        }
+        li.remove();
+      }
+    }
+    document.body.dataset.minimum=minimum.toFixed(4); document.body.dataset.generated=generated;document.body.dataset.boundary=boundary;document.body.dataset.spectrumCheck='passed';
+  } catch(error){document.body.dataset.spectrumCheck=error.message}})();
+  </script></body></html>`,
+  );
+  const html = runChrome(chrome, f.cwd, origin + "/spectrum-check.html");
+  assert.match(html, /data-spectrum-check="passed"/, html);
+  const minimum = Number(html.match(/data-minimum="([^"]+)"/)[1]);
+  assert.ok(minimum >= 4.5);
+  console.info(
+    `Seeded hue contrast: minimum ${minimum}:1; ${html.match(/data-generated="([^"]+)"/)[1]} generated and ${html.match(/data-boundary="([^"]+)"/)[1]} envelope surface checks`,
+  );
+});
+
 test("state rows, selected filters, all-hidden traversal, disabled native actions and lifecycle render in both themes and sizes", async (t) => {
   const chrome = availableChrome(t);
   if (!chrome) return;
@@ -4191,30 +4320,31 @@ test("state rows, selected filters, all-hidden traversal, disabled native action
           const paint = (value, scope) => { scope.append(probe); probe.style.background = value; const color = win.getComputedStyle(probe).backgroundColor; probe.remove(); return color; };
            const bg = rgb(win.getComputedStyle(doc.body).backgroundColor);
            const tagSurface = (element, backdrop = bg, opacity = 1) => {
-             const slot = Number(element.dataset.slot);
+             const tag = element.dataset.tag;
              for (const hovered of [false, true]) {
                element.classList.toggle('verify-hover', hovered);
                const s = win.getComputedStyle(element);
-               check(JSON.stringify(rgb(s.color)) === JSON.stringify(rgb(win.getComputedStyle(doc.documentElement).getPropertyValue('--tag-' + slot))), 'Tag ink slot mismatch: ' + slot);
-               check(s.backgroundColor === paint('color-mix(in srgb, var(--tag-tone) ' + (hovered ? 8 : 5) + '%, var(--panel))', element), 'Tag tint mismatch: ' + slot);
-               check(s.borderTopWidth === '1px' && s.borderTopStyle === 'solid' && s.borderTopColor === paint('color-mix(in srgb, var(--tag-tone) ' + (hovered ? 45 : 30) + '%, var(--panel))', element), 'Tag border mismatch: ' + slot);
+               check(s.color === paint('var(--tag-' + theme + ')', element), 'Generated tag ink mismatch: ' + tag);
+               check(s.backgroundColor === paint('color-mix(in srgb, var(--tag-tone) ' + (hovered ? 8 : 5) + '%, var(--panel))', element), 'Tag tint mismatch: ' + tag);
+               check(s.borderTopWidth === '1px' && s.borderTopStyle === 'solid' && s.borderTopColor === paint('color-mix(in srgb, var(--tag-tone) ' + (hovered ? 45 : 30) + '%, var(--panel))', element), 'Tag border mismatch: ' + tag);
                readable(win, element, backdrop, backdrop, opacity);
              }
              element.classList.remove('verify-hover');
            };
-           const allSlots = Array.from({length:16}, (_,i)=>i).join(',');
-           const slots = elements => [...new Set([...elements].map(e => Number(e.dataset.slot)))].sort((a,b)=>a-b).join(',');
+           const representatives = ${scriptString(representativeTags)};
+           const covers = elements => representatives.every(tag => [...elements].some(e => e.dataset.tag === tag));
            if (!native) {
-             check(slots(doc.querySelectorAll('#available-tags button')) === allSlots, 'Available fixture must cover sixteen slots');
-             const selectedSlots = new Set();
+             check(covers(doc.querySelectorAll('#available-tags button')), 'Available fixture must cover broad generated hues');
+             const selectedSeeds = new Set();
              for (const chip of doc.querySelectorAll('#available-tags button')) {
                tagSurface(chip);
                if (chip.hidden) continue;
                chip.click();
                const moved = [...doc.querySelectorAll('#selected-tags button')].find(b => b.dataset.tag === chip.dataset.tag);
-               tagSurface(moved); selectedSlots.add(Number(moved.dataset.slot)); moved.click();
+               check(moved.getAttribute('style') === chip.getAttribute('style'), 'Selected metadata must clone catalog');
+               tagSurface(moved); selectedSeeds.add(moved.dataset.tag); moved.click();
              }
-             check([...selectedSlots].sort((a,b)=>a-b).join(',') === allSlots, 'Selected fixture must cover sixteen slots');
+             check(representatives.every(tag => selectedSeeds.has(tag)), 'Selected fixture must cover generated hues');
              for (const li of doc.querySelectorAll('li[hidden]')) li.hidden = false;
              for (const details of doc.querySelectorAll('details')) details.open = true;
            }
@@ -4255,7 +4385,7 @@ test("state rows, selected filters, all-hidden traversal, disabled native action
              const dest = r.querySelector('.destination');
              check(dest.getBoundingClientRect().width >= (width < 500 ? 48 : 64), 'Destination reserve');
              const labelBackdrop = mask & 4 ? rgb(win.getComputedStyle(r.parentElement).backgroundColor) : bg;
-             check(slots(r.querySelectorAll('.tag-label')) === allSlots, 'Row fixture must cover sixteen slots');
+             check(covers(r.querySelectorAll('.tag-label')), 'Row fixture must cover generated hues');
              for (const hovered of [false, true]) {
                r.classList.toggle('verify-hover', hovered);
                for (const label of r.querySelectorAll('.tag-label')) tagSurface(label, labelBackdrop, Number(style.opacity));
@@ -4263,7 +4393,7 @@ test("state rows, selected filters, all-hidden traversal, disabled native action
              r.classList.remove('verify-hover');
              const tagsPanel = r.nextElementSibling;
              tagsPanel.showPopover();
-             check(slots(tagsPanel.querySelectorAll('.tag-label')) === allSlots, 'Popover fixture must cover sixteen slots');
+             check(covers(tagsPanel.querySelectorAll('.tag-label')), 'Popover fixture must cover generated hues');
              for (const label of tagsPanel.querySelectorAll('.tag-label')) tagSurface(label);
              tagsPanel.hidePopover();
             if (mask & 4) {

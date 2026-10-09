@@ -4,39 +4,22 @@ Derived from the spec memory and source decisions; applies to every directory pa
 
 ## Identity and validation — CAP-1, CAP-5
 
-- Keep the existing array-of-nonblank-strings contract; additionally reject any JavaScript `\s` character or comma anywhere in the raw tag, including leading/trailing whitespace. Do not trim invalid values into acceptance. Preserve valid Unicode, punctuation, casing, array order, and public `dist/links.json` values.
+- Keep the array-of-nonblank-strings contract. Reject raw JavaScript `\s`, commas, Unicode `\p{Uppercase}` or `\p{Lt}` (titlecase) and emoji characters anywhere in the tag, including padding. Emoji detection uses `\p{Extended_Pictographic}`, `\p{Emoji_Presentation}`, `\p{Regional_Indicator}` and U+20E3 (keycaps), covering pictographs, ZWJ/modifier sequences, flags and keycaps without banning bare digits, # or *. Preserve valid lowercase/uncased international text, digits, ordinary punctuation, NUL, raw values/order and public `dist/links.json`. Do not silently trim, lowercase, strip or otherwise normalize invalid names into acceptance.
 - Use `tag.toLowerCase()` as identity, matching existing case-insensitive search/states; do not add Unicode normalization. Exact reserved identities are `hidden`, `broken`, `disabled`, and `script`; descriptive lookalikes derive no state. Existing defensive trimmed state interpretation can remain for fetched recovery metadata.
-- Deduplicate identities per leaf/catalog/selection without mutating raw data. Row labels preserve configured case. For a catalog identity with case variants, choose the raw label smallest by JavaScript UTF-16 lexical comparison; sort the catalog by canonical identity with the same comparison. Selected tags use insertion order; returned tags rejoin catalog order.
-- Validation messages name source/entry path and offending value and explain: “Tag names must not contain whitespace or commas; rename this tag explicitly. No automatic renaming is performed.” Retain existing type/nonblank guidance where applicable. Every format fails before `dist/` deletion.
+- Deduplicate identities per leaf/catalog/selection without mutating raw data. Row labels preserve the first configured spelling and order; uppercase/titlecase source variants are invalid. Sort the catalog by canonical UTF-16 lexical identity; selected tags retain insertion order and returned tags rejoin catalog order. Typed uppercase tokens still resolve known lowercase identities; defensive fetched recovery interpretation remains case-insensitive.
+- Validation messages name source/entry path and offending value and explain: “Tag names must not contain whitespace, commas, Unicode uppercase/titlecase characters or emoji (pictographs, emoji-presentation symbols, flags or keycaps); rename this tag explicitly. No automatic renaming is performed.” Retain type/nonblank guidance. JSON/YAML/YML all fail before `dist/` deletion, including migration from legacy properties.
 - The user authorized `release notes` → `release-notes` on `search-test-exact` on 2026-10-09. Existing tests for padded state tags and multiword tags must become intentional rejection fixtures or explicitly updated valid fixtures, not silently transformed data.
+- The user additionally authorized exactly four checked-in renames on 2026-10-09: HiDdEn → hidden, BrOkEn → broken, DiSaBlEd → disabled and emoji-🎉 → emoji-party. Uppercase/emoji publication fixtures become explicit valid renames or intentional rejection cases; historical logs remain historical.
 
 ## Automatic color assignment — CAP-1
 
 Use one deterministic rule across build-time rendering; browser chips consume the same published identity/color metadata rather than implementing a competing rule. No registry, local storage, manual configuration, or result-order assignment.
 
-| Slot | Light ink | Dark ink | Role |
-| --- | --- | --- | --- |
-| 0 | `#006b60` | `#64b6a4` | Teal |
-| 1 | `#895400` | `#c6a36a` | Amber |
-| 2 | `#a33d20` | `#ee967b` | Orange-red |
-| 3 | `#606060` | `#a3a3a3` | Grey |
-| 4 | `#7044a3` | `#c4a1ec` | Violet |
-| 5 | `#245e9b` | `#90b9ed` | Blue |
-| 6 | `#94346b` | `#e999c3` | Magenta |
-| 7 | `#596600` | `#b3bc70` | Olive |
-| 8 | `#006579` | `#72bfce` | Cyan |
-| 9 | `#9b3548` | `#ef9baa` | Rose |
-| 10 | `#4c509d` | `#a8adf0` | Indigo |
-| 11 | `#39682c` | `#93c785` | Leaf |
-| 12 | `#875027` | `#d9aa80` | Copper |
-| 13 | `#7b3e80` | `#d5a0da` | Plum |
-| 14 | `#48616d` | `#9cb9c7` | Slate |
-| 15 | `#23674a` | `#7dc6a1` | Forest |
-
-- Reserve `hidden` and `disabled` for slot 3, `broken` for slot 2, `script` for slot 1. For other identities, start hash at `2166136261`; iterate canonical string UTF-16 code units, applying `(Math.imul(hash ^ charCode, 16777619) >>> 0)`; slot is `hash % 16`. The user-approved 2026-10-09 visual amendment supersedes the former modulo-six mapping. Freeze this sixteen-slot mapping across subsequent builds; unrelated additions/removals/reordering cannot recolor tags.
-- Theme changes select the corresponding ink variant, preserving slot identity. Sixteen slots reduce collisions without promising unique colors for every tag; full labels carry identity.
-- Individually color full `#label` spans in existing row tag trigger/popover and picker chips, with backgrounds and borders tinted from each tag's own ink. Shared CSS publishes `--tag-tone` per slot; one color-mix treatment blends tone into the local `--panel` at 5% resting / 8% hover for fills and 30% resting / 45% hover for borders. Do not duplicate per-slot surface declarations or inherit regular/script/broken/disabled row emphasis. Preserve 50px row heights and full-label horizontal overflow. Losslessly JSON-encode identity metadata, including accepted NUL, without changing raw public values.
-- Exempt only tag labels/chip treatment from disabled grayscale overrides; code, destination, unavailable actions and row wash remain neutral. Hidden dimming still applies and focus restores opacity. Verify text contrast ≥4.5:1 on actual backgrounds, including hidden opacity and hover/focus wash; if a proposed ink fails, adjust its theme pair and record the final mapping before shipping. Do not solve contrast by removing disabled-tag colors.
+- The latest user-approved 2026-10-09 amendment replaces finite palettes entirely, including special assignments for state labels. For EVERY canonical tag identity, start seed at `2166136261`; iterate UTF-16 code units with `Math.imul(seed ^ charCode, 16777619) >>> 0`.
+- Generate HSL inks directly: hue = `(seed % 3600) / 10`; saturation = `55 + ((seed >>> 16) % 21)` percent; light-theme lightness = `20 + ((seed >>> 24) % 3)` percent; dark-theme lightness = `80 + ((seed >>> 24) % 5)` percent. Final fixed bounds are hue 0–359.9°, saturation 55–75%, light lightness 20–22% and dark lightness 80–84%. Collisions remain possible; there is no unique-color promise or stored registry. Unrelated additions/removals/reordering cannot change a tag's colors.
+- Publish numeric generated `--tag-light` / `--tag-dark` HSL metadata on each row/popover label and catalog chip once. Selected chips clone the catalog metadata. Shared CSS sets `--tag-tone: light-dark(var(--tag-light), var(--tag-dark))` under the existing root color-scheme. No browser hash implementation, slot attributes, per-slot tokens or surface declarations.
+- Full #labels and chips share color-mix tint treatment against local `--panel`: 5% resting / 8% hover fills and 30% resting / 45% hover borders. Preserve lossless JSON-content identities, 50px rows and horizontal full-label overflow. State labels use their own generated inks; regular/script/broken/disabled row-state emphasis remains separately owned.
+- Only tags are exempt from disabled non-tag grayscale; hidden dimming stays independent and focus restores opacity. Require ≥4.5:1 on actual tinted backgrounds including hidden opacity and row wash. The initial light ceiling of 23% failed a yellow envelope edge; the fixed 22% ceiling and 80% dark floor passed the executed full-spectrum/envelope checks. Preserve these bounds rather than silently changing theme colors later.
 
 ## Tools and selection — CAP-2
 
@@ -63,7 +46,7 @@ Selecting `script` or an ordinary descriptive tag alone never reveals hidden lea
 
 ## Typed tokens — CAP-4
 
-- A candidate is `#` followed by a nonempty name, at the start of input or immediately after whitespace/comma. A `#` inside an ordinary word or URL fragment is not a token. Remove exactly one prefix; names themselves may contain `#` because the locked validation prohibits only whitespace/commas.
+- A candidate is `#` followed by a nonempty name, at the start of input or immediately after whitespace/comma, outside HTTP(S) URL spans. Remove exactly one prefix; names themselves may contain #, digits or * under the validation restrictions above. Typed uppercase syntax resolves known lowercase identities.
 - A following space/other whitespace or comma attempts commitment on input, including paste; Enter attempts the candidate at the caret and prevents form submission. Scan completed candidates left-to-right; process each once. Do not commit during IME composition; process after composition ends. Preserve caret placement and unrelated free text.
 - A known catalog identity adds one selection and consumes its token and one terminating delimiter. An already-selected identity consumes syntax, leaves the selection untouched, and politely announces “Tag already selected.” Typed duplicates do not toggle/removal. Enter contributes no input delimiter to remove.
 - Unknown attempted tokens, including their typed delimiter, remain unchanged and display exact “Tag not found” in a separate polite, search-associated error. Do not select them or erase them to force a match. Known candidates elsewhere can still commit. Clear the error when its offending token is corrected to a known tag and committed or removed; never overwrite it with count/copy/download feedback.
@@ -84,8 +67,8 @@ Reuse `test/build.test.mjs` and its browser harness; implementation checks are a
 
 | Responsibility | Required proof |
 | --- | --- |
-| Validation | JSON/YAML/YML reject internal/outer whitespace, tabs/newlines and commas with source/path/value guidance; existing output sentinel survives rejection. Valid Unicode/case/raw tag values stay intact. |
-| Colors | Same lossless identity/slot for mixed case, repeated tags, folders, every surface, and disabled tags; stable after source reorder/add/remove and reload; fixed reserved slots, both themes, safe HTML output. Fixtures must cover all sixteen slots with ≥4.5:1 contrast on actual resting/hover tinted fills, hidden opacity and row wash; palette-matched fill/border proof for inline/popover/available/selected tags. |
+| Validation | JSON/YAML/YML reject whitespace/commas, ASCII/accented/Greek/Cyrillic/fullwidth uppercase and titlecase, pictographs/ZWJ/modifiers/flags/keycaps before deleting output, with source/path/value rename guidance and retained sentinel. Allowed lowercase/uncased international text, bare digits/#/*, punctuation and NUL stay raw. Uppercase input/recovery remains case-insensitive. |
+| Colors | Pin UTF-16 seed/color vectors (including supplementary lowercase and NUL), verify stable source reorder/add/remove/reload/root/nested/all-surface metadata and >16 distinct representative inks. Execute full hue-spectrum and conservative HSL-envelope bounds on actual light/dark tinted rest/hover backgrounds, hidden opacity and state row wash, including every current-map tag. Preserve separate row state colors and shared fill/border proof for all tag surfaces. |
 | Catalog/selection | Hidden-inclusive subtree scope; dedup/order; unchanged pool under text/AND/zero results; removal restores order; all-selected, no-tag, empty and all-hidden pages; keyboard focus after moves. Selected track is left of search on desktop, above on mobile and before search in DOM/native Tab order; preserve Tab and horizontal touch-track scrolling proof. |
 | Filter predicate | No-selection baseline, two ordinary tags AND, text combination, nonmatching leaf, ancestor-only folder text, each reserved selection, broken+disabled, removal of last reserved tag; counts/disclosures/empty/no-match agree. |
 | Tokens | Space/comma/Enter, case, duplicates, bare #, unfinished/unknown/corrected/deleted token, mixed prose, multiple pasted tokens, mid-input caret, URL fragments and IME; no lost unrelated input/delimiters, no hidden reveal before selection. |
