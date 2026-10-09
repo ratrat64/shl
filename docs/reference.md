@@ -91,11 +91,13 @@ literal `#hidden` are descriptive, not states.
 Tags can be combined. Hidden opacity applies independently of broken/disabled
 styling. Labels stay readable on one line; crowded rows scroll horizontally.
 Selecting the labels opens an informational popover with all tags. Full labels use
-deterministic HSL light/dark inks generated from the tag string's UTF-16 FNV-1a
-seed, with matched tinted backgrounds/borders. Every tag, including hidden,
-broken, disabled and script labels, uses the same generator; row-state emphasis
-remains separate. No finite palette, storage or unique-color promise. Other
-disabled row content remains neutral.
+deterministic HSL light/dark inks generated from the descriptive tag string's
+UTF-16 FNV-1a seed, with matched tinted backgrounds/borders. Broken, script and
+disabled labels instead reuse their shared link-state colors; hidden uses readable
+neutral gray in light mode and light gray in dark mode. These colors are consistent
+across rows, popovers and available/selected filters regardless of row-state
+precedence. No finite palette, storage or unique-color promise. Other disabled
+row content remains neutral.
 
 Unicode validation uses Uppercase and titlecase categories, not ASCII-only checks.
 Emoji detection covers pictographs, emoji-presentation symbols, ZWJ/modifier

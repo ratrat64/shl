@@ -1,7 +1,15 @@
 import { esc, page, pageTitle } from "./layout.mjs";
 import { entryTree, entryCounts } from "./links.mjs";
 
+const fixed = {
+  broken: "var(--broken)",
+  script: "var(--tag-script)",
+  disabled: "var(--disabled)",
+  hidden: "var(--tag-hidden)",
+};
 export const tagColors = (identity) => {
+  if (Object.hasOwn(fixed, identity))
+    return { light: fixed[identity], dark: fixed[identity] };
   let hash = 2166136261;
   for (let i = 0; i < identity.length; i++)
     hash = Math.imul(hash ^ identity.charCodeAt(i), 16777619) >>> 0;

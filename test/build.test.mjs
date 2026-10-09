@@ -160,10 +160,13 @@ test("renderer publishes deduplicated lexical catalogs, safe full labels and sta
     36,
   );
   for (const [tag, light, dark] of [
-    ["hidden", "hsl(55.3 55% 20%)", "hsl(55.3 55% 81%)"],
-    ["disabled", "hsl(288.5 61% 20%)", "hsl(288.5 61% 81%)"],
-    ["broken", "hsl(80 56% 20%)", "hsl(80 56% 80%)"],
-    ["script", "hsl(153 56% 22%)", "hsl(153 56% 82%)"],
+    ["hidden", "var(--tag-hidden)", "var(--tag-hidden)"],
+    ["disabled", "var(--disabled)", "var(--disabled)"],
+    ["broken", "var(--broken)", "var(--broken)"],
+    ["script", "var(--tag-script)", "var(--tag-script)"],
+    ["script-tools", "hsl(350 63% 21%)", "hsl(350 63% 82%)"],
+    ["#hidden", "hsl(127.4 66% 20%)", "hsl(127.4 66% 83%)"],
+    ["invisible", "hsl(24 62% 20%)", "hsl(24 62% 80%)"],
     ["shell", "hsl(238.5 75% 22%)", "hsl(238.5 75% 82%)"],
     ["café", "hsl(146.8 57% 20%)", "hsl(146.8 57% 81%)"],
     ["𐐨", "hsl(223.6 69% 21%)", "hsl(223.6 69% 80%)"],
@@ -202,7 +205,10 @@ test("renderer publishes deduplicated lexical catalogs, safe full labels and sta
       catalogs[0].indexOf('data-tag="shell"'),
   );
   for (const catalog of catalogs)
-    assert.match(catalog, /data-tag="hidden" style="--tag-light:hsl\(/);
+    assert.match(
+      catalog,
+      /data-tag="hidden" style="--tag-light:var\(--tag-hidden\)/,
+    );
 });
 
 test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle and rendered root/nested matrix", async (t) => {
@@ -273,7 +279,17 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
       const shown = () => [...doc.querySelectorAll('.link-row')].filter(r => !r.closest('li').hidden && r.getClientRects().length).map(r => r.querySelector('.code').textContent).sort().join(',');
       const baseline = page ? 5 : 7;
       check(count() === baseline && choices() === '' && picker.hidden && selected.hidden, 'Fresh mount');
-      const catalog = pool(); check(catalog.includes('hidden') && catalog.includes('disabled') && (page ? !catalog.includes('outside') : catalog.includes('outside')), 'Subtree scope');
+       const catalog = pool(); check(catalog.includes('hidden') && catalog.includes('disabled') && (page ? !catalog.includes('outside') : catalog.includes('outside')), 'Subtree scope');
+       const publishedColors = new Map([...picker.querySelectorAll('button')].map(b => [b.dataset.tag, b.getAttribute('style')]));
+       // Browser selection must consume metadata, even if the renderer changes a fixed ink.
+       for (const tag of ['hidden','broken','script','disabled']) {
+         const original = picker.querySelector('button[data-tag="' + tag + '"]');
+         original.style.setProperty('--tag-light', 'var(--ink)'); original.style.setProperty('--tag-dark', 'var(--ink)');
+         pick(tag);
+         const clone = selected.querySelector('button');
+         check(clone.getAttribute('style') === original.getAttribute('style') && win.getComputedStyle(clone).color === win.getComputedStyle(original).color, 'Fixed selection must consume published metadata');
+         remove(tag); original.setAttribute('style', publishedColors.get(tag));
+       }
       toggle.click(); check(!picker.hidden && toggle.getAttribute('aria-expanded') === 'true' && count() === baseline, 'Opening changed results');
       const availableOrder = [...picker.querySelectorAll('button')];
       check(availableOrder.every((b, i) => !i || b.getBoundingClientRect().left > availableOrder[i - 1].getBoundingClientRect().left), 'Available visual catalog order');
@@ -325,7 +341,7 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
       input.dispatchEvent(new win.CompositionEvent('compositionstart')); type('#shell '); enter(); check(!choices() && input.value === '#shell ', 'IME premature');
       input.dispatchEvent(new win.CompositionEvent('compositionend')); check(choices() === 'shell' && input.value === '', 'IME completion'); clear();
       type('#CAFÉ '); check(choices() === 'café', 'Uppercase Unicode input resolves lowercase source'); clear();
-      // Every surface consumes the same generated theme pair and tinted treatment.
+       // Every surface consumes the same renderer-owned theme pair and tinted treatment.
       toggle.click();
       check(doc.documentElement.scrollWidth <= doc.documentElement.clientWidth && input.getBoundingClientRect().width >= 150, 'Viewport/search collapse');
       for (const chip of picker.querySelectorAll('button')) {
@@ -343,7 +359,11 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
         }
         for (const span of doc.querySelectorAll('.tag-label')) if (span.dataset.tag === chip.dataset.tag) check(span.getAttribute('style') === chip.getAttribute('style') && win.getComputedStyle(span).color === win.getComputedStyle(chip).color, 'Surface seed/color mismatch');
       }
-      for (const button of [...picker.querySelectorAll('button')]) button.click();
+       for (const button of [...picker.querySelectorAll('button')]) button.click();
+       for (const chip of selected.querySelectorAll('button')) {
+         const original = picker.querySelector('button[data-tag="' + chip.dataset.tag + '"]');
+         check(chip.getAttribute('style') === original.getAttribute('style') && win.getComputedStyle(chip).color === win.getComputedStyle(original).color, 'Selected color metadata cloning');
+       }
       check(!doc.querySelector('#all-tags-selected').hidden && !toggle.disabled && !picker.hidden, 'All-selected state');
       check(selected.scrollWidth > selected.clientWidth && selected.getBoundingClientRect().width > 0, 'Selected scroll track');
       check(!!(selected.compareDocumentPosition(input) & win.Node.DOCUMENT_POSITION_FOLLOWING), 'Selected DOM order must precede search');
@@ -373,7 +393,11 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
       const oldValue = input.value; type('#setup '); check(input.value === '#setup ' && choices() === 'shell', 'Outgoing input listener');
       picker.querySelector('button[data-tag="setup"]').click(); check(choices() === 'shell', 'Outgoing picker listener');
       win.history.back(); for (let i = 0; !doc.querySelector('#link-search') && i < 100; i++) await wait();
-      check(mounts === 2 && doc.querySelector('#link-search').value === '' && doc.querySelector('#selected-tags').hidden && doc.querySelector('#available-tags').hidden, 'Back reset/mount');
+       check(mounts === 2 && doc.querySelector('#link-search').value === '' && doc.querySelector('#selected-tags').hidden && doc.querySelector('#available-tags').hidden, 'Back reset/mount');
+       for (const chip of doc.querySelectorAll('#available-tags button')) {
+         check(chip.getAttribute('style') === publishedColors.get(chip.dataset.tag), 'App mount color metadata');
+         for (const label of doc.querySelectorAll('.tag-label')) if (label.dataset.tag === chip.dataset.tag) check(label.getAttribute('style') === chip.getAttribute('style') && win.getComputedStyle(label).color === win.getComputedStyle(chip).color, 'App mount tag color consistency');
+       }
       win.history.forward(); for (let i = 0; doc.querySelector('#link-search') && i < 100; i++) await wait(); check(mounts === 3, 'Forward mount');
     }
     await load('/noTags/'); check(frame.contentDocument.querySelector('#tag-toggle').disabled && !frame.contentDocument.querySelector('.search').hidden, 'Untagged search');
@@ -4469,13 +4493,24 @@ test("state rows, selected filters, all-hidden traversal, disabled native action
           for (const [rule, selector] of hoverRules) rule.selectorText = selector.replaceAll(':hover', ':is(:hover, .verify-hover)');
           const probe = doc.createElement('div'); probe.style.display = 'none';
           const paint = (value, scope) => { scope.append(probe); probe.style.background = value; const color = win.getComputedStyle(probe).backgroundColor; probe.remove(); return color; };
-           const bg = rgb(win.getComputedStyle(doc.body).backgroundColor);
-           const tagSurface = (element, backdrop = bg, opacity = 1) => {
+            const bg = rgb(win.getComputedStyle(doc.body).backgroundColor);
+            const fixedTags = ['broken','script','disabled','hidden'];
+            const matrixContext = () => ' theme=' + doc.documentElement.dataset.theme + ' width=' + width + ' prefix=' + prefix + ' native=' + native;
+            const fixedInk = element => {
+              const tag = element.dataset.tag;
+              if (!fixedTags.includes(tag)) return;
+              const expected = tag === 'hidden'
+                ? doc.documentElement.dataset.theme === 'light' ? 'rgb(96, 96, 96)' : 'rgb(208, 208, 208)'
+                : paint('var(--' + tag + ')', doc.documentElement);
+              check(win.getComputedStyle(element).color === expected, 'Fixed ink mismatch: ' + tag + matrixContext());
+            };
+            const tagSurface = (element, backdrop = bg, opacity = 1) => {
              const tag = element.dataset.tag;
              for (const hovered of [false, true]) {
                element.classList.toggle('verify-hover', hovered);
                const s = win.getComputedStyle(element);
-               check(s.color === paint('var(--tag-' + theme + ')', element), 'Generated tag ink mismatch: ' + tag);
+                 check(s.color === paint('var(--tag-' + theme + ')', element), 'Renderer tag ink mismatch: ' + tag + matrixContext());
+                 fixedInk(element);
                check(s.backgroundColor === paint('color-mix(in srgb, var(--tag-tone) ' + (hovered ? 8 : 5) + '%, var(--panel))', element), 'Tag tint mismatch: ' + tag);
                check(s.borderTopWidth === '1px' && s.borderTopStyle === 'solid' && s.borderTopColor === paint('color-mix(in srgb, var(--tag-tone) ' + (hovered ? 45 : 30) + '%, var(--panel))', element), 'Tag border mismatch: ' + tag);
                readable(win, element, backdrop, backdrop, opacity);
@@ -4486,7 +4521,10 @@ test("state rows, selected filters, all-hidden traversal, disabled native action
            const covers = elements => representatives.every(tag => [...elements].some(e => e.dataset.tag === tag));
            if (!native) {
              check(covers(doc.querySelectorAll('#available-tags button')), 'Available fixture must cover broad generated hues');
-             const selectedSeeds = new Set();
+              const selectedSeeds = new Set();
+              for (const chip of doc.querySelectorAll('#selected-tags button')) {
+                tagSurface(chip); selectedSeeds.add(chip.dataset.tag);
+              }
              for (const chip of doc.querySelectorAll('#available-tags button')) {
                tagSurface(chip);
                if (chip.hidden) continue;
@@ -4495,11 +4533,50 @@ test("state rows, selected filters, all-hidden traversal, disabled native action
                check(moved.getAttribute('style') === chip.getAttribute('style'), 'Selected metadata must clone catalog');
                tagSurface(moved); selectedSeeds.add(moved.dataset.tag); moved.click();
              }
-             check(representatives.every(tag => selectedSeeds.has(tag)), 'Selected fixture must cover generated hues');
-             for (const li of doc.querySelectorAll('li[hidden]')) li.hidden = false;
+              check(representatives.every(tag => selectedSeeds.has(tag)), 'Selected fixture must cover generated hues');
+              check(fixedTags.every(tag => selectedSeeds.has(tag)), 'Selected fixture must cover all fixed inks' + matrixContext());
+              // Toggle the mounted document with fixed chips and a disabled-script popover open.
+              for (const tag of fixedTags) {
+                const chip = doc.querySelector('#available-tags button[data-tag="' + tag + '"]');
+                if (!chip.hidden) chip.click();
+              }
+              const disabledScript = row(doc, 'State7'), panel = disabledScript.nextElementSibling;
+              panel.showPopover();
+              const surfaces = [...doc.querySelectorAll('#available-tags button, #selected-tags button'), ...disabledScript.querySelectorAll('.tag-label'), ...panel.querySelectorAll('.tag-label')].filter(e => fixedTags.includes(e.dataset.tag));
+              const metadata = surfaces.map(e => e.getAttribute('style'));
+              const before = surfaces.map(e => win.getComputedStyle(e).color);
+              const themeControl = doc.querySelector('[data-theme-control]');
+              for (const switched of [true, false]) {
+                themeControl.click();
+                check(doc.documentElement.dataset.theme === (switched ? theme === 'light' ? 'dark' : 'light' : theme), 'Mounted theme toggle' + matrixContext());
+                check(panel.matches(':popover-open'), 'Theme toggle closed popover' + matrixContext());
+                surfaces.forEach((e, i) => {
+                  check(doc.contains(e) && e.getAttribute('style') === metadata[i], 'Theme toggle replaced fixed metadata: ' + e.dataset.tag + matrixContext());
+                  fixedInk(e);
+                  check((win.getComputedStyle(e).color !== before[i]) === switched, 'Theme toggle fixed ink update/restore: ' + e.dataset.tag + matrixContext());
+                });
+              }
+              panel.hidePopover();
+              for (const chip of [...doc.querySelectorAll('#selected-tags button')]) if (chip.dataset.tag !== 'hidden') chip.click();
+              for (const li of doc.querySelectorAll('li[hidden]')) li.hidden = false;
              for (const details of doc.querySelectorAll('details')) details.open = true;
            }
-          for (const script of [true, false]) for (let mask = 0; mask < 8; mask++) {
+           // Prove script tags consume the shared root token, rather than a duplicated palette.
+           const disabledScript = row(doc, 'State7'), scriptPanel = disabledScript.nextElementSibling;
+           const scriptLabels = [...disabledScript.querySelectorAll('.tag-label[data-tag="script"]'), ...scriptPanel.querySelectorAll('.tag-label[data-tag="script"]')];
+           const nonTags = [...disabledScript.querySelectorAll('.code, .destination, .visit, .download')];
+           const neutralColors = nonTags.map(e => win.getComputedStyle(e).color);
+           const rootStyle = doc.documentElement.style, oldScript = rootStyle.getPropertyValue('--script'), oldPriority = rootStyle.getPropertyPriority('--script');
+           scriptPanel.showPopover(); rootStyle.setProperty('--script', 'rgb(120, 45, 180)');
+           for (const label of scriptLabels) check(win.getComputedStyle(label).color === 'rgb(120, 45, 180)', 'Script tag must follow root token override' + matrixContext());
+           nonTags.forEach((e, i) => {
+             check(win.getComputedStyle(e).color === neutralColors[i], 'Root script override changed disabled non-tag' + matrixContext());
+             grayscale(win, e);
+           });
+           if (oldScript) rootStyle.setProperty('--script', oldScript, oldPriority); else rootStyle.removeProperty('--script');
+           for (const label of scriptLabels) fixedInk(label);
+           scriptPanel.hidePopover();
+           for (const script of [true, false]) for (let mask = 0; mask < 8; mask++) {
             const r = row(doc, (script ? '' : 'Plain') + 'State' + mask), style = win.getComputedStyle(r), code = r.querySelector('.code');
             check(r.getBoundingClientRect().height === 50, 'State row changed height');
             check(Number(style.opacity) === (mask & 1 ? theme === 'dark' ? .8 : .94 : 1), 'State opacity');
@@ -4532,7 +4609,9 @@ test("state rows, selected filters, all-hidden traversal, disabled native action
             code.focus(); check(win.getComputedStyle(r).opacity === '1', 'Focus opacity');
             check(win.getComputedStyle(r).backgroundColor === rowWash, 'Row focus palette');
             check(contrast(rgb(win.getComputedStyle(visit).color), rgb(win.getComputedStyle(visit).backgroundColor)) >= 4.5, 'Open contrast');
-            check(win.getComputedStyle(code).outlineWidth === '2px', 'Focus outline'); code.blur();
+             check(win.getComputedStyle(code).outlineWidth === '2px', 'Focus outline');
+             for (const label of r.querySelectorAll('.tag-label')) tagSurface(label);
+             code.blur();
              const dest = r.querySelector('.destination');
              check(dest.getBoundingClientRect().width >= (width < 500 ? 48 : 64), 'Destination reserve');
              const labelBackdrop = mask & 4 ? rgb(win.getComputedStyle(r.parentElement).backgroundColor) : bg;

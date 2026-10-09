@@ -162,11 +162,12 @@ docs:
           lowercase names.
         </p>
         <p>
-          Every tag label and filter chip uses stable light/dark HSL inks
-          generated from its string seed, with matching tinted backgrounds and
-          borders. There is no fixed palette or unique-color promise.
-          State-label colors are generated too; link-state warning and disabled
-          styling remain separate.
+          Descriptive tags use stable light/dark HSL inks generated from their
+          string seeds. Broken, script and disabled tags reuse shared link-state
+          colors; hidden uses theme-aware neutral gray. All labels and filter
+          chips keep matching tinted backgrounds and borders. There is no finite
+          palette or unique-color promise; row-state precedence remains
+          separate.
         </p>
         <p>
           Add <code>script</code> to <code>tags</code> for a
