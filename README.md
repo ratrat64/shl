@@ -77,6 +77,12 @@ mobile, preceding search in keyboard order. Remove them individually to return t
 Opening or hiding the picker and clearing text retain selections. Only selected
 hidden, broken or disabled tags admit matching hidden leaves; script alone does not.
 
+Search text, selected tags and picker visibility follow you between directories,
+Guide and 404, including reload and Back/Forward, for this browser-tab session.
+Each site base has independent filters. Tags absent from a directory remain removable
+selections and can produce zero matches. If session storage is unavailable, filters
+still follow in-app navigation in the current document.
+
 Use absolute HTTP(S) destinations. Codes start with an ASCII letter or number and
 contain only letters, numbers, `.`, `_`, or `-`; reserved names and case-insensitive
 collisions are rejected. Keep exactly one root link file: `links.yaml`, `links.yml`,

@@ -96,6 +96,14 @@ The header brand reads `/shl/`: `shl` uses ink, the leading slash uses teal acti
 
 ### Directory tools
 
+Exact search text, insertion-ordered selected tags and picker visibility persist per
+canonical site base for the browser-tab session, including reload and latest-state
+Back/Forward. Restore without token commitment; clear transient feedback and reset
+disclosures on cross-page mounts, then expand matching groups. Searchless pages
+preserve records. Absent-subtree chips retain renderer-owned labels/colors and remain
+removable; available choices stay subtree-local. Storage failure retains document-memory
+state for in-app navigation. Same-page fragments preserve live controls.
+
 The count is the sole heading and polite result count. Keep the accessible search label visually hidden and placeholder "Search link, title or tag". Show tags / Hide tags exposes expanded state and its controlled available region, changing only visibility. Disable it for no-tag catalogs. Selected chips appear left of search (above on mobile), in insertion order and matching DOM/tab order; available chips retain canonical catalog order. Native buttons name Filter by #tag / Remove #tag filter and selected state. Empty selected tracks hide; all-selected pickers remain open with "All tags selected.". Focus moves to the selected chip on activation and next/previous/search on removal; tracks reveal focused chips. Independent polite Tag not found feedback is associated with search.
 
 An empty site has no search; every nonempty subtree has enhanced search, including all-hidden/untagged pages. Filters require selected-tag AND plus broad text; only selected reserved hidden/broken/disabled tags admit matching hidden leaves. Zero filtered results retain tools and show the no-match message; initial all-hidden pages show 0 links and No links listed here. Without JavaScript, search and usable picker controls stay hidden; disabled no-tag controls may remain visible.

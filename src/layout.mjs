@@ -116,7 +116,13 @@ export const page = (
             `<script src="${esc(depth)}assets/${name}.js" defer></script>`,
         ).join(""),
     body: /* HTML */ `${header(active, depth)}
-      <main class="wrap" data-app-page="${active}">${content}</main>
+      <main
+        class="wrap"
+        data-app-page="${active}"
+        ${active === "not-found" ? "" : ` data-site-base="${esc(depth)}"`}
+      >
+        ${content}
+      </main>
       ${footer(depth)}`,
     scripts:
       (embedded

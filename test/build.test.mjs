@@ -16,7 +16,7 @@ import { createContext, runInContext, runInNewContext } from "node:vm";
 import { stringify, parse } from "yaml";
 import { linkFields, entryTree } from "../src/links.mjs";
 import { scriptString } from "../src/layout.mjs";
-import { tagColors } from "../src/directory.mjs";
+import { tagColors, indexPage } from "../src/directory.mjs";
 
 function themeLabelAttributes(html) {
   const control = html.match(/<button\b[^>]*data-theme-control[^>]*>/)[0];
@@ -265,7 +265,7 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
     const check = (yes, label) => { if (!yes) throw Error(label); };
     for (const prefix of ['/', '/project/']) for (const page of ['', 'tools/']) for (const width of [320, 1440]) for (const theme of ['light', 'dark']) {
       frame.style.width = width + 'px'; localStorage.setItem('shortlink-theme', theme);
-      await load(prefix + page);
+       sessionStorage.clear(); await load(prefix + page);
       const doc = frame.contentDocument, win = frame.contentWindow;
       const input = doc.querySelector('#link-search'), picker = doc.querySelector('#available-tags'), selected = doc.querySelector('#selected-tags'), toggle = doc.querySelector('#tag-toggle');
       const count = () => Number(doc.querySelector('.count-number').textContent);
@@ -393,14 +393,14 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
       const oldValue = input.value; type('#setup '); check(input.value === '#setup ' && choices() === 'shell', 'Outgoing input listener');
       picker.querySelector('button[data-tag="setup"]').click(); check(choices() === 'shell', 'Outgoing picker listener');
       win.history.back(); for (let i = 0; !doc.querySelector('#link-search') && i < 100; i++) await wait();
-       check(mounts === 2 && doc.querySelector('#link-search').value === '' && doc.querySelector('#selected-tags').hidden && doc.querySelector('#available-tags').hidden, 'Back reset/mount');
+        check(mounts === 2 && doc.querySelector('#link-search').value === 'setup' && doc.querySelector('#selected-tags button').dataset.tag === 'shell' && doc.querySelector('#available-tags').hidden, 'Back restore/mount');
        for (const chip of doc.querySelectorAll('#available-tags button')) {
          check(chip.getAttribute('style') === publishedColors.get(chip.dataset.tag), 'App mount color metadata');
          for (const label of doc.querySelectorAll('.tag-label')) if (label.dataset.tag === chip.dataset.tag) check(label.getAttribute('style') === chip.getAttribute('style') && win.getComputedStyle(label).color === win.getComputedStyle(chip).color, 'App mount tag color consistency');
        }
       win.history.forward(); for (let i = 0; doc.querySelector('#link-search') && i < 100; i++) await wait(); check(mounts === 3, 'Forward mount');
     }
-    await load('/noTags/'); check(frame.contentDocument.querySelector('#tag-toggle').disabled && !frame.contentDocument.querySelector('.search').hidden, 'Untagged search');
+     sessionStorage.clear(); await load('/noTags/'); check(frame.contentDocument.querySelector('#tag-toggle').disabled && !frame.contentDocument.querySelector('.search').hidden, 'Untagged search');
     await load('/onlyHidden/'); check(frame.contentDocument.querySelector('.count-number').textContent === '0' && !frame.contentDocument.querySelector('#empty-directory').hidden, 'All-hidden baseline');
     frame.contentDocument.querySelector('#tag-toggle').click(); frame.contentDocument.querySelector('#available-tags button').click(); check(frame.contentDocument.querySelector('.count-number').textContent === '1', 'All-hidden selection');
     document.body.dataset.filtersCheck = 'passed';
@@ -412,6 +412,252 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
 });
 
 const buildScript = fileURLToPath(new URL("../build.mjs", import.meta.url));
+
+test("session filters preserve exact restoration, absent chips, native history, storage failures and site isolation", async (t) => {
+  const chrome = availableChrome(t);
+  if (!chrome) return;
+  const leaf = (tags) => ({ url: "https://example.com/", tags });
+  const f = await fixture(t, {
+    alpha: { One: leaf(["shell", "café", "hidden"]) },
+    beta: { Two: leaf(["setup", "script"]), Plain: "https://example.com/" },
+    Off: leaf(["disabled"]),
+  });
+  assert.equal(f.build().status, 0);
+  const origin = await browserServer(t, f.cwd);
+  const { send, evaluate, navigate, traverse } = await browserControls(
+    t,
+    chrome,
+    f.cwd,
+  );
+  for (const prefix of ["/", "/project/"])
+    for (const width of [390, 1440])
+      for (const theme of ["light", "dark"]) {
+        await send("Emulation.setDeviceMetricsOverride", {
+          width,
+          height: 900,
+          deviceScaleFactor: 1,
+          mobile: width === 390,
+        });
+        await navigate(origin + prefix);
+        await evaluate(
+          `sessionStorage.clear(); sessionStorage.setItem('shl:filters:v1:'+${JSON.stringify(prefix)},JSON.stringify({version:1,text:'',tags:[],picker:false})); localStorage.setItem('shortlink-theme', ${JSON.stringify(theme)}); document.documentElement.dataset.theme=${JSON.stringify(theme)}; initSearch(true)`,
+        );
+        await evaluate(`(async () => {
+      const prefix=${JSON.stringify(prefix)}, key='shl:filters:v1:'+prefix;
+      const check=(yes,msg)=>{if(!yes)throw Error(msg)};
+      const wait=async predicate=>{for(let n=0;!predicate()&&n<200;n++)await new Promise(r=>setTimeout(r,10));check(predicate(),'Navigation incomplete')};
+      const go=async path=>{const old=document.querySelector('main'),a=document.createElement('a');a.href=prefix+path;a.dataset.appLink='';old.append(a);a.click();await wait(()=>document.querySelector('main')!==old)};
+      const type=value=>{const input=document.querySelector('#link-search');input.value=value;input.dispatchEvent(new Event('input'))};
+      const tags=()=>[...document.querySelectorAll('#selected-tags button')].map(b=>b.dataset.tag);
+      const shell=[document.documentElement,document.querySelector('header'),document.querySelector('footer'),document.querySelector('[data-theme-control]')];
+      document.querySelector('#tag-toggle').click(); type('#shell,#café ');
+      const colors=[...document.querySelectorAll('#selected-tags button')].map(b=>[b.textContent,b.getAttribute('style'),getComputedStyle(b).color]);
+      type('#missing, #shell'); check(!document.querySelector('#tag-error').hidden,'Unknown feedback');
+      await go('alpha/');
+      check(document.querySelector('#link-search').value==='#missing, #shell'&&document.querySelector('#tag-error').hidden&&tags().join(',')==='shell,café','Noncommitting ordered restoration');
+      await go('beta/');
+      check(JSON.stringify([...document.querySelectorAll('#selected-tags button')].map(b=>[b.textContent,b.getAttribute('style'),getComputedStyle(b).color]))===JSON.stringify(colors),'Absent labels/colors');
+      check(document.querySelector('.count-number').textContent==='0','Absent AND');
+      check([...document.querySelectorAll('#available-tags button')].filter(b=>!b.hidden).map(b=>b.dataset.tag).join(',')==='script,setup','Local order');
+      check(document.querySelector('#all-tags-selected').hidden,'Foreign selections exhausted local picker');
+      for(const b of document.querySelectorAll('#available-tags button'))b.click();
+      check(!document.querySelector('#all-tags-selected').hidden&&tags().join(',')==='shell,café,script,setup','Local exhaustion with foreign selections');
+      for(const b of [...document.querySelectorAll('#selected-tags button')].slice(2))b.click();
+      type('#SHELL, #café ');
+      check(document.querySelector('#link-search').value===' '&&tags().join(',')==='shell,café'&&document.querySelector('#tag-error').hidden&&document.querySelector('#tag-notice').textContent==='Tag already selected.','Absent duplicate consumption/idempotence');
+      check([...document.querySelectorAll('#available-tags button')].map(b=>b.dataset.tag).join(',')==='script,setup','Absent duplicate changed local catalog');
+      type(''); check(tags().length===2&&JSON.parse(sessionStorage.getItem(key)).text==='','Clear save');
+      for(const b of [...document.querySelectorAll('#selected-tags button')])b.click();
+      check(document.querySelector('.count-number').textContent==='2'&&JSON.parse(sessionStorage.getItem(key)).tags.length===0,'Absent removal/save');
+      type('#setup ');type('#missing, ');
+      const saved=sessionStorage.getItem(key),oldInput=document.querySelector('#link-search'),oldToggle=document.querySelector('#tag-toggle');
+      await go('guide/');oldInput.value='#shell ';oldInput.dispatchEvent(new Event('input'));oldToggle.click();
+      check(sessionStorage.getItem(key)===saved&&!document.querySelector('#link-search'),'Detached/searchless writes');
+      await go('unknown/deep/');await wait(()=>document.querySelector('#head').textContent==='Link not found');
+      check(sessionStorage.getItem(key)===saved&&!document.querySelector('main').dataset.siteBase,'404 namespace/write');
+      await go('beta/');
+      check(document.querySelector('#link-search').value==='#missing, '&&tags()[0]==='setup'&&document.querySelector('#tag-error').hidden,'Searchless restore');
+      check([document.documentElement,document.querySelector('header'),document.querySelector('footer'),document.querySelector('[data-theme-control]')].every((n,i)=>n===shell[i]),'Shell identity');
+      const nativeFetch=fetch;
+      let release;
+      globalThis.fetch=(url,options)=>new Promise(resolve=>{release=()=>nativeFetch(url).then(resolve)});
+      const liveInput=document.querySelector('#link-search'), liveMain=document.querySelector('main');
+      document.querySelector('[data-nav=guide]').click(); await wait(()=>release);
+      check(liveInput.readOnly,'Paused input remains natively editable');
+      liveInput.value='obsolete';liveInput.dispatchEvent(new Event('input'));
+      check(sessionStorage.getItem(key)===saved,'Pending outgoing save');
+      const fragment=document.createElement('a');fragment.href='#link-count';fragment.dataset.appLink='';liveMain.append(fragment);fragment.click();
+      check(document.querySelector('#link-search')===liveInput,'Superseding fragment remounted');
+      check(!liveInput.readOnly&&liveInput.value==='#missing, '&&sessionStorage.getItem(key)===saved&&document.querySelector('.count-number').textContent==='0','Suppressed input not restored consistently');
+      type('resumed');const resumed=sessionStorage.getItem(key);
+      check(JSON.parse(resumed).text==='resumed','Superseding fragment did not resume');
+      globalThis.fetch=nativeFetch;release();await new Promise(r=>setTimeout(r,30));
+      check(document.querySelector('main')===liveMain&&sessionStorage.getItem(key)===resumed,'Stale fetch mutated filters/content');
+      const storageDescriptor=Object.getOwnPropertyDescriptor(window,'sessionStorage');
+      Object.defineProperty(window,'sessionStorage',{configurable:true,get(){throw Error('denied')}});
+      type('exact  text ');document.querySelector('#tag-toggle').click();await go('alpha/');
+      check(document.querySelector('#link-search').value==='exact  text '&&tags()[0]==='setup'&&document.querySelector('#available-tags').hidden,'Memory fallback');
+      Object.defineProperty(window,'sessionStorage',storageDescriptor);
+      const set=Storage.prototype.setItem;
+      Storage.prototype.setItem=()=>{throw Error('quota')};
+      type('quota fallback'); await go('beta/');
+      check(document.querySelector('#link-search').value==='quota fallback','Readable stale storage overrode memory');
+      initSearch(true);
+      check(document.querySelector('#link-search').value==='quota fallback','Persisted refresh lost unsaved memory');
+      sessionStorage.removeItem(key);initSearch(true);
+      check(document.querySelector('#link-search').value===''&&tags().length===0,'Removed record retained unsaved memory');
+      type('first quota edit');initSearch(true);
+      check(document.querySelector('#link-search').value==='first quota edit','Empty readable storage lost unsaved memory');
+      Storage.prototype.setItem=set;
+      sessionStorage.setItem(key,JSON.stringify({version:1,text:'newer native edit',tags:[],picker:false}));initSearch(true);
+      check(document.querySelector('#link-search').value==='newer native edit','Newer native storage did not supersede unsaved memory');
+      type('saved again');sessionStorage.removeItem(key);initSearch(true);
+      check(document.querySelector('#link-search').value===''&&tags().length===0&&document.querySelector('#available-tags').hidden,'Removed record resurrected memory');
+      type('read failure');Object.defineProperty(window,'sessionStorage',{configurable:true,get(){throw Error('denied')}});initSearch(true);
+      check(document.querySelector('#link-search').value==='read failure','Unavailable refresh lost memory');
+      Object.defineProperty(window,'sessionStorage',storageDescriptor);
+    })()`);
+        const key = "shl:filters:v1:" + prefix;
+        for (const bad of [
+          "{",
+          "null",
+          JSON.stringify({ version: 1, text: 7, tags: [], picker: false }),
+          JSON.stringify({
+            version: 1,
+            text: "",
+            tags: ["SHELL"],
+            picker: false,
+          }),
+          JSON.stringify({
+            version: 1,
+            text: "",
+            tags: ["shell", "shell"],
+            picker: false,
+          }),
+          JSON.stringify({
+            version: 1,
+            text: "",
+            tags: ["missing"],
+            picker: false,
+          }),
+        ]) {
+          await evaluate(
+            `sessionStorage.setItem(${JSON.stringify(key)},${JSON.stringify(bad)})`,
+          );
+          await navigate(origin + prefix + "beta/");
+          assert.equal(
+            await evaluate(
+              `document.querySelector('#link-search').value===''&&document.querySelector('#selected-tags').hidden`,
+            ),
+            true,
+          );
+        }
+        const record = {
+          version: 1,
+          text: "#shell, #unknown ",
+          tags: ["café", "shell"],
+          picker: true,
+        };
+        await evaluate(
+          `sessionStorage.setItem(${JSON.stringify(key)},${JSON.stringify(JSON.stringify(record))})`,
+        );
+        await navigate(origin + prefix + "alpha/");
+        assert.deepEqual(
+          await evaluate(
+            `({text:document.querySelector('#link-search').value,tags:[...document.querySelectorAll('#selected-tags button')].map(b=>b.dataset.tag),error:document.querySelector('#tag-error').hidden,picker:!document.querySelector('#available-tags').hidden})`,
+          ),
+          { text: record.text, tags: record.tags, error: true, picker: true },
+        );
+        await navigate(origin + prefix + "alpha/");
+        assert.equal(
+          await evaluate(`document.querySelector('#link-search').value`),
+          record.text,
+        );
+        await evaluate(
+          `window.cachedDocument=document;window.cachedRoot=document.documentElement;window.cachedHeader=document.querySelector('header');window.cachedChip=document.querySelector('#selected-tags button');window.persistedShows=[];window.restorationMounts=0;const originalSearch=initSearch;window.initSearch=(...args)=>{restorationMounts++;return originalSearch(...args)};window.addEventListener('pageshow',event=>persistedShows.push(event.persisted));document.querySelector('main').style.minHeight='3000px';cachedChip.focus({preventScroll:true});scrollTo({top:300,behavior:'instant'});window.cachedScroll=scrollY`,
+        );
+        await navigate(origin + prefix + "Off/", true);
+        assert.equal(
+          await evaluate(`!!document.querySelector('#link-search')`),
+          false,
+        );
+        await evaluate(
+          `sessionStorage.setItem(${JSON.stringify(key)},JSON.stringify({version:1,text:'',tags:['café','hidden'],picker:true}))`,
+        );
+        await traverse(-1);
+        await evaluate(
+          `if(document!==window.cachedDocument||document.documentElement!==cachedRoot||document.querySelector('header')!==cachedHeader||persistedShows.join(',')!=='true')throw Error('Native Back did not restore actual BFCache document');if(restorationMounts!==1||document.querySelector('#link-search').value!==''||document.querySelector('.count-number').textContent!=='1')throw Error('BFCache latest filters/single mount');if(document.activeElement===cachedChip||document.activeElement.dataset.tag!=='café'||scrollY!==cachedScroll)throw Error('BFCache chip focus/scroll lost');document.querySelector('#tag-toggle').click();if(document.querySelector('#tag-toggle').getAttribute('aria-expanded')!=='false')throw Error('BFCache duplicate listeners')`,
+        );
+        await evaluate(`window.cachedScroll=scrollY`);
+        await traverse(1);
+        await evaluate(
+          `(async()=>{for(let n=0;document.querySelector('h1')?.textContent!=='Link disabled'&&n<200;n++)await new Promise(r=>setTimeout(r,10));if(document.querySelector('#link-search'))throw Error('Native Forward minimal boundary')})()`,
+        );
+        await evaluate(
+          `sessionStorage.setItem(${JSON.stringify(key)},JSON.stringify({version:1,text:'',tags:['hidden'],picker:true}))`,
+        );
+        await traverse(-1);
+        await evaluate(
+          `if(document!==cachedDocument||restorationMounts!==2||persistedShows.join(',')!=='true,true'||document.activeElement.id!=='link-search'||scrollY!==cachedScroll)throw Error('BFCache removed-chip focus fallback/scroll '+JSON.stringify([document===cachedDocument,restorationMounts,persistedShows,document.activeElement.outerHTML,scrollY,cachedScroll]))`,
+        );
+      }
+  await evaluate(
+    `sessionStorage.setItem('shl:filters:v1:/',JSON.stringify({version:1,text:'root',tags:['shell'],picker:false}));sessionStorage.setItem('shl:filters:v1:/project/',JSON.stringify({version:1,text:'project',tags:['setup'],picker:true}))`,
+  );
+  for (const [prefix, text] of [
+    ["/", "root"],
+    ["/project/", "project"],
+  ]) {
+    await navigate(origin + prefix + "beta/");
+    assert.equal(
+      await evaluate(`document.querySelector('#link-search').value`),
+      text,
+    );
+  }
+  const rootHTML = await f.read("index.html");
+  await writeFile(
+    join(f.cwd, "dist", "index.html"),
+    indexPage({ raw: {}, links: [], source: "links.json" }),
+  );
+  await navigate(origin + "/");
+  assert.equal(
+    await evaluate(
+      `!document.querySelector('#link-search')&&JSON.parse(sessionStorage.getItem('shl:filters:v1:/')).text==='root'`,
+    ),
+    true,
+  );
+  await writeFile(join(f.cwd, "dist", "index.html"), rootHTML);
+  await evaluate(`sessionStorage.clear()`);
+  await navigate(origin + "/");
+  assert.equal(
+    await evaluate(
+      `document.querySelector('#link-search').value===''&&document.querySelector('#selected-tags').hidden`,
+    ),
+    true,
+  );
+  const blocked = await send("Page.addScriptToEvaluateOnNewDocument", {
+    source: `Object.defineProperty(window,'sessionStorage',{get(){throw Error('blocked')}})`,
+  });
+  await navigate(origin + "/beta/");
+  assert.equal(
+    await evaluate(
+      `document.querySelector('#link-search').value===''&&!document.querySelector('.search').hidden`,
+    ),
+    true,
+  );
+  await evaluate(
+    `document.querySelector('#link-search').value='works';document.querySelector('#link-search').dispatchEvent(new Event('input'));document.querySelector('#tag-toggle').click()`,
+  );
+  assert.equal(
+    await evaluate(
+      `document.querySelector('#tag-toggle').getAttribute('aria-expanded')`,
+    ),
+    "true",
+  );
+  await send("Page.removeScriptToEvaluateOnNewDocument", {
+    identifier: blocked.identifier,
+  });
+});
 
 function availableChrome(t) {
   const chrome = process.env.CHROME_BIN || "google-chrome";
@@ -572,15 +818,27 @@ async function browserControls(t, chrome, cwd) {
       });
   };
   await send("Page.enable");
-  const navigate = async (url) => {
+  const navigate = async (url, native = false) => {
     const loaded = new Promise((resolve) =>
       events.set("Page.loadEventFired", resolve),
     );
-    await send("Page.navigate", { url });
+    if (native)
+      await send("Runtime.evaluate", {
+        expression: `location.assign(${JSON.stringify(url)})`,
+      });
+    else await send("Page.navigate", { url });
     await loaded;
     await send("Page.bringToFront");
   };
-  return { send, evaluate, key, navigate };
+  const traverse = async (delta) => {
+    const changed = new Promise((resolve) =>
+      events.set("Page.frameNavigated", resolve),
+    );
+    await send("Runtime.evaluate", { expression: `history.go(${delta})` });
+    await changed;
+    await send("Page.bringToFront");
+  };
+  return { send, evaluate, key, navigate, traverse };
 }
 
 test("native Enter/Space chip and popover activation, typed delimiters, touch and scrolling execute in Chrome", async (t) => {
@@ -625,7 +883,7 @@ test("native Enter/Space chip and popover activation, typed delimiters, touch an
         )
           await new Promise((resolve) => setTimeout(resolve, 20));
         await evaluate(
-          `document.documentElement.dataset.theme = ${JSON.stringify(theme)}; document.querySelector('#tag-toggle').focus()`,
+          `sessionStorage.setItem('shl:filters:v1:/',JSON.stringify({version:1,text:'',tags:[],picker:false})); initSearch(true); document.documentElement.dataset.theme = ${JSON.stringify(theme)}; document.querySelector('#tag-toggle').focus()`,
         );
         await key("Enter", "Enter", 13);
         assert.equal(
@@ -787,7 +1045,9 @@ test("native track scrolling uses Tab focus and horizontal touch gestures withou
       mobile: width === 320,
     });
     await navigate(origin + "/tools/");
-    await evaluate("document.querySelector('#tag-toggle').focus()");
+    await evaluate(
+      "sessionStorage.setItem('shl:filters:v1:/',JSON.stringify({version:1,text:'',tags:[],picker:false})); initSearch(true); document.querySelector('#tag-toggle').focus()",
+    );
     await key("Enter", "Enter", 13);
     await key("Tab", "Tab", 9);
     await visible();
@@ -3462,7 +3722,7 @@ test("shared shell renders consistently across direct/native loads and app navig
       try {
         const frame = document.querySelector('iframe');
         const wait = () => new Promise(resolve => setTimeout(resolve, 30));
-        const load = path => new Promise(resolve => { frame.onload = resolve; frame.src = path; });
+        const load = path => new Promise(resolve => { sessionStorage.clear(); frame.onload = resolve; frame.src = path; });
         const system = new URL(location.href).searchParams.get('system');
         const palette = { light: ['rgb(246, 247, 245)', 'rgb(37, 43, 41)'], dark: ['rgb(0, 0, 0)', 'rgb(198, 208, 202)'] };
         const checkPalette = (doc, theme) => {
@@ -3532,7 +3792,7 @@ test("shared shell renders consistently across direct/native loads and app navig
         });
         const equal = (actual, expected, label) => {
           if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-            const a = actual.flat(), b = expected.flat();
+           const a = [actual].flat(2), b = [expected].flat(2);
             const index = a.findIndex((value, i) => JSON.stringify(value) !== JSON.stringify(b[i]));
             throw new Error('Chrome mismatch: ' + label + ' node ' + index + ': ' + JSON.stringify(a[index]) + ' expected ' + JSON.stringify(b[index]));
           }
@@ -3544,7 +3804,7 @@ test("shared shell renders consistently across direct/native loads and app navig
             equal(title.querySelector('.count-label').textContent, ' ' + (count === 1 ? title.dataset.labelSingular : title.dataset.labelPlural), 'static count label metadata');
           }
           const toggle = doc.querySelector('#tag-toggle');
-          if (toggle) equal(toggle.textContent.trim(), toggle.dataset.labelCollapsed, 'static picker label metadata');
+          if (toggle) equal(toggle.textContent.trim(), toggle.getAttribute('aria-expanded') === 'true' ? toggle.dataset.labelExpanded : toggle.dataset.labelCollapsed, 'picker label metadata');
           const theme = doc.querySelector('[data-theme-control]');
           equal(theme.textContent.trim(), theme.getAttribute('data-label-' + (native ? 'system' : doc.documentElement.dataset.theme || 'system')), 'static theme label metadata');
           const routes = [...doc.querySelectorAll('[data-nav]')];
@@ -3558,6 +3818,7 @@ test("shared shell renders consistently across direct/native loads and app navig
           const search = doc.querySelector('#link-search');
           const toggle = doc.querySelector('#tag-toggle');
           const theme = doc.querySelector('[data-theme-control]');
+          if (toggle.getAttribute('aria-expanded') === 'true') toggle.click();
           const saved = [title.dataset.labelSingular, title.dataset.labelPlural, toggle.dataset.labelCollapsed, toggle.dataset.labelExpanded, theme.dataset.labelLight, theme.dataset.labelDark];
           title.dataset.labelSingular = 'one published link';
           title.dataset.labelPlural = 'many published links';
@@ -4089,6 +4350,15 @@ test("Chrome 404 browsing and history preserve document/shell identity at both p
       '<article class="prose" style="min-height:3000px">',
     ),
   );
+  // Filtered zero-results pages still need scrollable fixture space for history proof.
+  for (const path of ["index.html", "tools/index.html"])
+    await writeFile(
+      join(f.cwd, "dist", path),
+      (await f.read(path)).replace(
+        /<main\b/,
+        '<main style="min-height:3000px"',
+      ),
+    );
   const origin = await browserServer(t, f.cwd);
   const { send, evaluate, navigate } = await browserControls(t, chrome, f.cwd);
   await send("Emulation.setEmulatedMedia", {
@@ -4117,6 +4387,7 @@ test("Chrome 404 browsing and history preserve document/shell identity at both p
       });
       for (const theme of ["light", "dark"]) {
         await navigate(origin + prefix);
+        await evaluate("sessionStorage.clear()");
         await evaluate(
           `localStorage.setItem('shortlink-theme', ${JSON.stringify(theme)})`,
         );
@@ -4193,10 +4464,10 @@ test("Chrome 404 browsing and history preserve document/shell identity at both p
           history.back(); await wait(() => !location.hash && scrollY === 230);
           check(scrollY === 230, 'Complete Links URL scroll not restored after fragment Back');
           await transition(() => document.querySelector('summary a[data-app-link]').click(), 'tools/', 'links', 'tools');
-          check(document.querySelector('#link-search').value === '' && document.querySelector('#selected-tags').hidden && document.querySelector('#available-tags').hidden && document.querySelector('#tag-error').hidden, 'Cross-page controls did not reset');
+           check(document.querySelector('#link-search').value === '#missing ' && !document.querySelector('#selected-tags').hidden && !document.querySelector('#available-tags').hidden && document.querySelector('#tag-error').hidden, 'Cross-page filters did not restore');
           // One mount owns each control: a duplicate listener would toggle twice.
           document.querySelector('#tag-toggle').click();
-          check(document.querySelector('#tag-toggle').getAttribute('aria-expanded') === 'true', 'Controls mounted more than once');
+           check(document.querySelector('#tag-toggle').getAttribute('aria-expanded') === 'false', 'Controls mounted more than once');
           document.querySelector('#tag-toggle').click();
           scrollTo({ top: 480, behavior: 'instant' });
           check(scrollY === 480, 'Directory fixture is not scrollable');
@@ -5007,7 +5278,7 @@ test("state rows, selected filters, all-hidden traversal, disabled native action
         frame.style.width = width + 'px'; localStorage.setItem('shortlink-theme', theme);
         for (const native of [false, true]) {
           frame.setAttribute('sandbox', native ? 'allow-same-origin' : 'allow-same-origin allow-scripts');
-          await load(prefix + (native ? '?native=1' : ''));
+          sessionStorage.clear(); await load(prefix + (native ? '?native=1' : ''));
           let doc = frame.contentDocument, win = frame.contentWindow;
           if (native) doc.documentElement.dataset.theme = theme;
            const toggle = doc.querySelector('#tag-toggle');
@@ -5238,9 +5509,9 @@ test("state rows, selected filters, all-hidden traversal, disabled native action
             check(!doc.querySelector('#copy-status'), 'Outgoing feedback remained');
             doc.querySelector('[data-nav="links"]').click();
             for (let tries = 0; !doc.querySelector('#link-search') && tries < 100; tries++) await wait();
-             check(doc.querySelector('#link-search').value === '' && doc.querySelector('#tag-toggle').getAttribute('aria-expanded') === 'false' && doc.querySelector('#selected-tags').hidden, 'State controls did not reset');
+              check(doc.querySelector('#link-search').value === '' && doc.querySelector('#tag-toggle').getAttribute('aria-expanded') === 'true' && doc.querySelector('#selected-tags button').dataset.tag === 'disabled', 'State controls did not restore');
           }
-          await load(prefix + 'onlyHidden/' + (native ? '?native=1' : ''));
+           sessionStorage.clear(); await load(prefix + 'onlyHidden/' + (native ? '?native=1' : ''));
           doc = frame.contentDocument;
           if (!native) {
             check(!doc.querySelector('.search').hidden && count(doc) === 0 && !doc.querySelector('#empty-directory').hidden, 'All-hidden search unreachable');

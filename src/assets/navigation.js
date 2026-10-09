@@ -1,5 +1,7 @@
 (() => {
   const rebase = (main, url) => {
+    if (main.dataset.siteBase)
+      main.dataset.siteBase = new URL(main.dataset.siteBase, url).href;
     for (const link of main.querySelectorAll("a[href]")) {
       if (/^[.#]/.test(link.getAttribute("href")))
         link.href = new URL(link.getAttribute("href"), url).href;
@@ -8,8 +10,8 @@
   // The header and footer survive page swaps, so their relative links must not drift.
   for (const link of document.querySelectorAll(".site-head a, .footer a"))
     link.href = link.href;
-  const mount = () => {
-    globalThis.initSearch();
+  const mount = (refreshStorage = false) => {
+    globalThis.initSearch(refreshStorage);
     globalThis.initCopy();
     globalThis.initDownload();
     globalThis.initRecovery(navigate);
@@ -71,10 +73,12 @@
       }
       if (push && url !== location.href) history.pushState(null, "", url);
       displayed = url;
+      globalThis.resumeSearch?.();
       place(url, !push);
       globalThis.initRecovery(navigate);
       return;
     }
+    globalThis.pauseSearch?.();
     try {
       const controller = new AbortController();
       pending = controller;
@@ -178,6 +182,32 @@
   window.addEventListener("popstate", () => {
     scroll.set(displayed, window.scrollY);
     navigate(location.href, false);
+  });
+  window.addEventListener("pageshow", (event) => {
+    if (!event.persisted) return;
+    const focusedTag = document.activeElement.closest("#selected-tags button")
+      ?.dataset.tag;
+    const position = {
+      left: window.scrollX,
+      top: window.scrollY,
+      behavior: "instant",
+    };
+    ++request;
+    pending?.abort();
+    cleanup();
+    for (const details of document.querySelectorAll("main details"))
+      details.open = false;
+    displayed = location.href;
+    mount(true);
+    if (focusedTag !== undefined) {
+      const chip = [...document.querySelectorAll("#selected-tags button")].find(
+        (button) => button.dataset.tag === focusedTag,
+      );
+      (chip || document.querySelector("#link-search"))?.focus({
+        preventScroll: true,
+      });
+      window.scrollTo(position);
+    }
   });
   rebase(document.querySelector("main"), location.href);
   mount();

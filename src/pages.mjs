@@ -205,7 +205,12 @@ docs:
           and their ancestors, still constrained by all filters. Selecting
           script alone never reveals hidden links. Show tags includes all
           subtree tags, even at zero results. Clearing text or hiding the picker
-          retains selections.
+          retains selections. Search text, ordered selected tags and picker
+          visibility persist across directories, Guide, 404, reload and
+          Back/Forward for this browser-tab session, independently per site
+          base. Tags absent from a directory remain removable filters and can
+          yield zero matches. If session storage is unavailable, in-app
+          navigation retains document-memory state.
         </p>
         <p>
           Search, copying and tag filters need JavaScript. Without it, enabled
