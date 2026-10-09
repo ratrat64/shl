@@ -1413,10 +1413,7 @@ test("nested JSON and YAML build themed directory pages and redirects", async (t
     css,
     /directory-page|\.site-head\s*\{[^}]*border|\.footer\s*\{[^}]*border/,
   );
-  assert.match(
-    css,
-    /\.prose section\s*\{\s*border-top:\s*1px solid var\(--line\)/,
-  );
+  assert.doesNotMatch(css, /\.prose section\s*\{[^}]*border/);
   assert.match(css, /\.code\s*\{[^}]*white-space:\s*nowrap/);
   assert.match(css, /\.destination-start\s*\{[^}]*text-overflow:\s*ellipsis/);
   assert.deepEqual(JSON.parse(await f.read("links.json")), links);
@@ -3624,6 +3621,14 @@ test("shared shell renders consistently across direct/native loads and app navig
           if (win.getComputedStyle(number).color !== win.getComputedStyle(doc.querySelector('.brand-slash:last-child')).color) throw new Error('Counter does not use logo amber');
           if (doc.querySelector('main').dataset.appPage === 'guide') {
             if (number.textContent !== '' || number.getAttribute('aria-hidden') !== 'true' || title.textContent.trim() !== 'Guide' || title.hasAttribute('aria-live')) throw new Error('Guide counter not disabled');
+            const navigation = doc.querySelector('.prose nav');
+            const rem = parseFloat(win.getComputedStyle(doc.documentElement).fontSize);
+            if (Math.abs(navigation.getBoundingClientRect().top - title.getBoundingClientRect().bottom - 2 * rem) > 1) throw new Error('Guide title spacing changed');
+            for (const section of doc.querySelectorAll('.prose section')) {
+              const sectionStyle = win.getComputedStyle(section);
+              if (sectionStyle.borderTopWidth !== '0px') throw new Error('Guide section divider remains');
+              if (Math.abs(parseFloat(sectionStyle.marginTop) - 2.5 * rem) > 1 || Math.abs(parseFloat(sectionStyle.paddingTop) - rem) > 1) throw new Error('Guide section spacing changed');
+            }
           } else if (!title.matches('#link-count[aria-live="polite"][aria-atomic="true"]')) throw new Error('Count announcement lost');
           return [rect.x, rect.y + win.scrollY, style.fontFamily, style.fontSize, style.fontWeight, style.lineHeight, style.letterSpacing];
         };
@@ -3667,7 +3672,6 @@ test("shared shell renders consistently across direct/native loads and app navig
                   if (!native && path.includes('unknown')) {
                     equal([...doc.querySelectorAll('.site-head a, .footer a[data-app-link]')].map(link => new URL(link.href).pathname), [prefix, prefix, prefix + 'guide/', prefix + 'guide/'], '404 shell rebase');
                   }
-                  if (path === 'guide/' && frame.contentWindow.getComputedStyle(doc.querySelector('.prose section')).borderTopWidth !== '1px') throw new Error('Guide content separator lost');
                 }
               }
               frame.setAttribute('sandbox', 'allow-same-origin allow-scripts');
