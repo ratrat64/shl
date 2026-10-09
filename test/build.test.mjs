@@ -1337,7 +1337,10 @@ test("nested JSON and YAML build themed directory pages and redirects", async (t
       page,
       /<div class="directory-toggles">\s*<button\s+id="tag-toggle"[^>]*disabled\s*>\s*Show tags\s*<\/button>\s*<\/div>/,
     );
-  assert.match(home, /<div class="breadcrumbs" aria-hidden="true"><\/div>/);
+  assert.match(
+    home,
+    /<nav class="breadcrumbs" aria-label="Breadcrumb">Links<\/nav>/,
+  );
   assert.match(
     tools,
     /<h1 id="link-count" class="count" aria-live="polite" aria-atomic="true">\s*<span class="count-number">2<\/span\s*><span class="count-label"> links<\/span>\s*<\/h1>/,
