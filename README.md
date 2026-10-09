@@ -62,9 +62,11 @@ Tags can be combined; configured names must contain no whitespace, commas,
 Unicode uppercase/titlecase characters or emojis. Explicitly rename invalid names;
 the build never silently lowercases or strips them. Lowercase/uncased international
 text, digits and ordinary punctuation (including bare `#` and `*`) stay intact.
-Every full label has stable HSL theme inks generated from its string seed, with
-matched tinted backgrounds/borders, including disabled rows. There is no finite
-palette or unique-color promise; row-state colors remain separate.
+Descriptive labels have stable HSL theme inks generated from their string seeds.
+The `broken`, `script` and `disabled` labels reuse shared link-state colors;
+`hidden` uses readable neutral gray in light mode and light gray in dark mode.
+All labels keep matched tinted backgrounds/borders, including disabled rows.
+There is no finite palette or unique-color promise; row-state precedence remains separate.
 
 Show tags offers all tags in the current subtree, including hidden leaves.
 Select tags to require every selection (AND), plus one broad substring of remaining

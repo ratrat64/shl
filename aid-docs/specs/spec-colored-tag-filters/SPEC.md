@@ -22,7 +22,7 @@ Give directory visitors a discoverable, reversible way to combine tags and text 
 
 - **CAP-1**
   - **intent:** Visitors can recognize full tag labels consistently across directory surfaces.
-  - **success:** Every tag, including state labels, has deterministic HSL light/dark inks generated from its UTF-16 string seed across folders, reloads, builds and all tag surfaces. Full labels have matched tinted backgrounds/borders and remain readable without hovering; colors are generated rather than selected from finite slots.
+  - **success:** Descriptive tags have deterministic HSL light/dark inks generated from their UTF-16 string seeds across folders, reloads, builds and all tag surfaces. Exact broken/script/disabled labels reuse shared link-state tokens independently of row precedence; hidden alone uses readable neutral light-theme gray and light-gray/white-ish dark ink. Full labels have matched tinted backgrounds/borders and remain readable without hovering; selected chips clone renderer-owned metadata, with no finite palette.
 - **CAP-2**
   - **intent:** Visitors can discover, select, and remove tags in their current directory subtree.
   - **success:** Show tags reveals one scrollable available-tag row containing the subtree's tags, including hidden leaves, minus selections. Activation moves a tag to the scrollable selected row left of search on desktop and above it on mobile, preceding search in DOM/tab order; removal returns it. Results never shrink the catalog.
@@ -38,7 +38,7 @@ Give directory visitors a discoverable, reversible way to combine tags and text 
 
 ## Constraints
 
-- Preserve locked source decisions except the latest approved 2026-10-09 amendments: generate colors directly from each tag's seed with fixed readable HSL bounds, reject uppercase/titlecase/emoji source names, retain tinted tag surfaces and selected tags left of search (above on mobile) in matching DOM/tab order. No finite palettes, dots, hover-only row labels, OR filtering, result-dependent tag pool or grayscale-only disabled tags.
+- Preserve locked source decisions except the latest approved 2026-10-09 amendments: generate descriptive colors directly from each tag's seed with fixed readable HSL bounds, use the four named fixed-state treatments, reject uppercase/titlecase/emoji source names, retain tinted tag surfaces and selected tags left of search (above on mobile) in matching DOM/tab order. No finite palettes, dots, hover-only row labels, OR filtering or result-dependent tag pool. Descriptive tags retain independent generated colors on disabled rows; the named neutral hidden/disabled exceptions are permitted.
 - Tag color is independent of link state; disabled codes, destinations, and unavailable actions retain disabled behavior/styling, and hidden opacity remains independent.
 - Keep static GitHub Pages publication, validation-before-output-deletion, public destinations, native browsing, existing routing/launchers, shared component ownership, and the single browser lifecycle. No frontend framework or new dependency.
 - Maintain usable search and one-line, horizontally scrollable full labels at narrow widths; meet existing focus, text contrast, count announcement, and no-JavaScript foundations.
@@ -57,7 +57,7 @@ Give directory visitors a discoverable, reversible way to combine tags and text 
 
 ## Assumptions
 
-- Deterministic seeded HSL generation fulfills persistent color assignment without storage or unique-color promises; light/dark use corresponding readable bounds rather than identical RGB values.
+- Deterministic seeded HSL generation plus the four fixed-state exceptions fulfills persistent color assignment without storage or unique-color promises; light/dark use corresponding readable inks rather than identical RGB values.
 - Uncommitted #tokens use live broad text search, with no hidden reveal; the previous initial-# exact-query mode is replaced by committed selections.
 - Duplicate commits are idempotent. Filters and picker visibility reset on cross-page mounts, matching current navigation; same-page/fragment navigation retains them. Clearing text or collapsing the picker retains selected tags.
 

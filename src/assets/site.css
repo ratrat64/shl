@@ -12,6 +12,9 @@
   --script: light-dark(#895400, #c6a36a);
   --broken: light-dark(#a33d20, #ee967b);
   --disabled: light-dark(#606060, #a3a3a3);
+  /* Resolve at the root so disabled row emphasis cannot recolor script tags. */
+  --tag-script: var(--script);
+  --tag-hidden: light-dark(#606060, #d0d0d0);
   --disabled-bg: light-dark(#f7f7f7, #000);
   --disabled-wash: light-dark(#ebebeb, #181818);
   --wash: light-dark(#e8eeeb, #111b16);

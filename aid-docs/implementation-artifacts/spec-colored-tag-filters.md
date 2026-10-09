@@ -72,6 +72,8 @@ context:
 
 ## Implementation Notes
 
+- The approved [predefined-state tag colors follow-up](spec-predefined-state-tag-colors.md) supersedes this completed task's all-tags-generated instructions: descriptive tags remain seeded; broken/script/disabled labels reuse shared state tokens and hidden alone gets theme-aware neutral gray. All surfaces retain renderer metadata, selected-chip cloning and shared tint/border treatment. Earlier intent and verification below record historical behavior.
+
 - Seeded-color follow-up uses fixed FNV-1a-derived HSL: hue=(seed%3600)/10, saturation=55+((seed>>>16)%21), light lightness=20+((seed>>>24)%3), dark=80+((seed>>>24)%5). Bounds are 0–359.9° hue, 55–75% saturation, 20–22% light and 80–84% dark lightness. Generated theme metadata and native light-dark replace finite slots, preserving tint/borders and selected-left layout.
 
 - Follow-up work retains color-matched tag surfaces/borders and selected-left native grid, now superseding the earlier finite palette with per-string HSL generation. No new component, storage or dependency; verify generated hue/bounds plus selected geometry/tab order through the existing browser harness.
