@@ -18,6 +18,14 @@ import { linkFields, entryTree } from "../src/links.mjs";
 import { scriptString } from "../src/layout.mjs";
 import { tagColors } from "../src/directory.mjs";
 
+function themeLabelAttributes(html) {
+  const control = html.match(/<button\b[^>]*data-theme-control[^>]*>/)[0];
+  return {
+    getAttribute: (name) =>
+      control.match(new RegExp(`${name}="([^"]*)"`))?.[1] ?? null,
+  };
+}
+
 // Actual generated identities cover every degree of the hue spectrum.
 const hueSamples = new Map();
 for (let n = 0; n < 10000 && hueSamples.size < 360; n++) {
@@ -462,6 +470,7 @@ async function browserControls(t, chrome, cwd) {
     "--no-sandbox",
     "--disable-gpu",
     "--remote-debugging-port=0",
+    "--disable-features=OverscrollHistoryNavigation",
     `--user-data-dir=${join(cwd, "keyboard-profile")}`,
     "about:blank",
   ]);
@@ -1291,7 +1300,7 @@ test("homepage lists sorted links safely with project-relative URLs and handles 
   assert.doesNotMatch(html, /<script>title|<img|undefined/);
   assert.match(
     html,
-    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">3<\/span\s*><span class="count-label"> Links<\/span>\s*<\/h1>/,
+    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true"[^>]*>\s*<span class="count-number">3<\/span\s*><span class="count-label"> Links<\/span>\s*<\/h1>/,
   );
   const liveHeading = html.match(
     /<h1\b[^>]*aria-live="polite"[^>]*>[\s\S]*?<\/h1>/,
@@ -1312,7 +1321,7 @@ test("homepage lists sorted links safely with project-relative URLs and handles 
   const emptyHtml = await empty.read("index.html");
   assert.match(
     emptyHtml,
-    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">0<\/span\s*><span class="count-label"> Links<\/span>\s*<\/h1>/,
+    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true"[^>]*>\s*<span class="count-number">0<\/span\s*><span class="count-label"> Links<\/span>\s*<\/h1>/,
   );
   assert.equal([...emptyHtml.matchAll(/<h1\b/g)].length, 1);
   assert.match(emptyHtml, /id="tag-toggle"[^>]*disabled\s*>\s*Show tags/);
@@ -1356,7 +1365,7 @@ test("nested JSON and YAML build themed directory pages and redirects", async (t
   );
   assert.match(
     tools,
-    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">2<\/span\s*><span class="count-label"> Links<\/span>\s*<\/h1>/,
+    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true"[^>]*>\s*<span class="count-number">2<\/span\s*><span class="count-label"> Links<\/span>\s*<\/h1>/,
   );
   assert.equal([...tools.matchAll(/<h1\b/g)].length, 1);
   assert.doesNotMatch(tools, /<h1>tools<\/h1>/);
@@ -1377,7 +1386,7 @@ test("nested JSON and YAML build themed directory pages and redirects", async (t
   assert.match(editors, /href="\.\.\/\.\.\/assets\/site\.css"/);
   assert.match(
     editors,
-    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">1<\/span\s*><span class="count-label"> Link<\/span>\s*<\/h1>/,
+    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true"[^>]*>\s*<span class="count-number">1<\/span\s*><span class="count-label"> Link<\/span>\s*<\/h1>/,
   );
   assert.equal([...editors.matchAll(/<h1\b/g)].length, 1);
   assert.match(editors, /href="\.\.\/\.\.\/" data-app-link>Home<\/a>/);
@@ -1632,6 +1641,7 @@ for (const prefix of ["/", "/project/"])
       "generated shell links carry app markers and navigation keys",
     );
     const themeButton = {
+      ...themeLabelAttributes(entryHtml),
       addEventListener(name, callback) {
         this[name] = callback;
       },
@@ -2130,7 +2140,7 @@ test("hidden links and hidden-only folders are hidden by default but keep their 
   const home = await f.read("index.html");
   assert.match(
     home,
-    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">4<\/span\s*><span class="count-label"> Links<\/span>\s*<\/h1>/,
+    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true"[^>]*>\s*<span class="count-number">4<\/span\s*><span class="count-label"> Links<\/span>\s*<\/h1>/,
   );
   assert.match(home, /href="\.\/tools\/nested\/" data-app-link>nested<\/a>/);
   assert.match(
@@ -2173,7 +2183,7 @@ test("hidden links and hidden-only folders are hidden by default but keep their 
     const html = await f.read(page);
     assert.match(
       html,
-      /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">0<\/span\s*><span class="count-label"> Links<\/span>\s*<\/h1>/,
+      /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true"[^>]*>\s*<span class="count-number">0<\/span\s*><span class="count-label"> Links<\/span>\s*<\/h1>/,
     );
     assert.match(html, /<p id="empty-directory">No links listed here\.<\/p>/);
     assert.match(html, /<div hidden><ul class="links">/);
@@ -2200,7 +2210,7 @@ test("hidden links and hidden-only folders are hidden by default but keep their 
   assert.match(await allHidden.read("index.html"), /No links listed here\./);
   assert.match(
     await allHidden.read("index.html"),
-    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true">\s*<span class="count-number">0<\/span\s*><span class="count-label"> Links<\/span>\s*<\/h1>/,
+    /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true"[^>]*>\s*<span class="count-number">0<\/span\s*><span class="count-label"> Links<\/span>\s*<\/h1>/,
   );
   assert.match(
     await allHidden.read("index.html"),
@@ -2975,7 +2985,7 @@ test("information pages use relative navigation and shared theme assets", async 
   assert.match(home, /<title>Links · shl<\/title>/);
   assert.match(
     home,
-    /class="brand" href="\.\/" data-app-link\s*><span class="brand-slash">\/<\/span>shl<span class="brand-slash"\s*>\/<\/span\s*><\/a\s*>/,
+    /class="brand" href="\.\/" data-app-link data-site-path=""\s*><span class="brand-slash">\/<\/span>shl<span class="brand-slash"\s*>\/<\/span\s*><\/a\s*>/,
   );
   assert.match(home, /<footer class="footer">[\s\S]*?<p>shl<\/p>/);
   assert.match(home, /href="\.\/assets\/site\.css"/);
@@ -2997,10 +3007,16 @@ test("information pages use relative navigation and shared theme assets", async 
     }
   }
   assert.match(await f.read("assets/site.css"), /data-theme="dark"/);
-  assert.match(await f.read("assets/site.css"), /--bg:\s*#000/);
+  assert.match(
+    await f.read("assets/site.css"),
+    /--bg:\s*light-dark\(#f6f7f5, #000\)/,
+  );
   const theme = await f.read("assets/theme.js");
   assert.match(theme, /shortlink-theme/);
-  const button = { addEventListener() {} };
+  const button = {
+    ...themeLabelAttributes(await f.read("guide/index.html")),
+    addEventListener() {},
+  };
   const root = { dataset: {} };
   runInNewContext(theme, {
     document: { documentElement: root, querySelector: () => button },
@@ -3153,6 +3169,7 @@ test("every document shares theme foundations, including minimal forwards and as
     for (const control of [false, true]) {
       const root = { dataset: {} };
       const button = {
+        ...themeLabelAttributes(await f.read("404.html")),
         addEventListener(name, handler) {
           this[name] = handler;
         },
@@ -3224,6 +3241,28 @@ test("shared shell renders consistently across direct/native loads and app navig
           const style = frame.contentWindow.getComputedStyle(doc.body);
           if (JSON.stringify([style.backgroundColor, style.color]) !== JSON.stringify(palette[theme])) throw new Error('Wrong palette: ' + theme);
         };
+        const resolvedThemeTokens = doc => {
+          const probe = doc.createElement('span');
+          doc.body.append(probe);
+          const win = frame.contentWindow;
+          const theme = win.getComputedStyle(doc.documentElement).colorScheme;
+          const expected = {
+            light: '#f6f7f5 #ffffff #252b29 #59645f #7a8580 #006b60 #895400 #a33d20 #606060 #f7f7f7 #ebebeb #e8eeeb',
+            dark: '#000000 #111715 #c6d0ca #96a59d #63736b #64b6a4 #c6a36a #ee967b #a3a3a3 #000000 #181818 #111b16',
+          }[theme].split(' ');
+          const colors = ['bg', 'panel', 'ink', 'muted', 'line', 'accent', 'script', 'broken', 'disabled', 'disabled-bg', 'disabled-wash', 'wash'].map(name => {
+            probe.style.color = 'var(--' + name + ')';
+            return frame.contentWindow.getComputedStyle(probe).color;
+          });
+          for (const [index, color] of colors.entries()) {
+            probe.style.color = expected[index];
+            if (win.getComputedStyle(probe).color !== color) throw new Error('Theme token changed: ' + theme + '/' + index);
+          }
+          probe.remove();
+          const opacity = win.getComputedStyle(doc.documentElement).getPropertyValue('--hidden-opacity').trim();
+          if (Number(opacity) !== (theme === 'dark' ? .8 : .94)) throw new Error('Theme opacity changed');
+          return JSON.stringify([...colors, opacity]);
+        };
         localStorage.removeItem('shortlink-theme');
         if (matchMedia('(prefers-color-scheme: dark)').matches !== (system === 'dark')) throw new Error('System preference flag did not apply');
         for (const native of [false, true]) {
@@ -3233,6 +3272,13 @@ test("shared shell renders consistently across direct/native loads and app navig
             const doc = frame.contentDocument;
             if (doc.documentElement.hasAttribute('data-theme')) throw new Error('System case used an override');
             checkPalette(doc, system);
+            const tokens = resolvedThemeTokens(doc);
+            doc.documentElement.dataset.theme = system;
+            if (resolvedThemeTokens(doc) !== tokens) throw new Error('Explicit/system theme token drift');
+            doc.documentElement.dataset.theme = system === 'dark' ? 'light' : 'dark';
+            checkPalette(doc, doc.documentElement.dataset.theme);
+            delete doc.documentElement.dataset.theme;
+            if (resolvedThemeTokens(doc) !== tokens) throw new Error('System theme tokens did not restore');
           }
         }
         document.body.dataset.systemCheck = system;
@@ -3262,6 +3308,53 @@ test("shared shell renders consistently across direct/native loads and app navig
             const index = a.findIndex((value, i) => JSON.stringify(value) !== JSON.stringify(b[i]));
             throw new Error('Chrome mismatch: ' + label + ' node ' + index + ': ' + JSON.stringify(a[index]) + ' expected ' + JSON.stringify(b[index]));
           }
+        };
+        const publishedLabels = (doc, native) => {
+          const title = doc.querySelector('#link-count');
+          if (title) {
+            const count = Number(title.querySelector('.count-number').textContent);
+            equal(title.querySelector('.count-label').textContent, ' ' + (count === 1 ? title.dataset.labelSingular : title.dataset.labelPlural), 'static count label metadata');
+          }
+          const toggle = doc.querySelector('#tag-toggle');
+          if (toggle) equal(toggle.textContent.trim(), toggle.dataset.labelCollapsed, 'static picker label metadata');
+          const theme = doc.querySelector('[data-theme-control]');
+          equal(theme.textContent.trim(), theme.getAttribute('data-label-' + (native ? 'system' : doc.documentElement.dataset.theme || 'system')), 'static theme label metadata');
+          const routes = [...doc.querySelectorAll('[data-nav]')];
+          const guide = routes.find(link => link.dataset.nav === 'guide');
+          const footerGuide = doc.querySelector('.footer [data-site-path]');
+          equal([footerGuide.textContent, footerGuide.dataset.sitePath], [guide.textContent, guide.dataset.sitePath], 'Guide navigation owner');
+        };
+        const consumePublishedLabels = doc => {
+          const win = frame.contentWindow;
+          const title = doc.querySelector('#link-count');
+          const search = doc.querySelector('#link-search');
+          const toggle = doc.querySelector('#tag-toggle');
+          const theme = doc.querySelector('[data-theme-control]');
+          const saved = [title.dataset.labelSingular, title.dataset.labelPlural, toggle.dataset.labelCollapsed, toggle.dataset.labelExpanded, theme.dataset.labelLight, theme.dataset.labelDark];
+          title.dataset.labelSingular = 'one published link';
+          title.dataset.labelPlural = 'many published links';
+          toggle.dataset.labelCollapsed = 'published closed';
+          toggle.dataset.labelExpanded = 'published open';
+          theme.dataset.labelLight = 'published light';
+          theme.dataset.labelDark = 'published dark';
+          for (const query of ['git', 'unmatched', '']) {
+            search.value = query;
+            search.dispatchEvent(new win.Event('input', { bubbles: true }));
+            const label = Number(title.querySelector('.count-number').textContent) === 1 ? title.dataset.labelSingular : title.dataset.labelPlural;
+            equal(title.querySelector('.count-label').textContent, ' ' + label, 'count consumes published labels');
+          }
+          for (const expanded of [true, false]) {
+            toggle.click();
+            equal([toggle.textContent, toggle.getAttribute('aria-expanded')], [expanded ? toggle.dataset.labelExpanded : toggle.dataset.labelCollapsed, String(expanded)], 'picker consumes published labels');
+          }
+          for (let n = 0; n < 2; n++) {
+            theme.click();
+            equal(theme.textContent, theme.getAttribute('data-label-' + doc.documentElement.dataset.theme), 'theme consumes published labels');
+          }
+          [title.dataset.labelSingular, title.dataset.labelPlural, toggle.dataset.labelCollapsed, toggle.dataset.labelExpanded, theme.dataset.labelLight, theme.dataset.labelDark] = saved;
+          search.dispatchEvent(new win.Event('input', { bubbles: true }));
+          toggle.click(); toggle.click();
+          theme.click(); theme.click(); theme.blur();
         };
         const shellGeometry = doc => {
           const win = frame.contentWindow;
@@ -3348,6 +3441,7 @@ test("shared shell renders consistently across direct/native loads and app navig
                   }
                   await wait();
                   checkPalette(doc, theme);
+                  publishedLabels(doc, native);
                   shellGeometry(doc);
                   const title = titleGeometry(doc);
                   if (title) {
@@ -3370,7 +3464,8 @@ test("shared shell renders consistently across direct/native loads and app navig
                 }
               }
               frame.setAttribute('sandbox', 'allow-same-origin allow-scripts');
-              await load(prefix);
+               await load(prefix);
+               consumePublishedLabels(frame.contentDocument);
               const header = frame.contentDocument.querySelector('header');
               const footer = frame.contentDocument.querySelector('footer');
               const themeControl = frame.contentDocument.querySelector('[data-theme-control]');
@@ -3408,7 +3503,9 @@ test("shared shell renders consistently across direct/native loads and app navig
                  shellGeometry(doc);
                  equal(titleGeometry(doc), titleBaseline, 'app title alignment/font');
                 equal(controlStates(doc), controls, 'app control states');
-                equal(snapshot(doc), baseline, 'app ' + path + '/' + width + '/' + theme);
+                 equal(snapshot(doc), baseline, 'app ' + path + '/' + width + '/' + theme);
+                 publishedLabels(doc, false);
+                 if (expected === 'links') consumePublishedLabels(doc);
               }
             }
           }
@@ -3491,7 +3588,10 @@ test("script launchers are opt-in, quote URLs, forward arguments and statuses, a
     /<span class="count-number">3<\/span\s*><span class="count-label"> Links<\/span>/,
   );
   assert.match(home, /class="code" href="\.\/disabled\/">disabled<\/a>/);
-  assert.match(await f.read("assets/site.css"), /--script:\s*#c6a36a/);
+  assert.match(
+    await f.read("assets/site.css"),
+    /--script:\s*light-dark\(#895400, #c6a36a\)/,
+  );
   assert.match(await f.read("assets/site.css"), /\.download\s*\{/);
   assert.match(
     await f.read("assets/site.css"),
@@ -3665,15 +3765,14 @@ test("404 resolves root and nested paths under user and project sites", async (t
   };
   const f = await fixture(t, map);
   assert.equal(f.build().status, 0);
-  const script = behaviorScript(await f.read("404.html"), "recovery");
+  const html = await f.read("404.html");
+  const script = behaviorScript(html, "recovery");
   for (const prefix of ["/", "/project/"]) {
     const visit = async (path, offline = false) => {
       const elements = { home: {}, head: {}, msg: {} };
-      const shellLinks = [
-        { dataset: {}, classList: { contains: () => true } },
-        ...["links", "guide"].map((nav) => ({ dataset: { nav } })),
-        { dataset: {}, classList: { contains: () => false } },
-      ];
+      const shellLinks = [...html.matchAll(/data-site-path="([^"]*)"/g)].map(
+        ([, sitePath]) => ({ dataset: { sitePath } }),
+      );
       const requests = [];
       let destination;
       await runInNewContext(script, {
@@ -3685,7 +3784,10 @@ test("404 resolves root and nested paths under user and project sites", async (t
         },
         document: {
           getElementById: (id) => elements[id],
-          querySelectorAll: () => shellLinks,
+          querySelectorAll: (selector) => {
+            assert.equal(selector, "[data-site-path]");
+            return shellLinks;
+          },
         },
         fetch: async (url) => {
           requests.push(url);
@@ -4401,13 +4503,13 @@ test("state rows, selected filters, all-hidden traversal, disabled native action
             const r = row(doc, (script ? '' : 'Plain') + 'State' + mask), style = win.getComputedStyle(r), code = r.querySelector('.code');
             check(r.getBoundingClientRect().height === 50, 'State row changed height');
             check(Number(style.opacity) === (mask & 1 ? theme === 'dark' ? .8 : .94 : 1), 'State opacity');
-            const expected = win.getComputedStyle(doc.documentElement).getPropertyValue(mask & 4 ? '--disabled' : mask & 2 ? '--broken' : script ? '--script' : '--accent');
+            const expected = paint('var(' + (mask & 4 ? '--disabled' : mask & 2 ? '--broken' : script ? '--script' : '--accent') + ')', r);
             check(!!r.querySelector('.download') === script, 'Non-script Download control');
             check(JSON.stringify(rgb(win.getComputedStyle(code).color)) === JSON.stringify(rgb(expected)), 'State precedence');
             const brokenEnabled = (mask & 2) && !(mask & 4), visit = r.querySelector('.visit');
             const rowWash = brokenEnabled ? paint('color-mix(in srgb, var(--broken) 6%, var(--bg))', r) : paint('var(--wash)', r);
             const tone = brokenEnabled ? '--broken' : '--accent';
-            check(JSON.stringify(rgb(win.getComputedStyle(visit).color)) === JSON.stringify(rgb(style.getPropertyValue(mask & 4 ? '--muted' : tone))), 'Open state palette');
+            check(JSON.stringify(rgb(win.getComputedStyle(visit).color)) === JSON.stringify(rgb(paint('var(' + (mask & 4 ? '--muted' : tone) + ')', r))), 'Open state palette');
             check(win.getComputedStyle(visit).borderTopColor === paint('color-mix(in srgb, var(' + tone + ') 25%, var(--bg))', r), 'Open border palette');
             check(win.getComputedStyle(visit).backgroundColor === paint(mask & 4 ? 'var(--wash)' : 'color-mix(in srgb, var(' + tone + ') 10%, var(--bg))', r), 'Open fill palette');
             r.classList.add('verify-hover'); visit.classList.add('verify-hover');
@@ -4415,9 +4517,9 @@ test("state rows, selected filters, all-hidden traversal, disabled native action
             check(win.getComputedStyle(visit).backgroundColor === paint(mask & 4 ? 'var(--wash)' : 'color-mix(in srgb, var(' + tone + ') ' + (brokenEnabled ? 12 : 18) + '%, var(--bg))', r), 'Open hover palette');
             if (brokenEnabled) check(contrast(blend(rgb(win.getComputedStyle(visit).color), bg, Number(style.opacity)), blend(rgb(win.getComputedStyle(visit).backgroundColor), bg, Number(style.opacity))) >= 4.5, 'Dimmed broken Open hover contrast: ' + theme + '/' + mask);
             const hoveredDestination = r.querySelector('.destination'), restingColor = win.getComputedStyle(hoveredDestination).color;
-            check(JSON.stringify(rgb(restingColor)) === JSON.stringify(rgb(style.getPropertyValue('--muted'))), 'Destination resting palette');
+            check(JSON.stringify(rgb(restingColor)) === JSON.stringify(rgb(paint('var(--muted)', r))), 'Destination resting palette');
             hoveredDestination.classList.add('verify-hover');
-            check(JSON.stringify(rgb(win.getComputedStyle(hoveredDestination).color)) === JSON.stringify(rgb(style.getPropertyValue(tone))), 'Destination hover palette');
+            check(JSON.stringify(rgb(win.getComputedStyle(hoveredDestination).color)) === JSON.stringify(rgb(paint('var(' + tone + ')', r))), 'Destination hover palette');
             for (const fragment of hoveredDestination.querySelectorAll('.destination-start, .destination-end')) check(win.getComputedStyle(fragment).color === win.getComputedStyle(hoveredDestination).color, 'Visible destination hover palette');
             check(win.getComputedStyle(hoveredDestination).textDecorationLine === 'underline', 'Destination hover underline');
             if (brokenEnabled) check(contrast(blend(rgb(win.getComputedStyle(hoveredDestination).color), bg, Number(style.opacity)), blend(rgb(rowWash), bg, Number(style.opacity))) >= 4.5, 'Dimmed broken destination hover contrast');
@@ -4455,7 +4557,7 @@ test("state rows, selected filters, all-hidden traversal, disabled native action
                 check(win.getComputedStyle(code).textDecorationLine === 'none', 'Disabled short code changed on hover');
                 const background = rgb(win.getComputedStyle(r).backgroundColor);
                 for (const element of elements.slice(1)) readable(win, element, background, backdrop, Number(style.opacity));
-                for (const action of r.querySelectorAll('.visit, .download')) check(JSON.stringify(rgb(win.getComputedStyle(action).backgroundColor)) === JSON.stringify(rgb(win.getComputedStyle(r).getPropertyValue('--wash'))), 'Disabled hover changed action wash');
+                for (const action of r.querySelectorAll('.visit, .download')) check(JSON.stringify(rgb(win.getComputedStyle(action).backgroundColor)) === JSON.stringify(rgb(paint('var(--wash)', r))), 'Disabled hover changed action wash');
               }
               for (const element of elements) element.classList.remove('verify-hover');
               for (const element of [code, dest, r.querySelector('.tags')]) {

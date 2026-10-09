@@ -92,7 +92,11 @@ globalThis.initSearch = () => {
     const number = countLabel.querySelector(".count-number");
     const label = countLabel.querySelector(".count-label");
     number.textContent = count;
-    label.textContent = count === 1 ? " Link" : " Links";
+    label.textContent =
+      " " +
+      (count === 1
+        ? countLabel.dataset.labelSingular
+        : countLabel.dataset.labelPlural);
   }
   function chips() {
     selected.hidden = !selections.size;
@@ -145,7 +149,9 @@ globalThis.initSearch = () => {
   listen(toggle, "click", () => {
     available.hidden = !available.hidden;
     toggle.setAttribute("aria-expanded", String(!available.hidden));
-    toggle.textContent = available.hidden ? "Show tags" : "Hide tags";
+    toggle.textContent = available.hidden
+      ? toggle.dataset.labelCollapsed
+      : toggle.dataset.labelExpanded;
   });
 
   function tokens(enter = false, defer = composing) {

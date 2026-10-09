@@ -18,31 +18,42 @@ export const NAV_ITEMS = [
   { label: "Links", path: "", key: "links" },
   { label: "Guide", path: "guide/", key: "guide" },
 ];
+export const GUIDE_NAV = NAV_ITEMS.find(({ key }) => key === "guide");
+
+const countLabels = { singular: "Link", plural: "Links" };
+const themeLabels = {
+  system: "Theme: system",
+  light: "Theme: light",
+  dark: "Theme: dark",
+};
 
 export const pageTitle = (title, count) => /* HTML */ `
-  <h1${count === undefined ? "" : ' id="link-count"'} class="page-title"${count === undefined ? "" : ' aria-live="polite" aria-atomic="true"'}>
+  <h1${count === undefined ? "" : ' id="link-count"'} class="page-title"${count === undefined ? "" : ` aria-live="polite" aria-atomic="true" data-label-singular="${esc(countLabels.singular)}" data-label-plural="${esc(countLabels.plural)}"`}>
     <span class="count-number"${count === undefined ? ' aria-hidden="true"' : ""}>${count === undefined ? "" : esc(count)}</span
-    ><span class="count-label">${count === undefined ? "" : " "}${esc(title)}</span>
+    ><span class="count-label">${count === undefined ? esc(title) : " " + esc(count === 1 ? countLabels.singular : countLabels.plural)}</span>
   </h1>`;
 
 const header = (active, depth) =>
   /* HTML */ `<header class="site-head">
     <div class="wrap head-inner">
-      <a class="brand" href="${depth}" data-app-link
+      <a class="brand" href="${depth}" data-app-link data-site-path=""
         ><span class="brand-slash">/</span>shl<span class="brand-slash"
           >/</span
         ></a
       >
       <nav class="nav" aria-label="Main navigation">
-        ${NAV_ITEMS.map(({ label, path, key }) => `<a href="${depth}${path}" data-app-link data-nav="${key}"${active === key ? ' aria-current="page"' : ""}>${label}</a>`).join("")}
+        ${NAV_ITEMS.map(({ label, path, key }) => `<a href="${depth}${path}" data-app-link data-site-path="${esc(path)}" data-nav="${key}"${active === key ? ' aria-current="page"' : ""}>${esc(label)}</a>`).join("")}
       </nav>
       <button
         class="theme-toggle"
         data-theme-control
+        ${Object.entries(themeLabels)
+          .map(([state, label]) => `data-label-${state}="${esc(label)}"`)
+          .join(" ")}
         type="button"
         aria-label="Change color theme"
       >
-        Theme: system
+        ${themeLabels.system}
       </button>
     </div>
   </header>`;
@@ -52,7 +63,13 @@ const footer = (depth) =>
     <div class="wrap">
       <p>shl</p>
       <p>
-        <a href="${depth}guide/" data-app-link>Guide</a> ·
+        <a
+          href="${depth}${GUIDE_NAV.path}"
+          data-app-link
+          data-site-path="${esc(GUIDE_NAV.path)}"
+          >${esc(GUIDE_NAV.label)}</a
+        >
+        ·
         <a href="https://github.com/ratrat64/shortlink#readme">Repository</a>
       </p>
     </div>

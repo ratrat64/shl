@@ -7,7 +7,8 @@
   const button = document.querySelector("[data-theme-control]");
   if (!button) return;
   const update = () => {
-    button.textContent = "Theme: " + (root.dataset.theme || "system");
+    const state = root.dataset.theme || "system";
+    button.textContent = button.getAttribute("data-label-" + state);
   };
   update();
   button.addEventListener("click", () => {
