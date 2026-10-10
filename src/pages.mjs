@@ -100,10 +100,6 @@ export const guidePage = (source) =>
             JSON or YAML; GitHub Pages hosts the site. No database or built-in
             click tracking.
           </li>
-          <li>
-            <strong>Your theme.</strong> Follow system light/dark mode or save
-            your own choice.
-          </li>
         </ul>
       </section>
       <section id="how-to-use">
