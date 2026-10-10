@@ -462,7 +462,7 @@ test("session filters preserve exact restoration, absent chips, native history, 
       const prefix=${JSON.stringify(prefix)}, key='shl:filters:v1:'+prefix;
       const check=(yes,msg)=>{if(!yes)throw Error(msg)};
       const wait=async predicate=>{for(let n=0;!predicate()&&n<200;n++)await new Promise(r=>setTimeout(r,10));check(predicate(),'Navigation incomplete')};
-      const go=async path=>{const old=document.querySelector('main'),a=document.createElement('a');a.href=prefix+path;a.dataset.appLink='';old.append(a);a.click();await wait(()=>document.querySelector('main')!==old)};
+      const go=async path=>{const old=document.querySelector('[data-directory-content]')||document.querySelector('main'),a=document.createElement('a');a.href=prefix+path;a.dataset.appLink='';document.querySelector('main').append(a);a.click();await wait(()=>location.pathname===prefix+path&&!old.isConnected)};
       const type=value=>{const input=document.querySelector('#link-search');input.value=value;input.dispatchEvent(new Event('input'))};
       const tags=()=>[...document.querySelectorAll('#selected-tags button')].map(b=>b.dataset.tag);
       const shell=[document.documentElement,document.querySelector('header'),document.querySelector('footer'),document.querySelector('[data-theme-control]')];
@@ -673,6 +673,163 @@ test("session filters preserve exact restoration, absent chips, native history, 
   await send("Page.removeScriptToEvaluateOnNewDocument", {
     identifier: blocked.identifier,
   });
+});
+
+test("stable directory tools retain identity, caret, tracks, metadata and content-only motion through browsing and history", async (t) => {
+  const chrome = availableChrome(t);
+  if (!chrome) return;
+  const longTags = Array.from(
+    { length: 12 },
+    (_, i) => `long-${i}-` + "full-label-".repeat(12),
+  );
+  const leaf = (tags) => ({ url: "https://example.com/setup.sh", tags });
+  const f = await fixture(t, {
+    alpha: {
+      One: leaf(["shell", "script", "alpha-only", ...longTags]),
+      deeper: { Nested: leaf(["shell", ...longTags]) },
+    },
+    beta: { Two: leaf(["shell", "script", "beta-only", ...longTags]) },
+    noTags: { Plain: "https://example.com/" },
+  });
+  assert.equal(f.build().status, 0);
+  // Incoming controls, rather than browser constants, own their labels.
+  await writeFile(
+    join(f.cwd, "dist", "alpha", "index.html"),
+    (await f.read("alpha/index.html"))
+      .replace('data-label-singular="Link"', 'data-label-singular="Entry"')
+      .replace('data-label-plural="Links"', 'data-label-plural="Entries"')
+      .replace(
+        'data-label-collapsed="Show tags"',
+        'data-label-collapsed="Browse directory tags"',
+      )
+      .replace(
+        'data-label-expanded="Hide tags"',
+        'data-label-expanded="Close directory tags"',
+      ),
+  );
+  const origin = await browserServer(t, f.cwd);
+  const { send, evaluate, navigate } = await browserControls(t, chrome, f.cwd);
+  for (const prefix of ["/", "/project/"])
+    for (const width of [390, 1440])
+      for (const theme of ["light", "dark"])
+        for (const motion of ["no-preference", "reduce"]) {
+          await send("Emulation.setDeviceMetricsOverride", {
+            width,
+            height: 900,
+            deviceScaleFactor: 1,
+            mobile: width === 390,
+          });
+          await send("Emulation.setEmulatedMedia", {
+            features: [{ name: "prefers-reduced-motion", value: motion }],
+          });
+          await navigate(origin + prefix);
+          await evaluate(`(async () => {
+            const prefix=${JSON.stringify(prefix)}, motion=${JSON.stringify(motion)}, key='shl:filters:v1:'+prefix;
+            const check=(yes,message)=>{if(!yes)throw Error(message)};
+            const wait=async predicate=>{for(let n=0;!predicate()&&n<200;n++)await new Promise(r=>setTimeout(r,10));check(predicate(),'Navigation incomplete: '+location.href)};
+            sessionStorage.clear();initSearch(true);document.documentElement.dataset.theme=${JSON.stringify(theme)};
+            const input=document.querySelector('#link-search'), toggle=document.querySelector('#tag-toggle'), selected=document.querySelector('#selected-tags'), available=document.querySelector('#available-tags');
+            const main=document.querySelector('main'), tools=document.querySelector('.directory-tools'), section=tools.parentElement;
+            const shell=[document.documentElement,document.querySelector('header'),document.querySelector('footer'),document.querySelector('[data-theme-control]')];
+            const type=value=>{input.value=value;input.dispatchEvent(new Event('input'))};
+            toggle.click();
+            for(const tag of ${JSON.stringify(["shell", longTags[0], longTags[1]])})available.querySelector('button[data-tag="'+tag+'"]').click();
+            type('  #missing, #shell');
+            for(const details of document.querySelectorAll('details'))details.open=true;
+            input.setSelectionRange(3,9,'backward');
+            await Promise.all(document.getAnimations().map(a=>a.finished.catch(()=>{})));
+            const buttons=[...selected.querySelectorAll('button')], metadata=buttons.map(b=>[b.textContent,b.getAttribute('style'),b.getAttribute('aria-label'),b.getAttribute('aria-pressed')]);
+            selected.scrollLeft=19;available.scrollLeft=23;
+            const offsets=[selected.scrollLeft,available.scrollLeft];
+            check(offsets.every(n=>n>0),'Fixture tracks do not overflow');
+            let writes=0, assignments=0, reentrances=0, disconnected=false;
+            const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');
+            Object.defineProperty(input,'value',{get(){return setter.get.call(this)},set(value){assignments++;setter.set.call(this,value)}});
+            const set=Storage.prototype.setItem;Storage.prototype.setItem=function(...args){if(args[0]===key)writes++;return set.apply(this,args)};
+            selected.addEventListener('animationstart',()=>reentrances++);
+            const observer=new MutationObserver(()=>{if(!tools.isConnected||!input.isConnected||buttons.some(b=>!b.isConnected))disconnected=true});observer.observe(main,{childList:true,subtree:true});
+            const identity=()=>{
+              check(document.querySelector('main')===main&&tools.parentElement===section&&document.querySelector('.directory-tools')===tools,'Main/section/tools replaced');
+              check(document.querySelector('#link-search')===input&&document.querySelector('#tag-toggle')===toggle&&document.querySelector('#selected-tags')===selected&&document.querySelector('#available-tags')===available,'Control identity lost');
+              check(buttons.every((b,i)=>selected.children[i]===b&&b.isConnected)&&!disconnected,'Selected controls detached/rebuilt/reordered');
+              check(JSON.stringify(buttons.map(b=>[b.textContent,b.getAttribute('style'),b.getAttribute('aria-label'),b.getAttribute('aria-pressed')]))===JSON.stringify(metadata),'Selected renderer metadata changed');
+              check(input.value==='  #missing, #shell'&&input.selectionStart===3&&input.selectionEnd===9&&input.selectionDirection==='backward'&&assignments===0,'Text/caret reassigned');
+              check(writes===0,'Initialization saved filters');
+              check(shell.every((node,i)=>node===[document.documentElement,document.querySelector('header'),document.querySelector('footer'),document.querySelector('[data-theme-control]')][i]),'Shell identity changed');
+            };
+            const activate=path=>{const a=document.createElement('a');a.href=prefix+path;a.dataset.appLink='';main.append(a);a.click();a.remove()};
+            const complete=async(path,old)=>{await wait(()=>location.pathname===prefix+path&&!old.isConnected);identity();check(document.activeElement===document.querySelector('h1'),'Heading focus');check(document.querySelector('#tag-error').hidden&&document.querySelector('#tag-notice').textContent===''&&input.getAttribute('aria-invalid')==='false','Transient token feedback retained');check(document.querySelector('.count-number').textContent==='0'&&!document.querySelector('#search-status').hidden,'Existing filters not applied')};
+            const go=async path=>{const old=document.querySelector('[data-directory-content]');activate(path);await complete(path,old)};
+            await go('alpha/');
+            check(!available.hidden&&!toggle.disabled&&toggle.querySelectorAll('svg').length===2,'Picker/icons lost');
+            check(toggle.getAttribute('aria-label')==='Close directory tags'&&document.querySelector('.count-label').textContent.trim()==='Entries','Incoming renderer labels ignored');
+            check([...document.querySelectorAll('details')].every(d=>!d.open),'Outgoing disclosures retained');
+            check(selected.scrollLeft===offsets[0]&&available.scrollLeft===offsets[1],'Track scroll reset');
+            check(document.title==='alpha · shl'&&document.querySelector('.breadcrumbs').textContent.includes('alpha'),'Title/breadcrumbs stale');
+            check(available.querySelector('[data-tag="alpha-only"]')&&!available.querySelector('[data-tag="beta-only"]'),'Alpha catalog stale');
+            const content=document.querySelector('[data-directory-content]'), animations=content.getAnimations();
+            check(main.getAnimations().length===0&&tools.getAnimations({subtree:true}).every(a=>a.animationName!=='feedback-appear'||available.contains(a.effect.target)),'Toolbar entrance replay');
+            check(animations.length===(motion==='reduce'?0:1),'Content-only entrance missing');
+            if(animations.length){const animation=animations[0];animation.pause();animation.currentTime=100;check(Number(getComputedStyle(content).opacity)>0&&Number(getComputedStyle(content).opacity)<1&&getComputedStyle(tools).opacity==='1'&&getComputedStyle(input).opacity==='1','Toolbar fades with results');animation.finish()}
+            await wait(()=>!content.hasAttribute('data-entering'));
+            await go('beta/');
+            check(available.querySelector('[data-tag="beta-only"]')&&!available.querySelector('[data-tag="alpha-only"]'),'Beta catalog stale');
+            check(selected.scrollLeft===offsets[0]&&available.scrollLeft===offsets[1],'Repeated scroll reset');
+            const betaContent=document.querySelector('[data-directory-content]');history.back();await complete('alpha/',betaContent);
+            const alphaContent=document.querySelector('[data-directory-content]');history.forward();await complete('beta/',alphaContent);
+            await go('noTags/');
+            check(toggle.disabled&&available.hidden&&toggle.getAttribute('aria-expanded')==='false'&&available.querySelectorAll('button').length===0,'No-tag availability');
+            identity();
+            // A visitor mutation in an untagged subtree must save the preference, not the hidden empty catalog.
+            observer.disconnect();type('');check(writes===1&&JSON.parse(sessionStorage.getItem(key)).picker,'No-tag mutation lost picker preference');
+            const oldPlain=document.querySelector('[data-directory-content]');activate('beta/');await wait(()=>location.pathname===prefix+'beta/'&&!oldPlain.isConnected);
+            check(!available.hidden&&!toggle.disabled&&document.querySelector('.count-number').textContent==='1','Tagged return lost picker/results');
+            check(selected.scrollLeft===offsets[0]&&available.scrollLeft===offsets[1],'No-tag return lost track scroll');
+            check(buttons.every((b,i)=>selected.children[i]===b)&&reentrances===0,'Existing chip entrance replay');
+            // Every live control has one effective listener and saves synchronously once per mutation.
+            let before=writes;toggle.click();check(available.hidden&&writes===before+1&&JSON.parse(sessionStorage.getItem(key)).picker===false,'Duplicate toggle listener/save');
+            before=writes;type('Two');check(writes===before+1&&JSON.parse(sessionStorage.getItem(key)).text==='Two'&&document.querySelector('.count-number').textContent==='1','Duplicate input listener/save');
+            before=writes;buttons[0].click();check(writes===before+1&&JSON.parse(sessionStorage.getItem(key)).tags.length===2&&!buttons[0].isConnected,'Duplicate removal listener/save');
+            // Superseded HTML and outgoing local actions cannot touch the retained tools or incoming results.
+            const nativeFetch=fetch, requests=[];globalThis.fetch=(url,options)=>new Promise(resolve=>requests.push({signal:options.signal,release:()=>nativeFetch(url).then(resolve)}));
+            const saved=sessionStorage.getItem(key);activate('alpha/');await wait(()=>requests.length===1);check(input.readOnly,'Outgoing input not paused');
+            input.value='obsolete';input.dispatchEvent(new Event('input'));toggle.click();check(sessionStorage.getItem(key)===saved,'Paused controls saved');
+            activate('noTags/');await wait(()=>requests.length===2);requests[1].release();await wait(()=>location.pathname===prefix+'noTags/');
+            const current=document.querySelector('[data-directory-content]');requests[0].release();await new Promise(r=>setTimeout(r,30));
+            check(requests[0].signal.aborted&&document.querySelector('[data-directory-content]')===current&&document.querySelector('#link-search')===input&&input.value==='Two'&&sessionStorage.getItem(key)===saved&&toggle.disabled,'Stale directory changed tools/state');
+            globalThis.fetch=nativeFetch;
+            const plainContent=document.querySelector('[data-directory-content]');activate('beta/');await wait(()=>location.pathname===prefix+'beta/'&&!plainContent.isConnected);
+            let copied,downloaded,pageLoaded,saves=0;
+            Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:()=>new Promise(resolve=>{copied=resolve})}});
+            const createURL=URL.createObjectURL;URL.createObjectURL=blob=>{saves++;return createURL(blob)};
+            globalThis.fetch=(url,options)=>String(url).startsWith('https://example.com/')?Promise.resolve({ok:true,blob:()=>new Promise(resolve=>{downloaded=resolve})}):new Promise(resolve=>{pageLoaded=()=>nativeFetch(url).then(resolve)});
+            document.querySelector('a.code').click();document.querySelector('button[data-download-url]').click();await wait(()=>copied&&downloaded);
+            const outgoingContent=document.querySelector('[data-directory-content]'),copyStatus=document.querySelector('#copy-status'),downloadStatus=document.querySelector('#download-status');
+            activate('alpha/');await wait(()=>pageLoaded);copied();downloaded(new Blob(['stale']));await new Promise(r=>setTimeout(r,10));
+            check(saves===0&&copyStatus.textContent===''&&downloadStatus.textContent===''&&outgoingContent.isConnected&&sessionStorage.getItem(key)===saved,'Stale local action changed pending directory');
+            pageLoaded();await wait(()=>location.pathname===prefix+'alpha/'&&!outgoingContent.isConnected);
+            check(document.querySelector('#link-search')===input&&sessionStorage.getItem(key)===saved&&document.querySelector('#copy-status').textContent===''&&document.querySelector('#download-status').textContent===''&&saves===0,'Stale local action changed incoming directory');
+            globalThis.fetch=nativeFetch;URL.createObjectURL=createURL;Storage.prototype.setItem=set;
+          })()`);
+        }
+  // Different canonical site bases deliberately take the normal mount path.
+  await navigate(origin + "/");
+  assert.equal(
+    await evaluate(
+      `(async()=>{sessionStorage.clear();initSearch(true);const input=document.querySelector('#link-search'),main=document.querySelector('main'),a=document.createElement('a');input.value='root';input.dispatchEvent(new Event('input'));a.href='/project/beta/';a.dataset.appLink='';main.append(a);a.click();for(let n=0;location.pathname!=='/project/beta/'&&n<200;n++)await new Promise(r=>setTimeout(r,10));return document.querySelector('main')!==main&&document.querySelector('#link-search')!==input&&document.querySelector('#link-search').value===''&&JSON.parse(sessionStorage.getItem('shl:filters:v1:/')).text==='root'&&!sessionStorage.getItem('shl:filters:v1:/project/')})()`,
+    ),
+    true,
+  );
+  await writeFile(
+    join(f.cwd, "dist", "index.html"),
+    indexPage({ raw: {}, links: [], source: "links.json" }),
+  );
+  assert.equal(
+    await evaluate(
+      `(async()=>{const key='shl:filters:v1:/project/',input=document.querySelector('#link-search'),main=document.querySelector('main');input.value='keep exact  text ';input.dispatchEvent(new Event('input'));const saved=sessionStorage.getItem(key);document.querySelector('[data-nav=links]').href='/project/';document.querySelector('[data-nav=links]').click();for(let n=0;location.pathname!=='/project/'&&n<200;n++)await new Promise(r=>setTimeout(r,10));if(document.querySelector('main')===main||document.querySelector('#link-search')||sessionStorage.getItem(key)!==saved)return false;const empty=document.querySelector('main'),a=document.createElement('a');a.href='/project/beta/';a.dataset.appLink='';empty.append(a);a.click();for(let n=0;location.pathname!=='/project/beta/'&&n<200;n++)await new Promise(r=>setTimeout(r,10));return document.querySelector('main')!==empty&&document.querySelector('#link-search')!==input&&document.querySelector('#link-search').value==='keep exact  text '&&sessionStorage.getItem(key)===saved})()`,
+    ),
+    true,
+  );
 });
 
 function availableChrome(t) {
@@ -5275,7 +5432,8 @@ test("Chrome 404 browsing and history preserve document/shell identity at both p
           const transition = async (activate, path, page, title) => {
             const outgoing = document.querySelector('main');
             activate();
-            await wait(() => location.pathname === prefix + path && document.querySelector('main') !== outgoing);
+            const oldContent = outgoing.querySelector('[data-directory-content]');
+            await wait(() => location.pathname === prefix + path && (oldContent ? !oldContent.isConnected : document.querySelector('main') !== outgoing));
             if (page === 'not-found') await wait(() => document.querySelector('#head')?.textContent === 'Link not found');
             verify(path, page, title);
           };

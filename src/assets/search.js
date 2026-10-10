@@ -1,7 +1,8 @@
 (() => {
   const records = new Map();
   const unsaved = new Map();
-  globalThis.initSearch = (refreshStorage = false) => {
+  const trackPositions = new WeakMap();
+  globalThis.initSearch = (refreshStorage = false, directoryTools = null) => {
     globalThis.cleanupSearch?.();
     const input = document.querySelector("#link-search");
     if (!input) return;
@@ -18,6 +19,21 @@
     const base = document.querySelector("main[data-site-base]")?.dataset
       .siteBase;
     if (!base) return;
+    const trackScroll = [selected, available].map((track) => {
+      if (!track.hidden) trackPositions.set(track, track.scrollLeft);
+      return trackPositions.get(track) || 0;
+    });
+    if (directoryTools) {
+      available.replaceChildren(
+        ...directoryTools.querySelector("#available-tags").childNodes,
+      );
+      const incomingToggle = directoryTools.querySelector("#tag-toggle");
+      toggle.dataset.labelCollapsed = incomingToggle.dataset.labelCollapsed;
+      toggle.dataset.labelExpanded = incomingToggle.dataset.labelExpanded;
+      const incomingCount = directoryTools.querySelector("#link-count");
+      countLabel.dataset.labelSingular = incomingCount.dataset.labelSingular;
+      countLabel.dataset.labelPlural = incomingCount.dataset.labelPlural;
+    }
     const key = "shl:filters:v1:" + new URL(base, location.href).pathname;
     const identity = (button) => JSON.parse(`"${button.dataset.tag}"`);
     const metadata = new Map(
@@ -63,6 +79,7 @@
     if (!valid(restored))
       restored = { version: 1, text: "", tags: [], picker: false };
     records.set(key, restored);
+    let pickerOpen = restored.picker;
     let active = true;
     globalThis.pauseSearch = () => {
       active = false;
@@ -79,7 +96,7 @@
         version: 1,
         text: input.value,
         tags: [...selections.keys()],
-        picker: !available.hidden,
+        picker: pickerOpen,
       };
       records.set(key, record);
       try {
@@ -93,9 +110,15 @@
         }
       }
     };
-    selected.replaceChildren();
+    if (directoryTools) {
+      for (const button of selected.querySelectorAll("button")) {
+        const tag = identity(button);
+        if (restored.tags.includes(tag)) selections.set(tag, button);
+        else button.remove();
+      }
+    } else selected.replaceChildren();
     for (const button of catalog.values()) button.hidden = false;
-    input.value = restored.text;
+    if (input.value !== restored.text) input.value = restored.text;
     input.readOnly = false;
     let unknown = [];
     let previousInput = input.value;
@@ -127,7 +150,8 @@
       globalThis.pauseSearch = globalThis.resumeSearch = null;
     };
     input.parentElement.hidden = false;
-    if (!toggle.disabled) toggle.hidden = false;
+    toggle.disabled = !catalog.size;
+    toggle.hidden = false;
     countLabel
       .querySelector(".count-number")
       .classList.remove("count-changing");
@@ -263,7 +287,10 @@
           event.target.scrollIntoView({ block: "nearest", inline: "nearest" });
       });
     function picker(open) {
-      available.hidden = !open;
+      pickerOpen = open;
+      available.hidden = !open || !catalog.size;
+      if (!available.hidden)
+        available.scrollLeft = trackPositions.get(available) || 0;
       toggle.setAttribute("aria-expanded", String(!available.hidden));
       toggle.setAttribute(
         "aria-label",
@@ -273,6 +300,8 @@
       );
     }
     listen(toggle, "click", () => {
+      if (!available.hidden)
+        trackPositions.set(available, available.scrollLeft);
       // Slide content below the toolbar with the picker: record positions,
       // toggle synchronously (state/AT/tests observe hidden immediately),
       // then play a FLIP transform so the list glides to its new spot.
@@ -502,7 +531,10 @@
       composing = false;
       tokens();
     });
-    for (const tag of restored.tags) select(tag);
+    for (const tag of restored.tags) {
+      if (!selections.has(tag)) select(tag);
+      if (catalog.has(tag)) catalog.get(tag).hidden = true;
+    }
     picker(restored.picker);
     error.hidden = true;
     error.textContent = "";
@@ -510,5 +542,9 @@
     input.setAttribute("aria-invalid", "false");
     chips();
     update();
+    if (directoryTools) {
+      selected.scrollLeft = trackScroll[0];
+      available.scrollLeft = trackScroll[1];
+    }
   };
 })();

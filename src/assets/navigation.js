@@ -10,8 +10,8 @@
   // The header and footer survive page swaps, so their relative links must not drift.
   for (const link of document.querySelectorAll(".site-head a, .footer a"))
     link.href = link.href;
-  const mount = (refreshStorage = false) => {
-    globalThis.initSearch(refreshStorage);
+  const mount = (refreshStorage = false, directoryTools = null) => {
+    globalThis.initSearch(refreshStorage, directoryTools);
     globalThis.initCopy();
     globalThis.initDownload();
     globalThis.initRecovery(navigate);
@@ -96,7 +96,7 @@
         await response.text(),
         "text/html",
       );
-      const main = page.querySelector("main[data-app-page]");
+      let main = page.querySelector("main[data-app-page]");
       const title = page.querySelector("title");
       if (
         !main ||
@@ -120,9 +120,28 @@
       for (const script of main.querySelectorAll("script")) script.remove();
       scroll.set(displayed, window.scrollY);
       cleanup();
+      const outgoing = document.querySelector("main");
+      let directoryTools = null;
+      let entrance = main;
+      if (
+        main.dataset.appPage === "links" &&
+        outgoing.dataset.appPage === "links" &&
+        main.dataset.siteBase === outgoing.dataset.siteBase &&
+        main.querySelector("#link-search") &&
+        outgoing.querySelector("#link-search") &&
+        main.querySelector("[data-directory-content]") &&
+        outgoing.querySelector("[data-directory-content]")
+      ) {
+        directoryTools = main.querySelector(".directory-tools");
+        entrance = main.querySelector("[data-directory-content]");
+        delete outgoing.dataset.entering;
+        outgoing
+          .querySelector("[data-directory-content]")
+          .replaceWith(entrance);
+        main = outgoing;
+      } else outgoing.replaceWith(main);
       if (!matchMedia("(prefers-reduced-motion: reduce)").matches)
-        main.dataset.entering = "";
-      document.querySelector("main").replaceWith(main);
+        entrance.dataset.entering = "";
       document.title = title.textContent;
       for (const link of document.querySelectorAll("[data-nav]")) {
         if (link.dataset.nav === main.dataset.appPage)
@@ -132,7 +151,7 @@
       if (push) history.pushState(null, "", url);
       else if (replace) history.replaceState(null, "", url);
       displayed = url;
-      mount();
+      mount(false, directoryTools);
       place(url, !push);
     } catch {
       if (current === request) {
@@ -146,7 +165,11 @@
   history.scrollRestoration = "manual";
   for (const name of ["animationend", "animationcancel"])
     document.addEventListener(name, (event) => {
-      if (event.target.matches("main[data-entering]"))
+      if (
+        event.target.matches(
+          "main[data-entering], [data-directory-content][data-entering]",
+        )
+      )
         delete event.target.dataset.entering;
     });
   document.addEventListener("click", (event) => {
