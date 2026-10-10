@@ -38,6 +38,8 @@ Add fast, purposeful motion to the existing directory: destination hover reveal,
 - Added required-Chrome checks across 390px/1440px, light/dark and both motion preferences, root/project-prefixed nested in-app navigation, native keyboard/popover interaction, actual intermediate fade opacity, focus interruption, hybrid-pointer overrides, repeated copies/popovers and overlapping copy/download failure feedback.
 - Verification: Bun 1.4.2; `bun ci`; `bun run format`; `SHL_REQUIRE_BROWSER=1 bun test --timeout 30000 ./test/build.test.mjs` (42 passed, none skipped); `bun build.mjs` (68 links); `bun run format:check`. Mechanical design detector returned no findings. After strengthening assertions, the focused required-Chrome motion test passed again.
 
+- PR #92 CI follow-up: run 38034719487 timed out in the broad filter/color snapshot matrix; its late Chrome-helper failure was also reported against the next session-filter test. The dedicated motion and toolbar matrices passed in that run. The filter snapshot now uses required Chrome's reduced-motion flag, matching the other settled appearance matrices; native/CDP motion checks retain normal-motion coverage. Targeted filter/session checks and the full 44-test required-browser suite pass locally, followed by a successful build and formatting check. This supersedes the earlier partial local verification note.
+
 ## Review Triage Log
 
 - Medium, patched: completed count/content markers could replay on preference changes. State owners now remove markers on completion/cancellation; navigation does not add an entrance marker under reduced motion. Live preference switching is tested after completion.

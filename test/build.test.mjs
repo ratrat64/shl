@@ -407,7 +407,11 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
   } catch(error) { document.body.dataset.filtersCheck = error.message; } })();
   </script></body></html>`,
   );
-  const html = runChrome(chrome, f.cwd, origin + "/filters-check.html");
+  // This matrix checks immediate filter state and settled colors/geometry.
+  // The dedicated CDP motion matrix verifies running/intermediate animations.
+  const html = runChrome(chrome, f.cwd, origin + "/filters-check.html", [
+    "--force-prefers-reduced-motion",
+  ]);
   assert.match(html, /data-filters-check="passed"/, html);
 });
 
