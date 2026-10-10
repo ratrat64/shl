@@ -64,6 +64,8 @@ Typing and selected-tag AND filter the current subtree. Native chip buttons sele
 
 ## Accessibility Floor
 
+Motion acknowledges interaction without delaying it: row/folder and button/tag highlights soften over 140ms, filter chips fade into their tracks, and the new count number briefly fades/slides into place after an immediate text update. Buttons press visibly with a deeper fill and subtle scale. Opening or closing the tag picker glides the list below it to its new position instead of jumping. Incoming main content fades on in-app page changes, including Links/Guide, while shared chrome stays stationary. Same-page fragments retain content identity and do not replay the entrance. Reduced motion keeps state changes immediate; theme changes retain synchronized readable inks and surfaces. Show/Hide tags retains a fixed width; selected-track space and chip-track scrollbar height are reserved so selection/removal never shifts search, toggle, available tags or the listing. The search keeps its width across count and label changes. Narrow layouts keep the reserved selected slot above search.
+
 Keep programmatic search labeling, named tag regions, search-associated independent error, visible keyboard focus and full chip labels. Expose picker expanded/controlled state and selected removal/state cues beyond color. Announce one polite live count without duplicate numbers. Preserve script Download cues, readable hidden labels, breadcrumbs, full accessible destinations and native foundations.
 
 ## Responsive & Platform

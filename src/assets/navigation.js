@@ -120,6 +120,8 @@
       for (const script of main.querySelectorAll("script")) script.remove();
       scroll.set(displayed, window.scrollY);
       cleanup();
+      if (!matchMedia("(prefers-reduced-motion: reduce)").matches)
+        main.dataset.entering = "";
       document.querySelector("main").replaceWith(main);
       document.title = title.textContent;
       for (const link of document.querySelectorAll("[data-nav]")) {
@@ -142,6 +144,11 @@
   }
 
   history.scrollRestoration = "manual";
+  for (const name of ["animationend", "animationcancel"])
+    document.addEventListener(name, (event) => {
+      if (event.target.matches("main[data-entering]"))
+        delete event.target.dataset.entering;
+    });
   document.addEventListener("click", (event) => {
     if (
       event.defaultPrevented ||
