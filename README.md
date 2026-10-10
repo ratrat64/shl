@@ -31,7 +31,12 @@ For `go.example.com/gh/`, follow the [custom-domain instructions](docs/reference
 ## Managing links
 
 Edit `links.yaml`, including through GitHub's web editor, and publish via a pull
-request:
+request. Administrators with a ruleset bypass may also commit and push directly
+to `main` when every outgoing commit changes only the root link config. Keep
+exactly one config file and run formatting, tests, and a build first; see the
+[direct-push guidance](docs/development.md#links-only-direct-commits).
+
+Example configuration:
 
 ```yaml
 gh: https://github.com/

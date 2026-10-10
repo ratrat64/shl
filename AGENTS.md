@@ -1,17 +1,19 @@
 # Working in this repository
 
 ## Git workflow
-- The agent may write commit messages, push commits, and publish new branches for requested work. Use a task branch for changes intended for a pull request; do not push directly to `main`.
+- The agent may write commit messages, push commits, and publish new branches for requested work. Use a task branch and pull request except for the links-only direct-commit exception below.
+- Commits and pushes directly to `main` are allowed only when every outgoing commit changes solely the root link configuration paths (`links.json`, `links.yaml`, or `links.yml`), with exactly one valid configuration remaining. Mixed changes and all other files require a task branch, separate worktree, and pull request.
+- Use the direct workflow only while checked out on local `main` with no unrelated working-tree changes; otherwise preserve that work and use the normal branch/worktree/PR workflow. Before editing, update `main` with a fast-forward pull. Run `bun run format`, `bun run format:check`, `SHL_REQUIRE_BROWSER=1 bun test --timeout 30000 ./test/build.test.mjs`, and `bun build.mjs` successfully before committing. Stage the complete validated link configuration changes, inspect the staged diff, and verify with `git diff --exit-code` that no tracked changes remain unstaged. Before pushing, fetch the latest `origin/main` and inspect every outgoing commit, including merge diffs, with `git log --name-status --diff-merges=first-parent origin/main..HEAD`; never push unrelated files or commits. If `main` advances, use a fast-forward update or the normal PR workflow and repeat checks on the resulting version. If direct pushes are unavailable, use the normal branch/worktree/PR workflow.
 
 ## Session startup
 - At the start of a new session, before tackling the first task, read `README.md`, `aid-docs/planning-artifacts/ux-designs/ux-shortlink-2026-10-06/PRODUCT.md`, `aid-docs/planning-artifacts/ux-designs/ux-shortlink-2026-10-06/DESIGN.md`, and `package.json`. For UI tasks, also read the adjacent `EXPERIENCE.md`. Identify the relevant code paths, then briefly summarize how the project works and what you will inspect for the task.
 
 ## Branch and worktree workflow
 - Before creating a new branch or worktree, update local `main` from `origin/main` with a fast-forward pull.
-- Before making changes, create one task branch and a separate Git worktree; do the work and run checks there. Keep related features for the task together in that worktree.
+- Before making changes other than links-only direct commits, create one task branch and a separate Git worktree; do the work and run checks there. Keep related features for the task together in that worktree.
 - Preserve existing uncommitted work when consolidating changes from other worktrees.
 - If `main` advances during feature work, check whether the feature needs changes to align with it; if so, make a plan for those changes before editing.
-- For every task that changes repository files, after checks pass, commit and push the task branch and open a pull request against `main` without waiting for a separate request. Check the pull request for merge conflicts against the latest `main` and report its status.
+- For every task that changes repository files other than links-only direct commits, after checks pass, commit and push the task branch and open a pull request against `main` without waiting for a separate request. Check the pull request for merge conflicts against the latest `main` and report its status.
 - Check the pull request's merge status before finishing and again in later sessions. Once it is merged, remove its local worktree and delete its local task branch; do not discard uncommitted work.
 - If resolving a conflict needs user input, report the blocker and stop; do not mark the feature ready.
 
