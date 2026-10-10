@@ -58,6 +58,7 @@
   };
   let pending;
   async function navigate(url, push, replace = false) {
+    globalThis.finishThemeTransition?.();
     const current = ++request;
     pending?.abort();
     globalThis.cleanupRecovery?.();
@@ -116,6 +117,7 @@
       )
         throw new Error("Not an app page");
       if (current !== request) return;
+      globalThis.finishThemeTransition?.();
       rebase(main, url);
       for (const script of main.querySelectorAll("script")) script.remove();
       scroll.set(displayed, window.scrollY);
@@ -178,6 +180,7 @@
       )
         return;
       ++request;
+      globalThis.finishThemeTransition?.();
       pending?.abort();
       cleanup();
       return;
@@ -192,6 +195,7 @@
   });
   window.addEventListener("pageshow", (event) => {
     if (!event.persisted) return;
+    globalThis.finishThemeTransition?.();
     const focusedTag = document.activeElement.closest("#selected-tags button")
       ?.dataset.tag;
     const position = {

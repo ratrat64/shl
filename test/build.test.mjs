@@ -1365,13 +1365,15 @@ test("directory motion respects reduced motion, focus, touch and repeated post-n
             }
           }
           assert.equal(
-            await evaluate(`(() => {
+            await evaluate(`(async () => {
             const button = document.querySelector('[data-theme-control]');
             const before = document.documentElement.dataset.theme;
             button.click();
+            while (document.documentElement.hasAttribute('data-theme-fading')) await new Promise(requestAnimationFrame);
             const changed = document.documentElement.dataset.theme !== before;
             const settled = !document.getAnimations().some(a => a instanceof CSSTransition);
             button.click();
+            while (document.documentElement.hasAttribute('data-theme-fading')) await new Promise(requestAnimationFrame);
             return changed && settled && document.documentElement.dataset.theme === before && !document.getAnimations().some(a => a instanceof CSSTransition);
           })()`),
             true,
@@ -4245,6 +4247,367 @@ test("inline tag disclosures target the correct link when codes repeat in differ
     }
     assert.doesNotMatch(html, /Show all tags for untagged/);
   }
+});
+
+test("theme fade preserves restoration, latest intent and immediate fallbacks", async (t) => {
+  const f = await fixture(t, { code: "https://example.com/" });
+  assert.equal(f.build().status, 0);
+  const source = await f.read("assets/theme.js");
+  for (const mode of ["native", "reduce", "unsupported", "throws", "blocked"]) {
+    const root = { dataset: {} };
+    const button = {
+      ...themeLabelAttributes(await f.read("index.html")),
+      addEventListener(type, listener) {
+        this[type] = listener;
+      },
+    };
+    const transitions = [];
+    const writes = [];
+    const preferences = new Map();
+    const context = createContext({
+      document: {
+        documentElement: root,
+        querySelector: () => button,
+        ...(mode === "unsupported"
+          ? {}
+          : {
+              startViewTransition(update) {
+                if (mode === "throws") throw Error("unavailable");
+                const ready = Promise.withResolvers();
+                const finished = Promise.withResolvers();
+                const transition = {
+                  update,
+                  ready: ready.promise,
+                  finished: finished.promise,
+                  complete: finished.resolve,
+                  skipTransition() {
+                    ready.reject(Error("skipped"));
+                    finished.resolve();
+                  },
+                };
+                transitions.push(transition);
+                return transition;
+              },
+            }),
+      },
+      matchMedia: (query) => ({
+        matches: mode === "reduce",
+        addEventListener(type, listener) {
+          preferences.set(query, listener);
+        },
+      }),
+      localStorage: {
+        getItem() {
+          if (mode === "blocked") throw Error("blocked");
+          return "light";
+        },
+        setItem(key, value) {
+          if (mode === "blocked") throw Error("blocked");
+          writes.push(value);
+        },
+      },
+    });
+    runInContext(source, context);
+    assert.equal(transitions.length, 0, mode + ": restoration never fades");
+    assert.equal(root.dataset.theme, mode === "blocked" ? undefined : "light");
+    button.click();
+    if (mode === "native" || mode === "blocked") {
+      button.click();
+      assert.equal(root.dataset.theme, "dark", "cancel commits pending theme");
+      transitions[0].update();
+      transitions[1].update();
+      assert.equal(root.dataset.theme, "light", "latest request wins");
+      transitions[1].complete();
+      await Promise.resolve();
+      assert.equal(root.dataset.themeFading, undefined);
+      button.click();
+      context.finishThemeTransition();
+      transitions[2].update();
+      assert.equal(
+        root.dataset.theme,
+        "dark",
+        "navigation settles pending choice",
+      );
+      if (mode === "native") {
+        button.click();
+        preferences.get("(prefers-color-scheme: dark)")();
+        transitions[3].update();
+        assert.equal(
+          root.dataset.theme,
+          "light",
+          "system change settles pending choice",
+        );
+        assert.equal(root.dataset.themeFading, undefined);
+        button.click();
+        transitions[4].update();
+        preferences.get("(prefers-color-scheme: dark)")();
+        assert.equal(
+          root.dataset.theme,
+          "dark",
+          "system change settles active fade",
+        );
+        assert.equal(root.dataset.themeFading, undefined);
+      }
+    }
+    assert.equal(root.dataset.theme, "dark", mode);
+    assert.equal(root.dataset.themeFading, undefined, mode);
+    assert.equal(button.attributes["aria-label"], "Theme: dark", mode);
+    assert.equal(button.querySelector(".btn-label").textContent, "dark", mode);
+    assert.deepEqual(
+      button
+        .querySelectorAll("[data-theme-icon]")
+        .filter((icon) => !icon.hidden)
+        .map((icon) => icon.getAttribute("data-theme-icon")),
+      ["dark"],
+      mode,
+    );
+    if (mode !== "blocked") assert.equal(writes.at(-1), "dark", mode);
+  }
+});
+
+test("theme crossfade renders stationary snapshots across shell pages and cancels on navigation", async (t) => {
+  const chrome = availableChrome(t);
+  if (!chrome) return;
+  const f = await fixture(t, {
+    tools: {
+      code: { url: "https://example.com/", tags: ["shell", "script"] },
+      off: { url: "https://example.com/off", tags: ["disabled", "broken"] },
+    },
+  });
+  assert.equal(f.build().status, 0);
+  const origin = await browserServer(t, f.cwd);
+  const { send, evaluate, navigate } = await browserControls(t, chrome, f.cwd);
+  await send("Emulation.setEmulatedMedia", {
+    features: [
+      { name: "prefers-reduced-motion", value: "no-preference" },
+      { name: "prefers-color-scheme", value: "light" },
+    ],
+  });
+  await send("Page.addScriptToEvaluateOnNewDocument", {
+    source: `const start = document.startViewTransition.bind(document);
+      document.startViewTransition = update => window.themeTransition = start(update);`,
+  });
+  for (const prefix of ["/", "/project/"])
+    for (const width of [390, 1440]) {
+      await send("Emulation.setDeviceMetricsOverride", {
+        width,
+        height: 900,
+        deviceScaleFactor: 1,
+        mobile: width === 390,
+      });
+      for (const path of ["", "tools/", "guide/", "missing/"]) {
+        await navigate(origin + prefix + path);
+        assert.equal(
+          await evaluate(
+            "document.documentElement.hasAttribute('data-theme-fading')",
+          ),
+          false,
+          "native load never fades",
+        );
+        for (const theme of ["light", "dark"]) {
+          const label = `${prefix}${path}/${width}/${theme}`;
+          assert.deepEqual(
+            await evaluate(`(async () => {
+            const root = document.documentElement;
+            root.dataset.theme = '${theme}';
+            const shell = [root, document.querySelector('header'), document.querySelector('footer'), document.querySelector('[data-theme-control]')];
+            const button = shell[3]; button.focus();
+            const geometry = () => shell.slice(1).map(n => { const r = n.getBoundingClientRect(); return [r.x,r.y,r.width,r.height]; });
+            const before = geometry();
+            button.click();
+            await themeTransition.ready;
+            const fades = document.getAnimations().filter(a => a.effect?.pseudoElement?.includes('view-transition'));
+            for (const animation of fades) { animation.pause(); animation.currentTime = 120; }
+            const oldStyle = getComputedStyle(root, '::view-transition-old(root)');
+            const hit = button.getBoundingClientRect();
+            const result = {
+              duration: oldStyle.animationDuration, easing: oldStyle.animationTimingFunction,
+              intermediate: Number(oldStyle.opacity) > 0 && Number(oldStyle.opacity) < 1,
+              live: getComputedStyle(root).viewTransitionName === 'none' && !fades.some(a => a.effect.pseudoElement === '::view-transition-new(root)'),
+              stationary: JSON.stringify(before) === JSON.stringify(geometry()),
+              passthrough: getComputedStyle(root, '::view-transition').pointerEvents === 'none',
+              hittable: button.contains(document.elementFromPoint(hit.x + hit.width / 2, hit.y + hit.height / 2)),
+              theme: root.dataset.theme,
+              label: button.getAttribute('aria-label'), saved: localStorage.getItem('shortlink-theme'),
+              focus: document.activeElement === button,
+            };
+            for (const animation of fades) animation.finish();
+            await themeTransition.finished;
+            await new Promise(requestAnimationFrame);
+            result.cleaned = !root.hasAttribute('data-theme-fading');
+            result.identity = shell.every((n,i) => n === [root,document.querySelector('header'),document.querySelector('footer'),document.querySelector('[data-theme-control]')][i]);
+            return result;
+          })()`),
+            {
+              duration: "0.24s",
+              easing: "ease-out",
+              intermediate: true,
+              live: true,
+              stationary: true,
+              passthrough: true,
+              hittable: true,
+              theme: theme === "light" ? "dark" : "light",
+              label: "Theme: " + (theme === "light" ? "dark" : "light"),
+              saved: theme === "light" ? "dark" : "light",
+              focus: true,
+              cleaned: true,
+              identity: true,
+            },
+            label,
+          );
+        }
+      }
+    }
+  await navigate(origin + "/project/");
+  assert.equal(
+    await evaluate(`(async () => {
+    const root = document.documentElement; root.dataset.theme = 'light';
+    const button = document.querySelector('[data-theme-control]');
+    button.click(); const first = themeTransition;
+    button.click(); const second = themeTransition;
+    button.click(); const third = themeTransition;
+    await Promise.all([first.finished, second.finished, third.finished]);
+    return root.dataset.theme === 'dark' && !root.hasAttribute('data-theme-fading') && localStorage.getItem('shortlink-theme') === 'dark';
+  })()`),
+    true,
+    "rapid toggles retain latest intent",
+  );
+  assert.equal(
+    await evaluate(`(async () => {
+    const shell = [document.querySelector('header'),document.querySelector('footer'),document.querySelector('[data-theme-control]')];
+    document.querySelector('[data-theme-control]').click();
+    const outgoing = themeTransition;
+    await outgoing.ready;
+    document.querySelector('[data-nav=guide]').click();
+    await outgoing.finished;
+    for (let i=0; i<100 && document.querySelector('main').dataset.appPage !== 'guide'; i++) await new Promise(requestAnimationFrame);
+    return !document.documentElement.hasAttribute('data-theme-fading') && document.documentElement.dataset.theme === 'light'
+      && location.pathname === '/project/guide/' && document.title === 'Guide · shl'
+      && document.querySelector('[data-nav=guide]').getAttribute('aria-current') === 'page'
+      && document.querySelector('main').contains(document.activeElement)
+      && shell.every((n,i) => n === [document.querySelector('header'),document.querySelector('footer'),document.querySelector('[data-theme-control]')][i]);
+  })()`),
+    true,
+    "navigation cancels outgoing snapshot",
+  );
+  await navigate(origin + "/project/");
+  assert.equal(
+    await evaluate(`(async () => {
+    const fetchPage = window.fetch;
+    window.fetch = async (...args) => {
+      if (String(args[0]).includes('/guide/')) await new Promise(resolve => window.releaseNavigation = resolve);
+      return fetchPage(...args);
+    };
+    document.querySelector('[data-nav=guide]').click();
+    document.querySelector('[data-theme-control]').click();
+    await themeTransition.ready;
+    for (const a of document.getAnimations()) if (a.effect?.pseudoElement?.includes('view-transition')) a.pause();
+    releaseNavigation();
+    for (let i=0; i<100 && document.querySelector('main').dataset.appPage !== 'guide'; i++) await new Promise(requestAnimationFrame);
+    await themeTransition.finished;
+    window.fetch = fetchPage;
+    return document.querySelector('main').dataset.appPage === 'guide' && !document.documentElement.hasAttribute('data-theme-fading');
+  })()`),
+    true,
+    "incoming content cancels a fade started during pending navigation",
+  );
+  await navigate(origin + "/project/");
+  for (const event of ["input", "toggle", "scroll", "keydown"]) {
+    assert.equal(
+      await evaluate(`(async () => {
+      const button = document.querySelector('[data-theme-control]'); button.click();
+      await themeTransition.ready;
+      for (const a of document.getAnimations()) if (a.effect?.pseudoElement?.includes('view-transition')) a.pause();
+      const target = document.querySelector('${event === "input" ? "#link-search" : event === "toggle" ? "details" : "main"}');
+      target.dispatchEvent(new Event('${event}'));
+      await themeTransition.finished;
+      return !document.documentElement.hasAttribute('data-theme-fading');
+    })()`),
+      true,
+      event + " cancels a stale snapshot before layout-changing work",
+    );
+  }
+  assert.equal(
+    await evaluate(`(async () => {
+    document.querySelector('[data-theme-control]').click(); await themeTransition.ready;
+    for (const a of document.getAnimations()) if (a.effect?.pseudoElement?.includes('view-transition')) a.pause();
+    return true;
+  })()`),
+    true,
+  );
+  await send("Emulation.setEmulatedMedia", {
+    features: [
+      { name: "prefers-reduced-motion", value: "no-preference" },
+      { name: "prefers-color-scheme", value: "dark" },
+    ],
+  });
+  assert.deepEqual(
+    await evaluate(`(async () => {
+    for (let i=0; i<100 && document.documentElement.hasAttribute('data-theme-fading'); i++) await new Promise(requestAnimationFrame);
+    return { cleaned: !document.documentElement.hasAttribute('data-theme-fading'), label: document.querySelector('[data-theme-control]').getAttribute('aria-label') === 'Theme: ' + document.documentElement.dataset.theme, saved: localStorage.getItem('shortlink-theme') === document.documentElement.dataset.theme, preference: matchMedia('(prefers-color-scheme: dark)').matches };
+  })()`),
+    { cleaned: true, label: true, saved: true, preference: true },
+    "system color preference cancels active fade without changing saved override",
+  );
+  await navigate(origin + "/project/");
+  const point = await evaluate(`(async () => {
+    const button = document.querySelector('[data-theme-control]');
+    button.click(); await themeTransition.ready;
+    for (const animation of document.getAnimations()) if (animation.effect?.pseudoElement?.includes('view-transition')) animation.pause();
+    const r = button.getBoundingClientRect();
+    window.pointerTheme = document.documentElement.dataset.theme;
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  })()`);
+  for (const type of ["mousePressed", "mouseReleased"])
+    await send("Input.dispatchMouseEvent", {
+      type,
+      ...point,
+      button: "left",
+      clickCount: 1,
+    });
+  assert.equal(
+    await evaluate(`(async () => {
+    await themeTransition.finished;
+    return document.documentElement.dataset.theme !== pointerTheme && !document.documentElement.hasAttribute('data-theme-fading');
+  })()`),
+    true,
+    "native pointer can toggle through a running fade",
+  );
+  await evaluate("document.querySelector('[data-theme-control]').click()");
+  await evaluate("themeTransition.ready");
+  await send("Emulation.setEmulatedMedia", {
+    features: [{ name: "prefers-reduced-motion", value: "reduce" }],
+  });
+  assert.equal(
+    await evaluate(
+      "(async () => { await new Promise(requestAnimationFrame); return !document.documentElement.hasAttribute('data-theme-fading'); })()",
+    ),
+    true,
+    "motion preference change cancels running fade",
+  );
+  await navigate(origin + "/project/");
+  assert.equal(
+    await evaluate(`(() => {
+    const before = document.documentElement.dataset.theme;
+    document.querySelector('[data-theme-control]').click();
+    return document.documentElement.dataset.theme !== before && !window.themeTransition && !document.documentElement.hasAttribute('data-theme-fading');
+  })()`),
+    true,
+    "reduced motion switches immediately",
+  );
+  await send("Emulation.setEmulatedMedia", {
+    features: [{ name: "prefers-reduced-motion", value: "no-preference" }],
+  });
+  assert.equal(
+    await evaluate(`(() => {
+    document.startViewTransition = undefined;
+    const before = document.documentElement.dataset.theme;
+    document.querySelector('[data-theme-control]').click();
+    return document.documentElement.dataset.theme !== before && !window.themeTransition && !document.documentElement.hasAttribute('data-theme-fading');
+  })()`),
+    true,
+    "unsupported browser switches immediately",
+  );
 });
 
 test("information pages use relative navigation and shared theme assets", async (t) => {
