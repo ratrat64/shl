@@ -2,6 +2,20 @@
   const records = new Map();
   const unsaved = new Map();
   const trackPositions = new WeakMap();
+  const rememberTrack = (track) => {
+    const position = trackPositions.get(track);
+    if (!track.hidden && track.scrollLeft !== position?.applied)
+      trackPositions.set(track, {
+        requested: track.scrollLeft,
+        applied: track.scrollLeft,
+      });
+    return trackPositions.get(track)?.requested || 0;
+  };
+  const restoreTrack = (track, requested) => {
+    track.scrollLeft = requested;
+    // Keep the requested offset when a smaller catalog clamps the applied one.
+    trackPositions.set(track, { requested, applied: track.scrollLeft });
+  };
   globalThis.initSearch = (refreshStorage = false, directoryTools = null) => {
     globalThis.cleanupSearch?.();
     const input = document.querySelector("#link-search");
@@ -19,10 +33,7 @@
     const base = document.querySelector("main[data-site-base]")?.dataset
       .siteBase;
     if (!base) return;
-    const trackScroll = [selected, available].map((track) => {
-      if (!track.hidden) trackPositions.set(track, track.scrollLeft);
-      return trackPositions.get(track) || 0;
-    });
+    const trackScroll = [selected, available].map(rememberTrack);
     if (directoryTools) {
       available.replaceChildren(
         ...directoryTools.querySelector("#available-tags").childNodes,
@@ -290,7 +301,7 @@
       pickerOpen = open;
       available.hidden = !open || !catalog.size;
       if (!available.hidden)
-        available.scrollLeft = trackPositions.get(available) || 0;
+        restoreTrack(available, trackPositions.get(available)?.requested || 0);
       toggle.setAttribute("aria-expanded", String(!available.hidden));
       toggle.setAttribute(
         "aria-label",
@@ -300,24 +311,18 @@
       );
     }
     listen(toggle, "click", () => {
-      if (!available.hidden)
-        trackPositions.set(available, available.scrollLeft);
+      rememberTrack(available);
       // Slide content below the toolbar with the picker: record positions,
       // toggle synchronously (state/AT/tests observe hidden immediately),
       // then play a FLIP transform so the list glides to its new spot.
       // Movers ignore pointer input in flight so taps land on the controls
       // visible beneath them instead of on passing rows.
-      const section = toggle.closest?.("section");
-      const tools = toggle.closest?.(".directory-tools");
+      const content = toggle
+        .closest?.("section")
+        ?.querySelector("[data-directory-content]");
       const below =
-        section && tools
-          ? [...section.children].filter(
-              (element) =>
-                element !== tools &&
-                element.tagName !== "TEMPLATE" &&
-                !element.hidden &&
-                element.getClientRects?.().length,
-            )
+        content && !content.hidden && content.getClientRects?.().length
+          ? [content]
           : [];
       const before = below.map((element) => {
         const rect = element.getBoundingClientRect();
@@ -528,6 +533,7 @@
       composing = true;
     });
     listen(input, "compositionend", () => {
+      if (!composing) return;
       composing = false;
       tokens();
     });
@@ -543,8 +549,8 @@
     chips();
     update();
     if (directoryTools) {
-      selected.scrollLeft = trackScroll[0];
-      available.scrollLeft = trackScroll[1];
+      restoreTrack(selected, trackScroll[0]);
+      restoreTrack(available, trackScroll[1]);
     }
   };
 })();

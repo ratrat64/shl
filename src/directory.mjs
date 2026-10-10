@@ -184,13 +184,14 @@ const directoryContents = (
       ${breadcrumbs || '<div class="breadcrumbs" aria-hidden="true"></div>'}
       ${
         total
-          ? `<p id="search-status" class="search-status" role="status" hidden></p><div class="search-status action-feedback"><p id="copy-status" role="status" aria-live="polite"></p><p id="download-status" role="status" aria-live="polite"></p></div>
+          ? `<p id="search-status" class="search-status" role="status" hidden></p>
      ${visible ? "" : '<p id="empty-directory">No links listed here.</p>'}
        <div${visible ? "" : " hidden"}>${listing(nodes)}</div>`
           : `<p>${emptyMessage}</p>`
       }
       ${total ? `<template id="restoration-tags">${[...tagCatalog(entryTree(siteEntries))].map(tagChip).join("")}</template>` : ""}
     </div>
+    ${total ? '<div class="search-status action-feedback"><p id="copy-status" role="status" aria-live="polite"></p><p id="download-status" role="status" aria-live="polite"></p></div>' : ""}
   </section>`;
 };
 

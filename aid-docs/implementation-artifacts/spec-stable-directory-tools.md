@@ -2,7 +2,7 @@
 title: Keep directory filter controls live during browsing
 type: bugfix
 created: 2026-10-10
-status: in-review
+status: done
 route: dispatch
 review_loop_iteration: 0
 context: []
@@ -81,3 +81,19 @@ baseline_commit: dcd324fe9c0cf4d08afef1edfe3e0bd73335f0d6
 - The stable-toolbar browser matrix executed root/project prefixes, 390px/1440px, light/dark and normal/reduced motion. It verifies connected main/section/control/selected-button identity, exact text and selection direction, both tracks' scroll offsets, renderer-published incoming labels, subtree choices, untagged round trips, disclosure/feedback reset, Back/Forward, synchronous single-listener saves, and superseded HTML/copy/download suppression.
 - Existing executed checks cover absent-subtree AND selections, native/BFCache latest-filter restoration, Guide/404 and empty-site boundaries, same-page fragments, complete-URL scroll/focus/history, no-JavaScript browsing, shared shell appearance and minimal-document/root/project recovery foundations. Different canonical bases and an enhanced empty-site round trip also explicitly use normal content replacement.
 - No application dependencies were added. Deployment and a live GitHub Pages smoke test remain outside this local implementation run.
+
+- Post-review verification: all 48 tests passed again with required Chrome after the scroll, feedback and composition fixes; build (68 links), formatting and whitespace checks passed. Fixed feedback now stays outside the directory entrance/picker transforms, while the copy/download owners clear their retained status elements normally. Requested track offsets survive browser clamping by shorter catalogs. An unpaired late composition end cannot commit pending syntax in the replacement controller.
+
+## Review Triage Log
+
+- Blind 1 — medium, patched: shorter tagged catalogs clamp the applied scroll offset and the next mount previously overwrote the requested offset. Separate requested/applied positions and the large→short→large browser regression preserve it.
+- Blind 2 — medium, patched: the transformed content wrapper became the containing block for fixed feedback. Feedback now sits outside the wrapper and only content participates in the picker slide; real running-animation viewport-coordinate checks pass for copy and download feedback.
+- Blind 3 — false as a regression/contract violation: the cited BFCache path goes through the native minimal disabled page, not between two searchable directories. That path already rebuilt selections before this change and deliberately restores the latest storage record through the ordinary mount path. Its existing removed-chip focus and latest-record checks still pass; this task's retained-chip promise applies to same-base searchable-directory swaps.
+- Blind 4 — low, patched: callback-time connectivity alone missed synchronous removal/reinsertion. The observer now inspects removed nodes/ancestors, with a deliberate detach/reinsert negative check before the retained-toolbar assertions.
+- Blind 5 — low, patched: a fixed delay could check stale suppression before body delivery. The test now awaits fetch release and the parser continuation deterministically before asserting no mutation.
+- Blind 6 — low, patched: composition handoff lacked proof and a late unpaired composition end could invoke token commitment in the remounted closure. The controller ignores ends without a paired start; the browser checks preserved pending text/tags/storage and successful subsequent paired composition.
+- Blind 7 — low, patched: incoming singular renderer labels were changed in the fixture but only plural consumption was asserted. The same browser test now requires exactly one matching Entry after reuse.
+- Edge 1 — medium, patched: duplicate evidence of the short-catalog scroll clamp; fixed by the same requested/applied-position correction and round-trip regression.
+- Verification gap 1 — low, patched: the incoming singular and collapsed-label transfer branches lacked assertions. Added one-result Entry and closed-picker Browse directory tags checks against incoming HTML metadata.
+- Verification gap 2 — low, patched: the new content marker's animationcancel branch lacked proof. CDP now interrupts a running entrance with reduced motion, verifies visibility/marker cleanup, and restores normal motion without a replay.
+- No findings deferred. All application corrections are local patches with no new public API or dependencies.

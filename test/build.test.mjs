@@ -689,6 +689,7 @@ test("stable directory tools retain identity, caret, tracks, metadata and conten
       deeper: { Nested: leaf(["shell", ...longTags]) },
     },
     beta: { Two: leaf(["shell", "script", "beta-only", ...longTags]) },
+    short: { Small: leaf(["tiny"]) },
     noTags: { Plain: "https://example.com/" },
   });
   assert.equal(f.build().status, 0);
@@ -730,6 +731,10 @@ test("stable directory tools retain identity, caret, tracks, metadata and conten
             sessionStorage.clear();initSearch(true);document.documentElement.dataset.theme=${JSON.stringify(theme)};
             const input=document.querySelector('#link-search'), toggle=document.querySelector('#tag-toggle'), selected=document.querySelector('#selected-tags'), available=document.querySelector('#available-tags');
             const main=document.querySelector('main'), tools=document.querySelector('.directory-tools'), section=tools.parentElement;
+            const removedRetained=(records,nodes)=>records.some(record=>[...record.removedNodes].some(removed=>nodes.some(node=>removed===node||removed.contains(node))));
+            const probe=new MutationObserver(()=>{});probe.observe(document,{childList:true,subtree:true});
+            tools.remove();section.prepend(tools);
+            check(input.isConnected&&removedRetained(probe.takeRecords(),[input,toggle,selected,available]),'Removal observer missed synchronous ancestor detach/reinsert');probe.disconnect();
             const shell=[document.documentElement,document.querySelector('header'),document.querySelector('footer'),document.querySelector('[data-theme-control]')];
             const type=value=>{input.value=value;input.dispatchEvent(new Event('input'))};
             toggle.click();
@@ -747,8 +752,10 @@ test("stable directory tools retain identity, caret, tracks, metadata and conten
             Object.defineProperty(input,'value',{get(){return setter.get.call(this)},set(value){assignments++;setter.set.call(this,value)}});
             const set=Storage.prototype.setItem;Storage.prototype.setItem=function(...args){if(args[0]===key)writes++;return set.apply(this,args)};
             selected.addEventListener('animationstart',()=>reentrances++);
-            const observer=new MutationObserver(()=>{if(!tools.isConnected||!input.isConnected||buttons.some(b=>!b.isConnected))disconnected=true});observer.observe(main,{childList:true,subtree:true});
+            const retained=[main,section,tools,input,toggle,selected,available,...buttons];
+            const observer=new MutationObserver(records=>{if(removedRetained(records,retained))disconnected=true});observer.observe(document,{childList:true,subtree:true});
             const identity=()=>{
+              if(removedRetained(observer.takeRecords(),retained))disconnected=true;
               check(document.querySelector('main')===main&&tools.parentElement===section&&document.querySelector('.directory-tools')===tools,'Main/section/tools replaced');
               check(document.querySelector('#link-search')===input&&document.querySelector('#tag-toggle')===toggle&&document.querySelector('#selected-tags')===selected&&document.querySelector('#available-tags')===available,'Control identity lost');
               check(buttons.every((b,i)=>selected.children[i]===b&&b.isConnected)&&!disconnected,'Selected controls detached/rebuilt/reordered');
@@ -777,6 +784,10 @@ test("stable directory tools retain identity, caret, tracks, metadata and conten
             check(selected.scrollLeft===offsets[0]&&available.scrollLeft===offsets[1],'Repeated scroll reset');
             const betaContent=document.querySelector('[data-directory-content]');history.back();await complete('alpha/',betaContent);
             const alphaContent=document.querySelector('[data-directory-content]');history.forward();await complete('beta/',alphaContent);
+            await go('short/');
+            check(!available.hidden&&!toggle.disabled&&available.scrollWidth===available.clientWidth&&available.scrollLeft===0,'Short tagged catalog did not clamp');
+            await go('beta/');
+            check(selected.scrollLeft===offsets[0]&&available.scrollLeft===offsets[1],'Short tagged round trip lost requested track scroll');
             await go('noTags/');
             check(toggle.disabled&&available.hidden&&toggle.getAttribute('aria-expanded')==='false'&&available.querySelectorAll('button').length===0,'No-tag availability');
             identity();
@@ -795,7 +806,10 @@ test("stable directory tools retain identity, caret, tracks, metadata and conten
             const saved=sessionStorage.getItem(key);activate('alpha/');await wait(()=>requests.length===1);check(input.readOnly,'Outgoing input not paused');
             input.value='obsolete';input.dispatchEvent(new Event('input'));toggle.click();check(sessionStorage.getItem(key)===saved,'Paused controls saved');
             activate('noTags/');await wait(()=>requests.length===2);requests[1].release();await wait(()=>location.pathname===prefix+'noTags/');
-            const current=document.querySelector('[data-directory-content]');requests[0].release();await new Promise(r=>setTimeout(r,30));
+            const current=document.querySelector('[data-directory-content]'),parse=DOMParser.prototype.parseFromString;
+            // The parser runs after fetch/body delivery; its promise resumes this check after the synchronous navigation continuation.
+            const staleParsed=new Promise(resolve=>{DOMParser.prototype.parseFromString=function(...args){const page=parse.apply(this,args);resolve();return page}});
+            await requests[0].release();await staleParsed;DOMParser.prototype.parseFromString=parse;
             check(requests[0].signal.aborted&&document.querySelector('[data-directory-content]')===current&&document.querySelector('#link-search')===input&&input.value==='Two'&&sessionStorage.getItem(key)===saved&&toggle.disabled,'Stale directory changed tools/state');
             globalThis.fetch=nativeFetch;
             const plainContent=document.querySelector('[data-directory-content]');activate('beta/');await wait(()=>location.pathname===prefix+'beta/'&&!plainContent.isConnected);
@@ -809,8 +823,71 @@ test("stable directory tools retain identity, caret, tracks, metadata and conten
             check(saves===0&&copyStatus.textContent===''&&downloadStatus.textContent===''&&outgoingContent.isConnected&&sessionStorage.getItem(key)===saved,'Stale local action changed pending directory');
             pageLoaded();await wait(()=>location.pathname===prefix+'alpha/'&&!outgoingContent.isConnected);
             check(document.querySelector('#link-search')===input&&sessionStorage.getItem(key)===saved&&document.querySelector('#copy-status').textContent===''&&document.querySelector('#download-status').textContent===''&&saves===0,'Stale local action changed incoming directory');
-            globalThis.fetch=nativeFetch;URL.createObjectURL=createURL;Storage.prototype.setItem=set;
+            globalThis.fetch=nativeFetch;URL.createObjectURL=createURL;
+            type('One');
+            check(document.querySelector('.count-number').textContent==='1'&&document.querySelector('.count-label').textContent.trim()==='Entry','Incoming singular count label ignored');
+            if(available.hidden)toggle.click();toggle.click();
+            check(available.hidden&&toggle.getAttribute('aria-label')==='Browse directory tags','Incoming collapsed toggle label ignored');
+            await Promise.all(document.getAnimations().map(a=>a.finished.catch(()=>{})));
+            Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{}}});
+            globalThis.fetch=async()=>{throw Error('Feedback positioning check')};
+            document.querySelector('a.code').click();document.querySelector('button[data-download-url]').click();
+            await wait(()=>copyStatus.textContent==='Short link copied.'&&downloadStatus.textContent.startsWith('Could not download'));
+            globalThis.fetch=nativeFetch;
+            const feedback=copyStatus.parentElement, beforeFeedback=feedback.getBoundingClientRect().toJSON();
+            check(feedback===downloadStatus.parentElement&&!document.querySelector('[data-directory-content]').contains(feedback),'Feedback inside directory mover');
+            toggle.click();
+            const slides=document.querySelector('[data-directory-content]').getAnimations().filter(a=>a.id==='picker-slide');
+            check(slides.length===(motion==='reduce'?0:1)&&feedback.getAnimations().every(a=>a.id!=='picker-slide'),'Feedback included in picker movers');
+            if(slides.length){slides[0].currentTime=120;slides[0].playbackRate=0.01;check(slides[0].playState==='running'&&getComputedStyle(document.querySelector('[data-directory-content]')).transform!=='none','Picker slide not running');}
+            const feedbackStyle=getComputedStyle(feedback), rect=feedback.getBoundingClientRect();
+            const viewportAnchor=document.createElement('div');viewportAnchor.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0';document.body.append(viewportAnchor);
+            const viewport=viewportAnchor.getBoundingClientRect();viewportAnchor.remove();
+            check(feedbackStyle.position==='fixed'&&Math.abs(rect.right-(viewport.right-parseFloat(feedbackStyle.right)))<1&&Math.abs(rect.bottom-(viewport.bottom-parseFloat(feedbackStyle.bottom)))<1&&JSON.stringify(rect.toJSON())===JSON.stringify(beforeFeedback),'Visible feedback moved away from viewport during picker slide');
+            if(slides.length)slides[0].finish();
+            await Promise.all(document.getAnimations().map(a=>a.finished.catch(()=>{})));
+            // A late end from an outgoing composition is not a visitor edit in the new controller.
+            input.dispatchEvent(new CompositionEvent('compositionstart'));type('#script ');
+            const pending=sessionStorage.getItem(key), pendingTags=[...selected.children],pendingWrites=writes;
+            const oldAlpha=document.querySelector('[data-directory-content]');activate('beta/');await wait(()=>location.pathname===prefix+'beta/'&&!oldAlpha.isConnected);
+            input.dispatchEvent(new CompositionEvent('compositionend'));
+            check(input.value==='#script '&&pendingTags.every((b,i)=>selected.children[i]===b)&&sessionStorage.getItem(key)===pending&&writes===pendingWrites,'Composition handoff committed pending syntax or saved');
+            check(copyStatus===document.querySelector('#copy-status')&&downloadStatus===document.querySelector('#download-status')&&copyStatus.textContent===''&&downloadStatus.textContent==='','Retained status ownership/cleanup lost');
+            input.dispatchEvent(new CompositionEvent('compositionstart'));input.dispatchEvent(new CompositionEvent('compositionend'));
+            check(input.value===''&&selected.querySelector('[data-tag="script"]')&&writes===pendingWrites+1,'Paired new composition did not commit once');
+            Storage.prototype.setItem=set;
           })()`);
+          if (motion === "no-preference") {
+            await evaluate(`(async()=>{
+              const old=document.querySelector('[data-directory-content]'),a=document.createElement('a');a.href=${JSON.stringify(prefix + "alpha/")};a.dataset.appLink='';document.querySelector('main').append(a);a.click();a.remove();
+              for(let n=0;old.isConnected&&n<200;n++)await new Promise(r=>setTimeout(r,10));
+              window.cancelledDirectoryContent=document.querySelector('[data-directory-content]');
+              const animation=cancelledDirectoryContent.getAnimations().find(a=>a.animationName==='feedback-appear');
+              if(!animation||animation.playState!=='running')throw Error('No running directory entrance to interrupt');
+              animation.currentTime=100;animation.playbackRate=0.01;
+              await animation.ready;await new Promise(resolve=>requestAnimationFrame(resolve));
+              if(animation.playState!=='running'||getComputedStyle(cancelledDirectoryContent).opacity==='1')throw Error('Directory entrance settled before cancellation');
+            })()`);
+            await send("Emulation.setEmulatedMedia", {
+              features: [{ name: "prefers-reduced-motion", value: "reduce" }],
+            });
+            await evaluate(`(async()=>{
+              for(let n=0;cancelledDirectoryContent.hasAttribute('data-entering')&&n<200;n++)await new Promise(r=>setTimeout(r,10));
+              if(cancelledDirectoryContent.hasAttribute('data-entering')||getComputedStyle(cancelledDirectoryContent).opacity!=='1'||cancelledDirectoryContent.getAnimations().length)throw Error('Cancelled content entrance left marker or hidden content: '+JSON.stringify({marker:cancelledDirectoryContent.hasAttribute('data-entering'),opacity:getComputedStyle(cancelledDirectoryContent).opacity,reduced:matchMedia('(prefers-reduced-motion: reduce)').matches,animations:cancelledDirectoryContent.getAnimations().map(a=>[a.animationName,a.playState,a.currentTime])}));
+            })()`);
+            await send("Emulation.setEmulatedMedia", {
+              features: [
+                { name: "prefers-reduced-motion", value: "no-preference" },
+              ],
+            });
+            assert.equal(
+              await evaluate(
+                `getComputedStyle(cancelledDirectoryContent).opacity==='1'&&!cancelledDirectoryContent.hasAttribute('data-entering')&&cancelledDirectoryContent.getAnimations().length===0`,
+              ),
+              true,
+              "Restoring normal motion must not replay the cancelled entrance",
+            );
+          }
         }
   // Different canonical site bases deliberately take the normal mount path.
   await navigate(origin + "/");
