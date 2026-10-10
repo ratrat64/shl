@@ -601,6 +601,13 @@ test("session filters preserve exact restoration, absent chips, native history, 
           `sessionStorage.setItem(${JSON.stringify(key)},JSON.stringify({version:1,text:'',tags:['café','hidden'],picker:true}))`,
         );
         await traverse(-1);
+        for (
+          let n = 0;
+          n < 200 &&
+          !(await evaluate(`(window.persistedShows || []).length >= 1`));
+          n++
+        )
+          await new Promise((r) => setTimeout(r, 10));
         await evaluate(
           `if(document!==window.cachedDocument||document.documentElement!==cachedRoot||document.querySelector('header')!==cachedHeader||persistedShows.join(',')!=='true')throw Error('Native Back did not restore actual BFCache document');if(restorationMounts!==1||document.querySelector('#link-search').value!==''||document.querySelector('.count-number').textContent!=='1')throw Error('BFCache latest filters/single mount');if(document.activeElement===cachedChip||document.activeElement.dataset.tag!=='café'||scrollY!==cachedScroll)throw Error('BFCache chip focus/scroll lost');document.querySelector('#tag-toggle').click();if(document.querySelector('#tag-toggle').getAttribute('aria-expanded')!=='false')throw Error('BFCache duplicate listeners')`,
         );
@@ -613,6 +620,13 @@ test("session filters preserve exact restoration, absent chips, native history, 
           `sessionStorage.setItem(${JSON.stringify(key)},JSON.stringify({version:1,text:'',tags:['hidden'],picker:true}))`,
         );
         await traverse(-1);
+        for (
+          let n = 0;
+          n < 200 &&
+          !(await evaluate(`(window.persistedShows || []).length >= 2`));
+          n++
+        )
+          await new Promise((r) => setTimeout(r, 10));
         await evaluate(
           `if(document!==cachedDocument||restorationMounts!==2||persistedShows.join(',')!=='true,true'||document.activeElement.id!=='link-search'||scrollY!==cachedScroll)throw Error('BFCache removed-chip focus fallback/scroll '+JSON.stringify([document===cachedDocument,restorationMounts,persistedShows,document.activeElement.outerHTML,scrollY,cachedScroll]))`,
         );

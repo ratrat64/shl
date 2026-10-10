@@ -12,9 +12,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
-    name: PR validation
+  changes:
+    name: Detect relevant changes
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run_checks: ${{ steps.changes.outputs.run_checks }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -24,27 +27,105 @@ jobs:
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
-          if git diff --quiet "$BASE" HEAD -- . ':(exclude)AGENTS.md'; then
-            echo 'AGENTS.md-only change; skipping tests and build'
+          if git diff --quiet "$BASE" HEAD -- . ':(exclude)AGENTS.md' ':(exclude)README.md' ':(exclude)docs' ':(exclude)aid-docs'; then
+            echo 'Docs-only change; skipping tests and build'
             echo 'run_checks=false' >> "$GITHUB_OUTPUT"
           else
             echo 'run_checks=true' >> "$GITHUB_OUTPUT"
           fi
+
+  lint:
+    name: Format check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: changes
+    if: needs.changes.outputs.run_checks == 'true'
+    steps:
+      - uses: actions/checkout@v7.0.1
       - uses: oven-sh/setup-bun@v2
-        if: steps.changes.outputs.run_checks == 'true'
         with:
           bun-version: 1.4.2
+      - name: Cache Bun store
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.4.2-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-1.4.2-
       - name: Install dependencies
-        if: steps.changes.outputs.run_checks == 'true'
         run: bun ci
-      - name: Format sources
-        if: steps.changes.outputs.run_checks == 'true'
-        run: bun run format
+      - name: Check formatting
+        run: bun run format:check
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: changes
+    if: needs.changes.outputs.run_checks == 'true'
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - name: Cache Bun store
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.4.2-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-1.4.2-
+      - name: Install dependencies
+        run: bun ci
       - name: Test
-        if: steps.changes.outputs.run_checks == 'true'
         env:
           SHL_REQUIRE_BROWSER: "1"
         run: bun test --timeout 30000 ./test/build.test.mjs
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: changes
+    if: needs.changes.outputs.run_checks == 'true'
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - name: Cache Bun store
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.4.2-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-1.4.2-
+      - name: Install dependencies
+        run: bun ci
       - name: Build
-        if: steps.changes.outputs.run_checks == 'true'
         run: bun build.mjs
+
+  check:
+    name: PR validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [changes, lint, test, build]
+    if: always()
+    steps:
+      - name: Verify required checks
+        run: |
+          if [ "${{ needs.changes.result }}" != "success" ]; then
+            echo "Change detection did not succeed"
+            exit 1
+          fi
+          if [ "${{ needs.changes.outputs.run_checks }}" != "true" ]; then
+            echo "Docs-only change; required checks skipped by design"
+            exit 0
+          fi
+          for result in "${{ needs.lint.result }}" "${{ needs.test.result }}" "${{ needs.build.result }}"; do
+            if [ "$result" != "success" ]; then
+              echo "Required check result: $result"
+              exit 1
+            fi
+          done
+          echo "All required checks passed"
