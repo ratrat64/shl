@@ -49,6 +49,42 @@ validates the link map during the build, and uploads only `dist/` to GitHub Page
 It also supports manual dispatch. Deployment does not rerun regression or browser
 tests; those run in PR validation. A root `CNAME`, if present, is copied to the output.
 
+### Links-only direct commits
+
+Repository administrators may commit and push directly to `main` when **every
+outgoing commit changes only root `links.yaml`, `links.yml`, or `links.json`**.
+Exactly one valid link config must remain. Any other or mixed-file change uses a
+branch and pull request; agents also use a separate worktree for those changes.
+
+The `Require PR validation` ruleset has an **Always** bypass for the repository
+administrator role. GitHub cannot scope this bypass to link files: agents follow
+the rule in `AGENTS.md`, and maintainers must follow it for manual pushes. Other
+contributors still use pull requests. In a fork, add this bypass in the ruleset's
+bypass list if you want the same direct-push option.
+
+Start checked out on local `main` with no unrelated working-tree changes. If you
+have unrelated work, preserve it and use the normal branch/worktree/PR workflow
+instead, so repository-wide formatting and checks cannot modify or depend on it.
+Before editing, update `main` with `git pull --ff-only origin main`. Before
+committing, run (Chrome is required, as in PR validation):
+
+```bash
+bun run format
+bun run format:check
+SHL_REQUIRE_BROWSER=1 bun test --timeout 30000 ./test/build.test.mjs
+bun build.mjs
+```
+
+Stage the complete validated link config changes and inspect `git diff --cached`.
+Use `git diff --exit-code` to confirm no tracked changes remain unstaged, so the
+commit contains the version that passed checks. Fetch the latest `origin/main`
+and inspect every outgoing commit (not just the combined diff), including merge
+diffs, with `git log --name-status --diff-merges=first-parent origin/main..HEAD`
+before pushing. Do not push unrelated files or commits. If `main` has advanced,
+integrate it with a fast-forward update or the normal PR workflow and repeat
+checks on the resulting version. A push triggers deployment, which does not
+rerun tests; the local checks replace the skipped PR validation.
+
 ## Source ownership
 
 A successful build deletes and recreates `dist/`. Edit sources, not generated files:
