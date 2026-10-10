@@ -3357,7 +3357,7 @@ test("hidden links and hidden-only folders are hidden by default but keep their 
     );
     assert.match(
       html,
-      /<li data-hidden="true" hidden data-tags="[^"]*" data-search="[^"]+"><div class="link-row"[^>]*><a class="code[^>]* href="\.\/.*(?:secret|SecretCode|HiddenDeep)\/"/,
+      /<li data-hidden="true" hidden data-tags="[^"]*" data-search="[^"]+"><div class="link-row"[^>]*><div class="link-main"><a class="code[^>]* href="\.\/.*(?:secret|SecretCode|HiddenDeep)\/"/,
     );
   }
   const home = await f.read("index.html");
@@ -3477,7 +3477,7 @@ test("long destinations keep their trailing path beside single-line short codes"
   );
   assert.match(
     html,
-    /class="destination-end" aria-hidden="true">oh-my-posh\/setup\.sh<\/span><\/a><a class="visit" href="https:\/\/raw\.githubusercontent\.com\/ratrat64[^>]*>Open<\/a>/,
+    /class="destination-end" aria-hidden="true">oh-my-posh\/setup\.sh<\/span><\/a><\/div><span class="link-actions"><a class="visit" href="https:\/\/raw\.githubusercontent\.com\/ratrat64[^>]*>Open<\/a><\/span>/,
   );
   assert.doesNotMatch(html, /class="link-title"/);
 });
@@ -4820,7 +4820,7 @@ test("script launchers are opt-in, quote URLs, forward arguments and statuses, a
   const home = await f.read("index.html");
   assert.match(
     home,
-    /<li data-hidden="true" hidden data-tags="[^"]*" data-search="Run script [^"]+"><div class="link-row script-row"><a class="code script-link" href="\.\/Run\/">Run<\/a>/,
+    /<li data-hidden="true" hidden data-tags="[^"]*" data-search="Run script [^"]+"><div class="link-row script-row"><div class="link-main"><a class="code script-link" href="\.\/Run\/">Run<\/a>/,
   );
   assert.doesNotMatch(home, /class="script-label"/);
   assert.match(
@@ -4851,6 +4851,23 @@ test("script launchers are opt-in, quote URLs, forward arguments and statuses, a
     /--script:\s*light-dark\(#895400, #c6a36a\)/,
   );
   assert.match(await f.read("assets/site.css"), /\.download\s*\{/);
+  assert.match(
+    home,
+    /<span class="link-actions"><button type="button" class="download"[^>]*>Download<\/button><a class="visit"/,
+  );
+  assert.match(home, /<\/a><\/div><span class="link-actions"><a class="visit"/);
+  assert.match(
+    await f.read("assets/site.css"),
+    /\.link-main\s*\{\s*display:\s*contents;?\s*\}/,
+  );
+  assert.match(
+    await f.read("assets/site.css"),
+    /\.link-main\s*\{[^}]*overflow-x:\s*auto;[^}]*\}/,
+  );
+  assert.match(
+    await f.read("assets/site.css"),
+    /\.disabled-row\s+\.link-actions\s*\{\s*display:\s*none;?\s*\}/,
+  );
   assert.match(
     await f.read("assets/site.css"),
     /\.link-row\.script-row\s*\{\s*grid-template-columns:\s*max-content minmax\(4rem,\s*1fr\) max-content max-content;?\s*\}/,

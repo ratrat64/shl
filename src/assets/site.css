@@ -566,6 +566,11 @@ button.destination:has(.destination-end:empty) .destination-start {
   padding: 0.2rem 0.55rem;
   text-decoration: none;
 }
+/* Pass-through on desktop so the grid sees the row content directly. */
+.link-actions,
+.link-main {
+  display: contents;
+}
 .download {
   --button-tone: var(--script);
   color: var(--script);
@@ -744,6 +749,42 @@ main.minimal-document {
   }
   .link-row {
     gap: 0.5rem;
+  }
+  /* Narrow rows keep trailing actions fixed while the content strip
+     scrolls beneath: Open/Download stay visible on the right instead of
+     scrolling away with long codes, tags, and destinations. */
+  .link-row {
+    display: flex;
+    align-items: center;
+  }
+  .link-main {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .link-main .code,
+  .link-main .tags,
+  .link-actions {
+    flex: none;
+  }
+  /* Keep the tappable destination reserve while the strip scrolls. */
+  .link-main .destination {
+    flex: 1 1 auto;
+    min-width: 3rem;
+  }
+  .link-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  /* Disabled actions do nothing: drop them on narrow rows so the content
+     strip uses the full width. */
+  .disabled-row .link-actions {
+    display: none;
   }
   .footer .wrap {
     display: block;
