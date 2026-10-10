@@ -24,6 +24,7 @@ context: []
 - Kept existing tint/border fills unchanged so rendered tag-surface checks still match; 0.8 keeps ≥4.5:1 headroom on the generated ink envelope in both themes.
 - No transition change: opacity flips immediately, consistent with reduced-motion immediacy.
 - Review follow-up: restore rule widened from `:focus-visible` to `:focus`, and `opacity` added to the shared `.tag-chip` highlight transition so hover/focus softens over 140ms like neighbouring tint/border changes.
+- Follow-up (2026-10-10): resting opacity lowered 0.8 → 0.7 per maintainer choice. Measured via headless-Chrome CDP probe across the full hue envelope plus real map tags: at 0.7 the gray fixed tags read 3.1:1 light / 3.8:1 dark (below the 4.5:1 floor); all generated hues stay above 3.1. Accepted tradeoff for a clearer selected/unselected distinction.
 
 ## Review Triage Log
 
