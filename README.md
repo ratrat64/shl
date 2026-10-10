@@ -58,7 +58,7 @@ it after the next deployment.
 
 | Tag | Effect |
 | --- | --- |
-| `hidden` | Omit from default listings and search; selecting hidden, broken or disabled admits only matching hidden links. The short URL still works. |
+| `hidden` | Omit from default listings, counts and search; selecting hidden, broken or disabled admits only matching hidden links and their ancestors. The short URL still works. |
 | `broken` | Show a warning without blocking actions. |
 | `disabled` | Stop forwarding and script execution; Open and Download are unavailable, but both URLs remain copyable. |
 | `script` | Generate a `<path>.sh` Bash launcher and show Download. |
