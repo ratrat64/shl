@@ -4675,6 +4675,18 @@ test("shared shell renders consistently across direct/native loads and app navig
         };
         const controlStates = doc => {
           const win = frame.contentWindow, button = doc.querySelector('[data-theme-control]');
+          const icons = [...button.querySelectorAll('[data-theme-icon]')].filter(icon => !icon.hidden);
+          if (icons.length !== 1 || icons[0].dataset.themeIcon !== (doc.documentElement.dataset.theme || 'system')) throw new Error('Theme icon does not reflect current state');
+          const svg = icons[0].querySelector('svg');
+          const iconRect = svg.getBoundingClientRect();
+          const buttonRect = button.getBoundingClientRect();
+          const center = rect => rect.top + rect.height / 2;
+          if (Math.abs(center(iconRect) - center(buttonRect)) > .5) throw new Error('Theme icon is not vertically centered');
+          if (win.innerWidth > 740 && Math.abs(center(iconRect) - center(button.querySelector('.btn-label').getBoundingClientRect())) > .5) throw new Error('Theme icon and text are misaligned');
+          if (icons[0].dataset.themeIcon === 'dark') {
+            const bounds = svg.querySelector('path').getBBox();
+            if (bounds.width < 9.6 || bounds.height < 9.6) throw new Error('Moon is too small to read as a crescent');
+          }
           const state = () => { const s = win.getComputedStyle(button); return [s.color, s.backgroundColor, s.borderColor, s.outlineWidth, s.outlineStyle, s.outlineColor, s.outlineOffset]; };
           const normal = state();
           button.focus();

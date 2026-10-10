@@ -140,6 +140,11 @@ button {
   height: 1em;
   flex: none;
 }
+[data-theme-icon]:not([hidden]) {
+  display: flex;
+  align-items: center;
+  block-size: 1lh;
+}
 .theme-toggle {
   color: var(--ink);
   padding: 0.35rem 0.7rem;

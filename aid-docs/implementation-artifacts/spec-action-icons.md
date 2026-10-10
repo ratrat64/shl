@@ -31,6 +31,7 @@ context:
 - Surprise: shell snapshot failed on guide/390/dark by ~2e-5px moon-path bbox height. Root cause is Blink float dust on SVG bboxes measured on BFCache-scrolled pages (footer-link focus in a prior iteration scrolled guide; restoration carried it into the snapshot load) — not path shape (arcs, cubics, and polygons showed the identical signature; only integer-aligned straight paths were immune). Fixed by rounding numbers to 0.001px in the harness's inner snapshot `equal()`; still catches every visible shift. Moon kept as originally approved arcs.
 - Files: `src/directory.mjs`, `src/layout.mjs`, `src/assets/theme.js`, `src/assets/search.js`, `src/assets/site.css`, `test/build.test.mjs`.
 - Verified: `bun run format`, full `bun test` 47/47 with `SHL_REQUIRE_BROWSER=1` (real Chrome).
+- Screenshot feedback correction: visible theme-icon wrappers now use flex alignment instead of an inline SVG baseline; replace the nearly overlapping moon arcs with a full crescent. Shared-shell browser checks now assert icon/text centering and a readable moon footprint across themes, viewports, direct loads and app navigation; the alignment check failed before the fix and passed after it.
 
 ## Review Triage Log
 
