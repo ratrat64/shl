@@ -30,6 +30,11 @@ context: []
   for the new wrappers. Full suite: 47 pass, 0 fail with
   `SHL_REQUIRE_BROWSER=1`; real-Chrome screenshots verified trailing
   actions on mobile and byte-identical desktop vs main.
+- Follow-up: disabled rows hide the action group below 740px
+  (`.disabled-row .link-actions { display: none }`, mobile only; desktop
+  keeps the disabled-button treatment), freeing the full row width for
+  content. Static assert added; suite still 47/47 with
+  `SHL_REQUIRE_BROWSER=1`, confirmed in a mobile Chrome screenshot.
 
 ## Review Triage Log
 

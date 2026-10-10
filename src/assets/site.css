@@ -774,6 +774,11 @@ main.minimal-document {
     align-items: center;
     gap: 0.5rem;
   }
+  /* Disabled actions do nothing: drop them on narrow rows so the content
+     strip uses the full width. */
+  .disabled-row .link-actions {
+    display: none;
+  }
   .footer .wrap {
     display: block;
   }

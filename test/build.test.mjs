@@ -4866,6 +4866,10 @@ test("script launchers are opt-in, quote URLs, forward arguments and statuses, a
   );
   assert.match(
     await f.read("assets/site.css"),
+    /\.disabled-row\s+\.link-actions\s*\{\s*display:\s*none;?\s*\}/,
+  );
+  assert.match(
+    await f.read("assets/site.css"),
     /\.link-row\.script-row\s*\{\s*grid-template-columns:\s*max-content minmax\(4rem,\s*1fr\) max-content max-content;?\s*\}/,
   );
   assert.match(await f.read("tools/Nested/index.html"), /http-equiv="refresh"/);
