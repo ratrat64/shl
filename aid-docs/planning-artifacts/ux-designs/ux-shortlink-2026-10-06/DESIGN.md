@@ -104,6 +104,15 @@ preserve records. Absent-subtree chips retain renderer-owned labels/colors and r
 removable; available choices stay subtree-local. Storage failure retains document-memory
 state for in-app navigation. Same-page fragments preserve live controls.
 
+Browsing or traversing history between searchable directories at the same canonical
+site base retains the connected toolbar, search input and its selection, toggle,
+both tag tracks and existing selected buttons. Track scroll positions and picker
+preference survive the update; only subtree-local available choices, count,
+breadcrumbs and listing refresh. Untagged directories disable the toggle without
+discarding picker preference. Search rebinds once without committing pending tokens
+or saving initialization state. Searchless pages and different site bases use the
+ordinary content mount path.
+
 The count is the sole heading and polite result count. Keep the accessible search label visually hidden and placeholder "Search link, title or tag". Show tags / Hide tags exposes expanded state and its controlled available region, changing only visibility. Disable it for no-tag catalogs. Selected chips appear left of search (above on mobile), in insertion order and matching DOM/tab order; available chips retain canonical catalog order. Native buttons name Filter by #tag / Remove #tag filter and selected state. Empty selected tracks hide; all-selected pickers remain open with "All tags selected.". Focus moves to the selected chip on activation and next/previous/search on removal; tracks reveal focused chips. Independent polite Tag not found feedback is associated with search.
 
 An empty site has no search; every nonempty subtree has enhanced search, including all-hidden/untagged pages. Filters require selected-tag AND plus broad text; only selected reserved hidden/broken/disabled tags admit matching hidden leaves. Zero filtered results retain tools and show the no-match message; initial all-hidden pages show 0 links and No links listed here. Without JavaScript, search and usable picker controls stay hidden; disabled no-tag controls may remain visible.
@@ -132,7 +141,7 @@ Show/Hide tags has a fixed 6.5rem width. The enhanced toolbar reserves the 4rem 
 
 The count label reserves a fixed 5ch width, so filtering (including singular/plural flips) never resizes the search field. Buttons acknowledge presses with a deeper fill and a subtle scale, using the shared highlight easing. Opening or closing the tag picker slides the content below the toolbar to its new position over 240ms with ease-out; sliding content ignores pointer input in flight and restores it on finish, cancellation, or cleanup, so taps land on the controls visible beneath passing rows. Reduced motion skips the slide and toggles instantly.
 
-Changing the live count updates its text and singular/plural label immediately, then animates only the new number with a small upward-offset-to-rest fade over 240ms. Repeated edits restart that animation without delaying filtering or announcing intermediate numbers. In-app page replacement fades incoming main content over 280ms; shell identity and chrome remain stationary, and title/history/focus update immediately. Same-page fragments do not restart content motion. Completed and cancelled count/content entrances clear their transient markers.
+Changing the live count updates its text and singular/plural label immediately, then animates only the new number with a small upward-offset-to-rest fade over 240ms. Repeated edits restart that animation without delaying filtering or announcing intermediate numbers. In-app page replacement fades incoming main content over 280ms; same-base searchable directory updates fade only the changing content below the toolbar. Retained controls and selected chips never replay their entrances. Shell identity and chrome remain stationary, and title/history/focus update immediately. Same-page fragments do not restart content motion. Completed and cancelled count/content entrances clear their transient markers.
 
 Reduced-motion mode removes these effects. Visitor-triggered light/dark changes crossfade the stationary whole page over 240ms with ease-out using native View Transitions. Inks and surfaces switch together underneath the snapshots rather than independently interpolating across palettes. Initial saved-theme restoration, system-preference changes, reduced motion and unsupported browsers switch immediately. Repeated toggles honor the latest choice; navigation and preference changes end an active fade and clear transient state. The fade does not block local controls or move content. Shared CSS owns timing, easing and keyframes; browser state owners trigger count changes, page entrances and theme fades.
 

@@ -882,7 +882,8 @@ main.minimal-document {
     pointer-events: none;
   }
   :root[data-theme-fading]::view-transition-group(root) {
-    animation: none;
+    /* Preserve inherited fill so the old snapshot stays transparent at the end. */
+    animation-name: none;
   }
   :root[data-theme-fading]::view-transition-old(root) {
     animation-duration: var(--motion-duration);
@@ -896,7 +897,8 @@ main.minimal-document {
   .count-number.count-changing {
     animation: count-change var(--motion-duration) var(--motion-easing);
   }
-  main[data-app-page][data-entering] {
+  main[data-app-page][data-entering],
+  [data-directory-content][data-entering] {
     animation: feedback-appear 280ms var(--motion-easing);
   }
   .link-row,
