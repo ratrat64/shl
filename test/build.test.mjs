@@ -1315,7 +1315,7 @@ test("directory motion respects reduced motion, focus, touch and repeated post-n
               });
               const point = await evaluate(`(() => {
                 document.activeElement.blur();
-                const element = document.querySelector('${selector}'); element.scrollIntoView({block:'center',inline:'nearest'});
+                const element = document.querySelector('${selector}'); element.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'});
                 const r = element.getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2};
               })()`);
               await send("Input.dispatchMouseEvent", {
@@ -1325,8 +1325,15 @@ test("directory motion respects reduced motion, focus, touch and repeated post-n
               assert.equal(
                 await evaluate(`(() => {
                 const animations = document.querySelector('${selector}').getAnimations();
-                return animations.some(a => a.transitionProperty === 'background-color') &&
+                const highlighting = animations.some(a => a.transitionProperty === 'background-color') &&
                   (${JSON.stringify(selector.includes("tag-label") || selector.includes("tag-chip"))} === false || animations.some(a => a.transitionProperty?.startsWith('border-')));
+                // Leaving at time zero can correctly cancel without an exit
+                // transition. Seek a visible midpoint before testing reversal.
+                for (const animation of animations) if (animation instanceof CSSTransition) {
+                  animation.pause();
+                  animation.currentTime = animation.effect.getTiming().duration / 2;
+                }
+                return highlighting;
               })()`),
                 motion !== "reduce" && !selector.includes(":disabled"),
                 label + ": shared highlight " + selector,
@@ -5958,52 +5965,56 @@ test("seeded colors cover the hue spectrum, current map and conservative bounds 
   );
 });
 
-test("state rows, selected filters, all-hidden traversal, disabled native actions and lifecycle render in both themes and sizes", async (t) => {
-  const chrome = availableChrome(t);
-  if (!chrome) return;
-  const f = await fixture(t, {
-    ...stateMap(),
-    ...stateMap(false),
-    nativeFolder: {
-      DisabledCode: {
-        url: "https://example.com/native-disabled",
-        tags: ["disabled"],
-      },
-    },
-    onlyHidden: {
-      deeper: {
-        Broken: {
-          url: "https://example.com/broken",
-          tags: ["hidden", "broken"],
+// Keep every matrix cell/assertion, with a separate browser deadline per
+// hosting prefix/viewport rather than one deadline for all sixteen cells.
+for (const prefix of ["/", "/project/"])
+  for (const width of [390, 1440])
+    test(`state rows, selected filters, all-hidden traversal, disabled native actions and lifecycle at ${prefix} ${width}px in both themes`, async (t) => {
+      const chrome = availableChrome(t);
+      if (!chrome) return;
+      const f = await fixture(t, {
+        ...stateMap(),
+        ...stateMap(false),
+        nativeFolder: {
+          DisabledCode: {
+            url: "https://example.com/native-disabled",
+            tags: ["disabled"],
+          },
         },
-        Disabled: {
-          url: "https://example.com/disabled",
-          tags: ["hidden", "disabled", "script"],
+        onlyHidden: {
+          deeper: {
+            Broken: {
+              url: "https://example.com/broken",
+              tags: ["hidden", "broken"],
+            },
+            Disabled: {
+              url: "https://example.com/disabled",
+              tags: ["hidden", "disabled", "script"],
+            },
+            Unmatched: {
+              url: "https://example.com/other",
+              tags: ["hidden", "docs-api"],
+            },
+          },
         },
-        Unmatched: {
-          url: "https://example.com/other",
-          tags: ["hidden", "docs-api"],
+        docs: {
+          Fragment: {
+            url: "https://example.com/#docs",
+            title: "docs broken disabled",
+            tags: ["docs-api", "broken-#disabled"],
+          },
+          Literal: {
+            url: "https://example.com/",
+            title: "docs guide",
+            tags: ["release-notes"],
+          },
         },
-      },
-    },
-    docs: {
-      Fragment: {
-        url: "https://example.com/#docs",
-        title: "docs broken disabled",
-        tags: ["docs-api", "broken-#disabled"],
-      },
-      Literal: {
-        url: "https://example.com/",
-        title: "docs guide",
-        tags: ["release-notes"],
-      },
-    },
-  });
-  assert.equal(f.build().status, 0);
-  const origin = await browserServer(t, f.cwd);
-  await writeFile(
-    join(f.cwd, "dist", "state-check.html"),
-    `<!doctype html><html><body><iframe style="height:900px;border:0"></iframe><script>
+      });
+      assert.equal(f.build().status, 0);
+      const origin = await browserServer(t, f.cwd);
+      await writeFile(
+        join(f.cwd, "dist", "state-check.html"),
+        `<!doctype html><html><body><iframe style="height:900px;border:0"></iframe><script>
     (async () => { try {
       const frame = document.querySelector('iframe');
       const wait = () => new Promise(resolve => setTimeout(resolve, 30));
@@ -6031,7 +6042,7 @@ test("state rows, selected filters, all-hidden traversal, disabled native action
       const count = doc => Number(doc.querySelector('.count-number').textContent);
       const row = (doc, code) => [...doc.querySelectorAll('.link-row')].find(row => row.querySelector('.code').textContent === code);
       const shown = doc => [...doc.querySelectorAll('.link-row')].filter(row => !row.closest('li').hidden && row.getClientRects().length).map(row => row.querySelector('.code').textContent).sort().join(',');
-      for (const prefix of ['/', '/project/']) for (const width of [390, 1440]) for (const theme of ['light', 'dark']) {
+      for (const prefix of [${scriptString(prefix)}]) for (const width of [${width}]) for (const theme of ['light', 'dark']) {
         frame.style.width = width + 'px'; localStorage.setItem('shortlink-theme', theme);
         for (const native of [false, true]) {
           frame.setAttribute('sandbox', native ? 'allow-same-origin' : 'allow-same-origin allow-scripts');
@@ -6319,9 +6330,9 @@ test("state rows, selected filters, all-hidden traversal, disabled native action
       document.body.dataset.stateCheck = 'passed';
     } catch (error) { document.body.dataset.stateCheck = error.message; } })();
   </script></body></html>`,
-  );
-  const html = runChrome(chrome, f.cwd, origin + "/state-check.html", [
-    "--force-prefers-reduced-motion",
-  ]);
-  assert.match(html, /data-state-check="passed"/, html);
-});
+      );
+      const html = runChrome(chrome, f.cwd, origin + "/state-check.html", [
+        "--force-prefers-reduced-motion",
+      ]);
+      assert.match(html, /data-state-check="passed"/, html);
+    });
