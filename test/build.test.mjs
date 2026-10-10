@@ -3477,7 +3477,7 @@ test("long destinations keep their trailing path beside single-line short codes"
   );
   assert.match(
     html,
-    /class="destination-end" aria-hidden="true">oh-my-posh\/setup\.sh<\/span><\/a><a class="visit" href="https:\/\/raw\.githubusercontent\.com\/ratrat64[^>]*>Open<\/a>/,
+    /class="destination-end" aria-hidden="true">oh-my-posh\/setup\.sh<\/span><\/a><span class="link-actions"><a class="visit" href="https:\/\/raw\.githubusercontent\.com\/ratrat64[^>]*>Open<\/a><\/span>/,
   );
   assert.doesNotMatch(html, /class="link-title"/);
 });
@@ -4851,6 +4851,19 @@ test("script launchers are opt-in, quote URLs, forward arguments and statuses, a
     /--script:\s*light-dark\(#895400, #c6a36a\)/,
   );
   assert.match(await f.read("assets/site.css"), /\.download\s*\{/);
+  assert.match(
+    home,
+    /<span class="link-actions"><button type="button" class="download"[^>]*>Download<\/button><a class="visit"/,
+  );
+  assert.match(home, /<\/a><span class="link-actions"><a class="visit"/);
+  assert.match(
+    await f.read("assets/site.css"),
+    /\.link-actions\s*\{\s*display:\s*contents;?\s*\}/,
+  );
+  assert.match(
+    await f.read("assets/site.css"),
+    /\.link-actions\s*\{[^}]*display:\s*flex;[^}]*order:\s*-1;[^}]*position:\s*sticky;[^}]*z-index:\s*1;[^}]*background:\s*var\(--bg\);[^}]*\}/,
+  );
   assert.match(
     await f.read("assets/site.css"),
     /\.link-row\.script-row\s*\{\s*grid-template-columns:\s*max-content minmax\(4rem,\s*1fr\) max-content max-content;?\s*\}/,
