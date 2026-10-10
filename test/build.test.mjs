@@ -6634,6 +6634,7 @@ test("seeded colors cover the hue spectrum, current map and conservative bounds 
   const samples = [
     ...new Set([
       "docs",
+      "release-notes",
       ...spectrumTags,
       ...current.filter(
         (tag) => !["hidden", "broken", "disabled", "script"].includes(tag),
