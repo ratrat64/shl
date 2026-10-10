@@ -407,7 +407,11 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
   } catch(error) { document.body.dataset.filtersCheck = error.message; } })();
   </script></body></html>`,
   );
-  const html = runChrome(chrome, f.cwd, origin + "/filters-check.html");
+  // This matrix checks immediate filter state and settled colors/geometry.
+  // The dedicated CDP motion matrix verifies running/intermediate animations.
+  const html = runChrome(chrome, f.cwd, origin + "/filters-check.html", [
+    "--force-prefers-reduced-motion",
+  ]);
   assert.match(html, /data-filters-check="passed"/, html);
 });
 
@@ -977,6 +981,759 @@ test("native Enter/Space chip and popover activation, typed delimiters, touch an
         );
         await send("Emulation.setTouchEmulationEnabled", { enabled: false });
       }
+});
+
+test("directory motion respects reduced motion, focus, touch and repeated post-navigation feedback", async (t) => {
+  const chrome = availableChrome(t);
+  if (!chrome) return;
+  const f = await fixture(t, {
+    tools: {
+      code: { url: "https://example.com/", tags: ["shell", "script"] },
+      off: { url: "https://example.com/off.sh", tags: ["disabled", "script"] },
+      plain: { url: "https://example.com/plain", tags: ["reference"] },
+    },
+  });
+  assert.equal(f.build().status, 0);
+  const origin = await browserServer(t, f.cwd);
+  const { send, evaluate, key, navigate } = await browserControls(
+    t,
+    chrome,
+    f.cwd,
+  );
+  for (const width of [390, 1440])
+    for (const theme of ["light", "dark"])
+      for (const motion of ["no-preference", "reduce"]) {
+        const label = `${width}/${theme}/${motion}`;
+        await send("Emulation.setDeviceMetricsOverride", {
+          width,
+          height: 900,
+          deviceScaleFactor: 1,
+          mobile: width === 390,
+        });
+        await send("Emulation.setEmulatedMedia", {
+          features: [{ name: "prefers-reduced-motion", value: motion }],
+        });
+        await send("Emulation.setTouchEmulationEnabled", {
+          enabled: width === 390,
+        });
+        await navigate(origin + "/project/");
+        await evaluate(`document.documentElement.dataset.theme = ${JSON.stringify(theme)};
+          window.motionHeader = document.querySelector('header');
+          window.motionFooter = document.querySelector('footer');
+          window.motionTheme = document.querySelector('[data-theme-control]');
+          Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => {} } });`);
+        // Headless Chrome reports no fine pointer after touch emulation. Force
+        // the existing fine-pointer media branches; mouse events remain native.
+        if (width === 1440)
+          await evaluate(`(() => {
+            const visit = rules => { for (const rule of rules) {
+              if (rule.conditionText === '(hover: hover) and (pointer: fine)') rule.media.mediaText = 'all';
+              if (rule.cssRules) visit(rule.cssRules);
+            } };
+            for (const sheet of document.styleSheets) visit(sheet.cssRules);
+          })()`);
+        for (const page of ["root", "nested"]) {
+          await evaluate(
+            "if (!document.querySelector('#available-tags').hidden) document.querySelector('#tag-toggle').click()",
+          );
+          // Closing a restored picker slides content; settle before sampling.
+          await evaluate(
+            "(async () => { await Promise.all([...document.getAnimations()].filter(a => a.id === 'picker-slide').map(a => a.finished.catch(() => {}))); await new Promise(r => requestAnimationFrame(r)); })()",
+          );
+          await evaluate(
+            "document.querySelector('details')?.setAttribute('open', '')",
+          );
+          await send("Input.dispatchMouseEvent", {
+            type: "mouseMoved",
+            x: 0,
+            y: 0,
+          });
+          assert.equal(
+            await evaluate(`document.activeElement.blur();
+            getComputedStyle(document.querySelector('.destination')).opacity`),
+            width === 1440 ? "0" : "1",
+            label + ": resting pointer visibility",
+          );
+          const point = await evaluate(`(() => {
+            document.activeElement.blur();
+            const row = document.querySelector('.link-row');
+            row.scrollIntoView({block: 'center'});
+            const r = row.getBoundingClientRect();
+            return { x: r.x + 2, y: r.y + r.height / 2 };
+          })()`);
+          await send("Input.dispatchMouseEvent", {
+            type: "mouseMoved",
+            ...point,
+          });
+          const reveal = await evaluate(`(async () => {
+            const row = document.querySelector('.link-row'), d = row.querySelector('.destination');
+            const duration = getComputedStyle(d).transitionDuration;
+            // Let hover styles recalc before sampling the running highlight.
+            await new Promise(r => requestAnimationFrame(r));
+            const highlight = row.matches(':hover') && row.getAnimations().some(a => a.transitionProperty === 'background-color');
+            const animations = d.getAnimations();
+            let intermediate = false, interrupted = false;
+            if (animations.length) {
+              animations[0].pause(); animations[0].currentTime = 60;
+              const opacity = Number(getComputedStyle(d).opacity);
+              intermediate = opacity > 0 && opacity < 0.6;
+              d.focus();
+              interrupted = getComputedStyle(d).opacity === '1' && d.getAnimations().length === 0;
+              d.blur();
+            }
+            const r = row.getBoundingClientRect();
+            const under = document.elementFromPoint(r.x + 2, r.y + r.height / 2);
+            return { duration, highlight, count: animations.length, intermediate, interrupted,
+              opacity: getComputedStyle(d).opacity, height: row.getBoundingClientRect().height };
+          })()`);
+          assert.deepEqual(
+            reveal,
+            {
+              duration:
+                width === 1440 && motion === "no-preference" ? "0.22s" : "0s",
+              opacity: "1",
+              height: 50,
+              highlight: motion === "no-preference",
+              count: width === 1440 && motion === "no-preference" ? 1 : 0,
+              intermediate: width === 1440 && motion === "no-preference",
+              interrupted: width === 1440 && motion === "no-preference",
+            },
+            label + "/" + page + ": hover/touch reveal",
+          );
+          await send("Input.dispatchMouseEvent", {
+            type: "mouseMoved",
+            x: 0,
+            y: 0,
+          });
+          await evaluate("document.querySelector('#tag-toggle').focus()");
+          for (
+            let i = 0;
+            i < 10 &&
+            !(await evaluate(
+              "document.querySelector('.link-row').matches(':focus-within')",
+            ));
+            i++
+          )
+            await key("Tab", "Tab", 9);
+          assert.equal(
+            await evaluate(
+              "document.querySelector('.link-row').matches(':focus-within')",
+            ),
+            true,
+          );
+          assert.deepEqual(
+            await evaluate(`(() => {
+            const d = document.querySelector('.destination');
+            return [getComputedStyle(d).opacity, getComputedStyle(d).transitionDuration];
+          })()`),
+            ["1", "0s"],
+            label + ": immediate focus reveal",
+          );
+          if (width === 1440) {
+            await send("Input.dispatchMouseEvent", {
+              type: "mouseMoved",
+              ...point,
+            });
+            assert.deepEqual(
+              await evaluate(`(() => {
+              document.activeElement.blur();
+              const coarse = [...document.styleSheets[0].cssRules].find(r => r.conditionText === '(any-pointer: coarse)');
+              const motion = [...document.styleSheets[0].cssRules].find(r => r.conditionText === '(prefers-reduced-motion: no-preference)');
+              const motionCoarse = [...motion.cssRules].find(r => r.conditionText === '(any-pointer: coarse)');
+              coarse.media.mediaText = motionCoarse.media.mediaText = 'all';
+              const d = document.querySelector('.destination');
+              const result = [getComputedStyle(d).opacity, getComputedStyle(d).transitionDuration];
+              coarse.media.mediaText = motionCoarse.media.mediaText = '(any-pointer: coarse)';
+              return result;
+            })()`),
+              ["1", "0s"],
+              label + ": hybrid touch/mouse visibility",
+            );
+          }
+          for (let repeat = 0; repeat < 2; repeat++) {
+            await evaluate("document.querySelector('.tags').focus()");
+            await key("Enter", "Enter", 13);
+            const panel = await evaluate(`(async () => {
+              const panel = document.querySelector('.tag-panel:popover-open');
+              const animations = panel.getAnimations();
+              const duration = getComputedStyle(panel).animationDuration;
+              await Promise.all(animations.map(a => a.finished));
+              return { duration, count: animations.length, opacity: getComputedStyle(panel).opacity,
+                height: document.querySelector('.link-row').getBoundingClientRect().height };
+            })()`);
+            assert.deepEqual(
+              panel,
+              {
+                duration: motion === "reduce" ? "0s" : "0.24s",
+                count: motion === "reduce" ? 0 : 1,
+                opacity: "1",
+                height: 50,
+              },
+              label + ": repeated native popover entrance",
+            );
+            await key("Escape", "Escape", 27);
+            assert.equal(
+              await evaluate(
+                "!!document.querySelector('.tag-panel:popover-open')",
+              ),
+              false,
+            );
+            const feedback = await evaluate(`(async () => {
+              const row = document.querySelector('.link-row'), before = row.getBoundingClientRect().toJSON();
+              document.querySelector('.code').click();
+              await new Promise(r => setTimeout(r, 0));
+              const status = document.querySelector('#copy-status');
+              const duration = getComputedStyle(status).animationDuration;
+              await Promise.all(status.getAnimations().map(a => a.finished));
+              return { text: status.textContent, duration, opacity: getComputedStyle(status).opacity,
+                fixed: getComputedStyle(status.parentElement).position, stable: JSON.stringify(before) === JSON.stringify(row.getBoundingClientRect().toJSON()) };
+            })()`);
+            assert.deepEqual(
+              feedback,
+              {
+                text: "Short link copied.",
+                duration: motion === "reduce" ? "0s" : "0.24s",
+                opacity: "1",
+                fixed: "fixed",
+                stable: true,
+              },
+              label + ": repeated copy feedback",
+            );
+          }
+          assert.deepEqual(
+            await evaluate(`(async () => {
+            const fetch = window.fetch;
+            window.fetch = async () => { throw new Error('Motion check download failure'); };
+            document.querySelector('.download').click();
+            await new Promise(r => setTimeout(r, 0));
+            window.fetch = fetch;
+            const status = document.querySelector('#download-status');
+            const animations = status.getAnimations();
+            await Promise.all(animations.map(a => a.finished));
+            return { count: animations.length, visible: getComputedStyle(status).opacity === '1',
+              error: status.textContent.startsWith('Could not download'),
+              copy: document.querySelector('#copy-status').textContent === 'Short link copied.',
+              height: document.querySelector('.link-row').getBoundingClientRect().height };
+          })()`),
+            {
+              count: motion === "reduce" ? 0 : 1,
+              visible: true,
+              error: true,
+              copy: true,
+              height: 50,
+            },
+            label + ": shared feedback while copy status remains visible",
+          );
+          const buttonPoint = await evaluate(`(() => {
+            document.activeElement.blur();
+            const button = document.querySelector('#tag-toggle'); button.scrollIntoView({block:'center'});
+            const r = button.getBoundingClientRect(); return { x:r.x+r.width/2, y:r.y+r.height/2 };
+          })()`);
+          await send("Input.dispatchMouseEvent", {
+            type: "mouseMoved",
+            ...buttonPoint,
+          });
+          assert.equal(
+            await evaluate(
+              "document.querySelector('#tag-toggle').getAnimations().some(a => a.transitionProperty === 'background-color')",
+            ),
+            motion === "no-preference",
+            label + ": button highlight",
+          );
+          const tagsAndCount = await evaluate(`(async () => {
+            const number = document.querySelector('.count-number');
+            document.querySelector('#tag-toggle').click();
+            const available = document.querySelector('#available-tags button[data-tag=shell]');
+            const entrance = available.getAnimations().filter(a => a.animationName === 'feedback-appear');
+            await Promise.all(entrance.map(a => a.finished));
+            available.click();
+            const selected = document.querySelector('#selected-tags button');
+            const selectedEntrance = selected.getAnimations().filter(a => a.animationName === 'feedback-appear');
+            let chipIntermediate = false, countIntermediate = false;
+            if (selectedEntrance.length) {
+              selectedEntrance[0].pause(); selectedEntrance[0].currentTime = 120;
+              const opacity = Number(getComputedStyle(selected).opacity);
+              chipIntermediate = opacity > 0 && opacity < .8;
+              selectedEntrance[0].play();
+            }
+            const first = number.getAnimations().find(a => a.animationName === 'count-change');
+            if (first) {
+              first.pause(); first.currentTime = 120;
+              const style = getComputedStyle(number);
+              countIntermediate = Number(style.opacity) > .45 && Number(style.opacity) < .95 && style.transform !== 'none';
+              first.play();
+            }
+            const immediate = number.textContent === '1' && document.querySelector('.count-label').textContent.trim() === 'Link';
+            const input = document.querySelector('#link-search');
+            input.value = 'no-match'; input.dispatchEvent(new Event('input'));
+            const second = number.getAnimations().find(a => a.animationName === 'count-change');
+            const restarted = first && second && first !== second && first.playState === 'idle';
+            const zero = number.textContent === '0';
+            input.value = ''; input.dispatchEvent(new Event('input'));
+            selected.click();
+            const returned = available.getAnimations().filter(a => a.animationName === 'feedback-appear');
+            await Promise.all(number.getAnimations().map(a => a.finished));
+            await new Promise(r => requestAnimationFrame(r));
+            return { entrance: entrance.length, selected: selectedEntrance.length, returned: returned.length,
+              chipIntermediate, countIntermediate, cleared: !number.classList.contains('count-changing'),
+              countAnimated: !!first, restarted: !!restarted, immediate, zero, restored: number.textContent === '3' };
+          })()`);
+          assert.deepEqual(
+            tagsAndCount,
+            {
+              entrance: motion === "reduce" ? 0 : 1,
+              selected: motion === "reduce" ? 0 : 1,
+              returned: motion === "reduce" ? 0 : 1,
+              countAnimated: motion !== "reduce",
+              restarted: motion !== "reduce",
+              chipIntermediate: motion !== "reduce",
+              countIntermediate: motion !== "reduce",
+              cleared: true,
+              immediate: true,
+              zero: true,
+              restored: true,
+            },
+            label +
+              ": picker/chip appearance and immediate restartable counter",
+          );
+          if (width === 1440) {
+            for (const selector of [
+              "[data-theme-control]",
+              ".visit",
+              ".download",
+              ".visit:disabled",
+              ".download:disabled",
+              ".tags",
+              ".tag-label",
+              "#available-tags .tag-chip",
+              ...(page === "root" ? ["summary"] : []),
+            ]) {
+              await send("Input.dispatchMouseEvent", {
+                type: "mouseMoved",
+                x: 0,
+                y: 0,
+              });
+              const point = await evaluate(`(() => {
+                document.activeElement.blur();
+                const element = document.querySelector('${selector}'); element.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'});
+                const r = element.getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2};
+              })()`);
+              await send("Input.dispatchMouseEvent", {
+                type: "mouseMoved",
+                ...point,
+              });
+              assert.equal(
+                await evaluate(`(() => {
+                const animations = document.querySelector('${selector}').getAnimations();
+                const highlighting = animations.some(a => a.transitionProperty === 'background-color') &&
+                  (${JSON.stringify(selector.includes("tag-label") || selector.includes("tag-chip"))} === false || animations.some(a => a.transitionProperty?.startsWith('border-')));
+                // Leaving at time zero can correctly cancel without an exit
+                // transition. Seek a visible midpoint before testing reversal.
+                for (const animation of animations) if (animation instanceof CSSTransition) {
+                  animation.pause();
+                  animation.currentTime = animation.effect.getTiming().duration / 2;
+                }
+                return highlighting;
+              })()`),
+                motion !== "reduce" && !selector.includes(":disabled"),
+                label + ": shared highlight " + selector,
+              );
+              await send("Input.dispatchMouseEvent", {
+                type: "mouseMoved",
+                x: 0,
+                y: 0,
+              });
+              assert.equal(
+                await evaluate(
+                  `document.querySelector('${selector}').getAnimations().some(a => a.transitionProperty === 'background-color')`,
+                ),
+                motion !== "reduce" && !selector.includes(":disabled"),
+                label + ": highlight exit " + selector,
+              );
+            }
+          }
+          assert.equal(
+            await evaluate(`(() => {
+            const button = document.querySelector('[data-theme-control]');
+            const before = document.documentElement.dataset.theme;
+            button.click();
+            const changed = document.documentElement.dataset.theme !== before;
+            const settled = !document.getAnimations().some(a => a instanceof CSSTransition);
+            button.click();
+            return changed && settled && document.documentElement.dataset.theme === before && !document.getAnimations().some(a => a instanceof CSSTransition);
+          })()`),
+            true,
+            label + ": theme ink and surfaces switch together",
+          );
+          if (page === "root") {
+            await evaluate("document.querySelector('summary a').click()");
+            for (
+              let i = 0;
+              i < 100 &&
+              !(await evaluate(
+                "location.pathname === '/project/tools/' && !document.querySelector('summary')",
+              ));
+              i++
+            )
+              await new Promise((r) => setTimeout(r, 20));
+            assert.equal(
+              await evaluate("location.pathname"),
+              "/project/tools/",
+            );
+            assert.equal(
+              await evaluate(
+                "document.querySelector('header') === motionHeader && document.querySelector('#copy-status').textContent === ''",
+              ),
+              true,
+            );
+          }
+        }
+        for (const page of ["guide", "links"]) {
+          await evaluate(
+            `document.querySelector('[data-nav=${page}]').click()`,
+          );
+          for (
+            let i = 0;
+            i < 100 &&
+            !(await evaluate(
+              `document.querySelector('main').dataset.appPage === '${page}'`,
+            ));
+            i++
+          )
+            await new Promise((r) => setTimeout(r, 10));
+          assert.deepEqual(
+            await evaluate(`(async () => {
+            const main = document.querySelector('main');
+            const animations = main.getAnimations();
+            const duration = getComputedStyle(main).animationDuration;
+            const focused = main.contains(document.activeElement);
+            let intermediate = false;
+            if (animations.length) {
+              animations[0].pause(); animations[0].currentTime = 140;
+              const opacity = Number(getComputedStyle(main).opacity);
+              intermediate = opacity > 0 && opacity < .8;
+              animations[0].play();
+            }
+            await Promise.all(animations.map(a => a.finished));
+            await new Promise(r => requestAnimationFrame(r));
+            return { page: main.dataset.appPage, duration, count: animations.length, focused, intermediate,
+              cleared: !main.hasAttribute('data-entering'),
+              shell: document.querySelector('header') === motionHeader && document.querySelector('footer') === motionFooter && document.querySelector('[data-theme-control]') === motionTheme,
+              opacity: getComputedStyle(main).opacity };
+          })()`),
+            {
+              page,
+              duration: motion === "reduce" ? "0s" : "0.28s",
+              count: motion === "reduce" ? 0 : 1,
+              focused: true,
+              intermediate: motion !== "reduce",
+              cleared: true,
+              shell: true,
+              opacity: "1",
+            },
+            label + ": page content entrance",
+          );
+          if (page === "guide") {
+            assert.equal(
+              await evaluate(`(() => {
+              const main = document.querySelector('main');
+              document.querySelector('main a[href$="#about"]').click();
+              return document.querySelector('main') === main && main.getAnimations().length === 0;
+            })()`),
+              true,
+              label + ": same-page fragment does not restart content motion",
+            );
+          }
+        }
+        for (const value of ["reduce", "no-preference", motion]) {
+          await send("Emulation.setEmulatedMedia", {
+            features: [{ name: "prefers-reduced-motion", value }],
+          });
+          assert.equal(
+            await evaluate(
+              `document.querySelector('main').getAnimations().length === 0 && document.querySelector('.count-number').getAnimations().length === 0`,
+            ),
+            true,
+            label + ": completed motion does not replay on preference changes",
+          );
+        }
+      }
+});
+
+test("directory toolbar stays anchored when toggling and selecting full scrolling tags", async (t) => {
+  const chrome = availableChrome(t);
+  if (!chrome) return;
+  const tags = [
+    "a",
+    "b",
+    "c",
+    "long-" + "x".repeat(100),
+    "long-" + "y".repeat(100),
+  ];
+  const leaf = { url: "https://example.com/", tags };
+  const f = await fixture(t, { code: leaf, tools: { nested: leaf } });
+  assert.equal(f.build().status, 0);
+  const origin = await browserServer(t, f.cwd);
+  const { send, evaluate, navigate } = await browserControls(t, chrome, f.cwd);
+  await navigate(origin + "/");
+  for (const width of [390, 740, 741, 1440])
+    for (const theme of ["light", "dark"])
+      for (const path of ["/", "/tools/"]) {
+        const context = `${width}/${theme}/${path}`;
+        await evaluate("sessionStorage.clear()");
+        await send("Emulation.setDeviceMetricsOverride", {
+          width,
+          height: 900,
+          deviceScaleFactor: 1,
+          mobile: width < 741,
+        });
+        await navigate(origin + path);
+        await evaluate(`document.documentElement.dataset.theme = '${theme}';
+          window.toolbarGeometry = () => {
+            const rect = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; };
+            return { search: rect('.search'), toggle: rect('#tag-toggle'), available: rect('#available-tags').slice(1, 4), listTop: document.querySelector('.links').getBoundingClientRect().top };
+          };`);
+        const closed = await evaluate("toolbarGeometry()");
+        await evaluate("document.querySelector('#tag-toggle').click()");
+        // Let the picker slide finish: FLIP transforms shift rects in flight.
+        await evaluate(
+          "(async () => { await Promise.all([...document.getAnimations()].filter(a => a.id === 'picker-slide').map(a => a.finished.catch(() => {}))); await new Promise(r => requestAnimationFrame(r)); })()",
+        );
+        const open = await evaluate("toolbarGeometry()");
+        assert.deepEqual(
+          open.search,
+          closed.search,
+          context + ": toggle label must not resize search",
+        );
+        assert.deepEqual(
+          open.toggle,
+          closed.toggle,
+          context + ": Show/Hide tags fixed geometry",
+        );
+        for (const tag of tags) {
+          await evaluate(
+            `document.querySelector('#available-tags button[data-tag="${tag}"]').click()`,
+          );
+          await evaluate(
+            "(async () => { await Promise.all([...document.getAnimations()].filter(a => a.id === 'picker-slide').map(a => a.finished.catch(() => {}))); await new Promise(r => requestAnimationFrame(r)); })()",
+          );
+          assert.deepEqual(
+            await evaluate("toolbarGeometry()"),
+            open,
+            context + ": selection must not move toolbar/catalog/list",
+          );
+        }
+        assert.equal(
+          await evaluate(
+            "document.querySelector('#selected-tags').scrollWidth > document.querySelector('#selected-tags').clientWidth",
+          ),
+          true,
+          context + ": full selected labels scroll",
+        );
+        for (const tag of tags) {
+          await evaluate(
+            `document.querySelector('#selected-tags button[data-tag="${tag}"]').click()`,
+          );
+          await evaluate(
+            "(async () => { await Promise.all([...document.getAnimations()].filter(a => a.id === 'picker-slide').map(a => a.finished.catch(() => {}))); await new Promise(r => requestAnimationFrame(r)); })()",
+          );
+          assert.deepEqual(
+            await evaluate("toolbarGeometry()"),
+            open,
+            context + ": removal must not move toolbar/catalog/list",
+          );
+        }
+        assert.equal(
+          await evaluate("document.querySelector('#selected-tags').hidden"),
+          true,
+        );
+        await evaluate("document.querySelector('#tag-toggle').click()");
+        await evaluate(
+          "(async () => { await Promise.all([...document.getAnimations()].filter(a => a.id === 'picker-slide').map(a => a.finished.catch(() => {}))); await new Promise(r => requestAnimationFrame(r)); })()",
+        );
+        assert.deepEqual(
+          await evaluate("toolbarGeometry()"),
+          closed,
+          context + ": closing picker restores exact geometry",
+        );
+        assert.equal(
+          await evaluate(
+            "document.documentElement.scrollWidth <= document.documentElement.clientWidth",
+          ),
+          true,
+          context + ": viewport does not overflow",
+        );
+      }
+  const css = await f.read("assets/site.css");
+  assert.match(
+    css,
+    /\.count-label\s*\{[^}]*min-width:\s*6ch/,
+    "count label reserves its width",
+  );
+  assert.match(css, /:active:not\(:disabled\)/, "buttons define pressed state");
+  assert.match(
+    css,
+    /prefers-reduced-motion:\s*no-preference[\s\S]*?transform:\s*scale\(0\.96\)/,
+    "press scale is motion-gated",
+  );
+  // Selecting a tag that narrows the count (and flips Link/Links) must not
+  // resize the search field.
+  const varied = await fixture(t, {
+    solo: { url: "https://example.com/solo", tags: ["shell"] },
+    plain: { url: "https://example.com/plain", tags: ["reference"] },
+  });
+  assert.equal(varied.build().status, 0);
+  const origin2 = await browserServer(t, varied.cwd);
+  await send("Emulation.setDeviceMetricsOverride", {
+    width: 1440,
+    height: 900,
+    deviceScaleFactor: 1,
+    mobile: false,
+  });
+  await send("Emulation.setTouchEmulationEnabled", { enabled: false });
+  await navigate(origin2 + "/");
+  await evaluate(
+    "sessionStorage.clear(); document.documentElement.dataset.theme = 'light';",
+  );
+  await navigate(origin2 + "/");
+  const beforeSelect = await evaluate(
+    "document.querySelector('.search').getBoundingClientRect().toJSON()",
+  );
+  await evaluate("document.querySelector('#tag-toggle').click()");
+  await evaluate(
+    "document.querySelector('#available-tags button[data-tag=shell]').click()",
+  );
+  assert.equal(
+    await evaluate(
+      "document.querySelector('.count-number').textContent + ' ' + document.querySelector('.count-label').textContent.trim()",
+    ),
+    "1 Link",
+  );
+  assert.deepEqual(
+    await evaluate(
+      "document.querySelector('.search').getBoundingClientRect().toJSON()",
+    ),
+    beforeSelect,
+    "count/label change must not resize search",
+  );
+  await evaluate("document.querySelector('#selected-tags button').click()");
+  assert.equal(
+    await evaluate(
+      "document.querySelector('.count-number').textContent + ' ' + document.querySelector('.count-label').textContent.trim()",
+    ),
+    "2 Links",
+  );
+  assert.deepEqual(
+    await evaluate(
+      "document.querySelector('.search').getBoundingClientRect().toJSON()",
+    ),
+    beforeSelect,
+    "removal and plural label must not resize search",
+  );
+  // Real press visibly changes the button, then releases cleanly.
+  const togglePoint = await evaluate(`(() => {
+    const button = document.querySelector('#tag-toggle');
+    button.scrollIntoView({block: 'center', behavior: 'instant'});
+    const r = button.getBoundingClientRect();
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  })()`);
+  const restingFill = await evaluate(
+    "getComputedStyle(document.querySelector('#tag-toggle')).backgroundColor",
+  );
+  await send("Input.dispatchMouseEvent", {
+    type: "mouseMoved",
+    ...togglePoint,
+  });
+  await send("Input.dispatchMouseEvent", {
+    type: "mousePressed",
+    button: "left",
+    clickCount: 1,
+    ...togglePoint,
+  });
+  await new Promise((r) => setTimeout(r, 100));
+  const pressedState = await evaluate(`(() => {
+    const button = document.querySelector('#tag-toggle');
+    const style = getComputedStyle(button);
+    return { transform: style.transform, fill: style.backgroundColor };
+  })()`);
+  assert.equal(pressedState.transform !== "none", true, "press must scale");
+  assert.equal(
+    pressedState.fill !== restingFill,
+    true,
+    "press must deepen the fill",
+  );
+  await send("Input.dispatchMouseEvent", {
+    type: "mouseReleased",
+    button: "left",
+    clickCount: 1,
+    ...togglePoint,
+  });
+  await evaluate(
+    "(async () => { await Promise.all([...document.getAnimations()].map(a => a.finished.catch(() => {}))); await new Promise(r => requestAnimationFrame(r)); })()",
+  );
+  assert.equal(
+    await evaluate(
+      "getComputedStyle(document.querySelector('#tag-toggle')).transform",
+    ),
+    "none",
+    "release must restore the button",
+  );
+  // Toggling the picker slides content below the toolbar instead of jumping.
+  await evaluate(
+    "if (!document.querySelector('#available-tags').hidden) document.querySelector('#tag-toggle').click()",
+  );
+  const sliding = await evaluate(`(() => {
+    document.querySelector('#tag-toggle').click();
+    return [...document.querySelector('section').children]
+      .filter(el => !el.classList.contains('directory-tools') && el.tagName !== 'TEMPLATE' && !el.hidden && el.getClientRects().length)
+      .map(el => el.getAnimations().filter(a => a.id === 'picker-slide' && a.playState === 'running').map(a => ({
+        duration: a.effect.getTiming().duration,
+        easing: a.effect.getTiming().easing,
+        suppressed: getComputedStyle(el).pointerEvents === 'none',
+      })));
+  })()`);
+  const flights = sliding.flat();
+  assert.equal(flights.length > 0, true, "picker toggle must slide content");
+  for (const flight of flights)
+    assert.deepEqual(
+      flight,
+      { duration: 240, easing: "ease-out", suppressed: true },
+      "slide uses shared timing and suppresses taps in flight",
+    );
+  // Interrupting the motion settles cleanly with no stuck offsets.
+  await evaluate("document.querySelector('#tag-toggle').click()");
+  await evaluate("document.querySelector('#selected-tags button')?.click()");
+  for (
+    let i = 0;
+    i < 50 &&
+    !(await evaluate(
+      "document.querySelector('#available-tags').hidden && document.querySelectorAll('section > :not(.directory-tools):not(template)').length > 0",
+    ));
+    i++
+  )
+    await new Promise((r) => setTimeout(r, 20));
+  assert.deepEqual(
+    await evaluate(`(() => {
+      const below = [...document.querySelector('section').children].filter(el => !el.classList.contains('directory-tools') && el.tagName !== 'TEMPLATE' && !el.hidden && el.getClientRects().length);
+      return { hidden: document.querySelector('#available-tags').hidden, settled: below.every(el => getComputedStyle(el).transform === 'none' && el.getAnimations().length === 0 && el.style.pointerEvents === '') };
+    })()`),
+    { hidden: true, settled: true },
+    "interrupted picker motion settles without stuck offsets",
+  );
+  await send("Emulation.setEmulatedMedia", {
+    features: [{ name: "prefers-reduced-motion", value: "reduce" }],
+  });
+  assert.equal(
+    await evaluate(`(() => {
+      document.querySelector('#tag-toggle').click();
+      return document.getAnimations().filter(a => a.id === 'picker-slide').length;
+    })()`),
+    0,
+    "reduced motion skips picker slide",
+  );
+  await send("Emulation.setEmulatedMedia", {
+    features: [{ name: "prefers-reduced-motion", value: "no-preference" }],
+  });
 });
 
 async function fixture(t, links, source = "links.json") {
@@ -2036,6 +2793,7 @@ for (const prefix of ["/", "/project/"])
       },
       AbortController,
       localStorage: { getItem: () => "dark" },
+      matchMedia: () => ({ matches: false, addEventListener() {} }),
       navigator: {
         clipboard: { writeText: async (text) => copied.push(text) },
       },
@@ -4032,7 +4790,11 @@ test("shared shell renders consistently across direct/native loads and app navig
       chrome,
       f.cwd,
       origin + "/shell-check.html?system=" + system,
-      system === "dark" ? ["--force-dark-mode"] : [],
+      // Snapshot end-state appearance; the CDP motion matrix covers live frames.
+      [
+        "--force-prefers-reduced-motion",
+        ...(system === "dark" ? ["--force-dark-mode"] : []),
+      ],
     );
     assert.match(html, /data-shell-check="passed"/, html);
     assert.ok(
@@ -5192,7 +5954,9 @@ test("seeded colors cover the hue spectrum, current map and conservative bounds 
   } catch(error){document.body.dataset.spectrumCheck=error.message}})();
   </script></body></html>`,
   );
-  const html = runChrome(chrome, f.cwd, origin + "/spectrum-check.html");
+  const html = runChrome(chrome, f.cwd, origin + "/spectrum-check.html", [
+    "--force-prefers-reduced-motion",
+  ]);
   assert.match(html, /data-spectrum-check="passed"/, html);
   const minimum = Number(html.match(/data-minimum="([^"]+)"/)[1]);
   assert.ok(minimum >= 4.5);
@@ -5201,52 +5965,56 @@ test("seeded colors cover the hue spectrum, current map and conservative bounds 
   );
 });
 
-test("state rows, selected filters, all-hidden traversal, disabled native actions and lifecycle render in both themes and sizes", async (t) => {
-  const chrome = availableChrome(t);
-  if (!chrome) return;
-  const f = await fixture(t, {
-    ...stateMap(),
-    ...stateMap(false),
-    nativeFolder: {
-      DisabledCode: {
-        url: "https://example.com/native-disabled",
-        tags: ["disabled"],
-      },
-    },
-    onlyHidden: {
-      deeper: {
-        Broken: {
-          url: "https://example.com/broken",
-          tags: ["hidden", "broken"],
+// Keep every matrix cell/assertion, with a separate browser deadline per
+// hosting prefix/viewport rather than one deadline for all sixteen cells.
+for (const prefix of ["/", "/project/"])
+  for (const width of [390, 1440])
+    test(`state rows, selected filters, all-hidden traversal, disabled native actions and lifecycle at ${prefix} ${width}px in both themes`, async (t) => {
+      const chrome = availableChrome(t);
+      if (!chrome) return;
+      const f = await fixture(t, {
+        ...stateMap(),
+        ...stateMap(false),
+        nativeFolder: {
+          DisabledCode: {
+            url: "https://example.com/native-disabled",
+            tags: ["disabled"],
+          },
         },
-        Disabled: {
-          url: "https://example.com/disabled",
-          tags: ["hidden", "disabled", "script"],
+        onlyHidden: {
+          deeper: {
+            Broken: {
+              url: "https://example.com/broken",
+              tags: ["hidden", "broken"],
+            },
+            Disabled: {
+              url: "https://example.com/disabled",
+              tags: ["hidden", "disabled", "script"],
+            },
+            Unmatched: {
+              url: "https://example.com/other",
+              tags: ["hidden", "docs-api"],
+            },
+          },
         },
-        Unmatched: {
-          url: "https://example.com/other",
-          tags: ["hidden", "docs-api"],
+        docs: {
+          Fragment: {
+            url: "https://example.com/#docs",
+            title: "docs broken disabled",
+            tags: ["docs-api", "broken-#disabled"],
+          },
+          Literal: {
+            url: "https://example.com/",
+            title: "docs guide",
+            tags: ["release-notes"],
+          },
         },
-      },
-    },
-    docs: {
-      Fragment: {
-        url: "https://example.com/#docs",
-        title: "docs broken disabled",
-        tags: ["docs-api", "broken-#disabled"],
-      },
-      Literal: {
-        url: "https://example.com/",
-        title: "docs guide",
-        tags: ["release-notes"],
-      },
-    },
-  });
-  assert.equal(f.build().status, 0);
-  const origin = await browserServer(t, f.cwd);
-  await writeFile(
-    join(f.cwd, "dist", "state-check.html"),
-    `<!doctype html><html><body><iframe style="height:900px;border:0"></iframe><script>
+      });
+      assert.equal(f.build().status, 0);
+      const origin = await browserServer(t, f.cwd);
+      await writeFile(
+        join(f.cwd, "dist", "state-check.html"),
+        `<!doctype html><html><body><iframe style="height:900px;border:0"></iframe><script>
     (async () => { try {
       const frame = document.querySelector('iframe');
       const wait = () => new Promise(resolve => setTimeout(resolve, 30));
@@ -5274,7 +6042,7 @@ test("state rows, selected filters, all-hidden traversal, disabled native action
       const count = doc => Number(doc.querySelector('.count-number').textContent);
       const row = (doc, code) => [...doc.querySelectorAll('.link-row')].find(row => row.querySelector('.code').textContent === code);
       const shown = doc => [...doc.querySelectorAll('.link-row')].filter(row => !row.closest('li').hidden && row.getClientRects().length).map(row => row.querySelector('.code').textContent).sort().join(',');
-      for (const prefix of ['/', '/project/']) for (const width of [390, 1440]) for (const theme of ['light', 'dark']) {
+      for (const prefix of [${scriptString(prefix)}]) for (const width of [${width}]) for (const theme of ['light', 'dark']) {
         frame.style.width = width + 'px'; localStorage.setItem('shortlink-theme', theme);
         for (const native of [false, true]) {
           frame.setAttribute('sandbox', native ? 'allow-same-origin' : 'allow-same-origin allow-scripts');
@@ -5562,7 +6330,9 @@ test("state rows, selected filters, all-hidden traversal, disabled native action
       document.body.dataset.stateCheck = 'passed';
     } catch (error) { document.body.dataset.stateCheck = error.message; } })();
   </script></body></html>`,
-  );
-  const html = runChrome(chrome, f.cwd, origin + "/state-check.html");
-  assert.match(html, /data-state-check="passed"/, html);
-});
+      );
+      const html = runChrome(chrome, f.cwd, origin + "/state-check.html", [
+        "--force-prefers-reduced-motion",
+      ]);
+      assert.match(html, /data-state-check="passed"/, html);
+    });

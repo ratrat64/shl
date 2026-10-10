@@ -124,6 +124,18 @@ Folder summaries stay on one line and scroll horizontally for long names, preser
 
 Link rows and folder summaries share a 50px minimum height (3.125rem), 10px vertical and 12px horizontal padding (.625rem .75rem), and a 4px radius. Both use the theme wash on hover and focus-within; broken enabled rows instead use a 6% orange-red mix with the page background, preserving dimmed metadata contrast. Preserve visible focus outlines; folder wash applies only to the summary, never its descendant list. Revealed hidden links retain their regular/broken/disabled colors and weights with row/tag opacity 80% dark and 94% light. Hidden-only summaries dim independently without dimming descendants again. Keyboard focus restores full opacity. Keep full state tags; do not add duplicate hidden or SCRIPT labels.
 
+## Interaction motion
+
+Shared row/folder highlights and enabled button/tag fills and borders transition over 140ms with ease-out. Available and selected filter chips fade in when they appear; native tag popovers and shared copy/download feedback use the same 240ms entrance. Fine-pointer destination hover reveals fade over 220ms; keyboard reveal and coarse/hybrid-pointer visibility remain immediate.
+
+Show/Hide tags has a fixed 6.5rem width. The enhanced toolbar reserves the 4rem selected-track height, including native scrollbar space, before any chip is selected. On narrow layouts that slot stays above search; search, toggle and available catalog keep their positions when selections change. Both chip tracks retain the same minimum height through long-label overflow and the all-selected message. Empty selected tracks remain hidden, and hiding the available picker still collapses its row. No-JavaScript tools keep their compact flow.
+
+The count label reserves a fixed 5ch width, so filtering (including singular/plural flips) never resizes the search field. Buttons acknowledge presses with a deeper fill and a subtle scale, using the shared highlight easing. Opening or closing the tag picker slides the content below the toolbar to its new position over 240ms with ease-out; sliding content ignores pointer input in flight and restores it on finish, cancellation, or cleanup, so taps land on the controls visible beneath passing rows. Reduced motion skips the slide and toggles instantly.
+
+Changing the live count updates its text and singular/plural label immediately, then animates only the new number with a small upward-offset-to-rest fade over 240ms. Repeated edits restart that animation without delaying filtering or announcing intermediate numbers. In-app page replacement fades incoming main content over 280ms; shell identity and chrome remain stationary, and title/history/focus update immediately. Same-page fragments do not restart content motion. Completed and cancelled count/content entrances clear their transient markers.
+
+Reduced-motion mode removes these effects. Theme changes switch inks and surfaces together rather than interpolating hover fills across palettes. Shared CSS owns timing, easing and keyframes; browser state owners trigger only count changes and page entrances.
+
 ## Do's and Don'ts
 
 ### Do:

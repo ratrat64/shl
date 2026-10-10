@@ -110,14 +110,35 @@
       target.addEventListener(name, handle);
       listeners.push(() => target.removeEventListener(name, handle));
     };
+    let pickerMotion = [];
+    const cancelPickerMotion = () => {
+      for (const animation of pickerMotion) {
+        try {
+          animation.cancel();
+        } catch {}
+      }
+      pickerMotion = [];
+    };
     globalThis.cleanupSearch = () => {
       active = false;
+      cancelPickerMotion();
       for (const remove of listeners) remove();
       globalThis.cleanupSearch = null;
       globalThis.pauseSearch = globalThis.resumeSearch = null;
     };
     input.parentElement.hidden = false;
     if (!toggle.disabled) toggle.hidden = false;
+    countLabel
+      .querySelector(".count-number")
+      .classList.remove("count-changing");
+    for (const name of ["animationend", "animationcancel"])
+      listen(countLabel, name, (event) => {
+        if (
+          event.animationName === "count-change" &&
+          !event.target.getAnimations().length
+        )
+          event.target.classList.remove("count-changing");
+      });
 
     function filter(group, query, revealHidden, active, path = "") {
       let count = 0;
@@ -175,12 +196,19 @@
       list.parentElement.hidden = !count;
       const number = countLabel.querySelector(".count-number");
       const label = countLabel.querySelector(".count-label");
+      const changed = number.textContent !== String(count);
       number.textContent = count;
       label.textContent =
         " " +
         (count === 1
           ? countLabel.dataset.labelSingular
           : countLabel.dataset.labelPlural);
+      if (changed && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        number.classList.remove("count-changing");
+        // Commit the resting style so rapid edits restart the CSS-owned animation.
+        void getComputedStyle(number).animationName;
+        number.classList.add("count-changing");
+      }
     }
     function chips() {
       selected.hidden = !selections.size;
@@ -242,8 +270,86 @@
         : toggle.dataset.labelExpanded;
     }
     listen(toggle, "click", () => {
+      // Slide content below the toolbar with the picker: record positions,
+      // toggle synchronously (state/AT/tests observe hidden immediately),
+      // then play a FLIP transform so the list glides to its new spot.
+      // Movers ignore pointer input in flight so taps land on the controls
+      // visible beneath them instead of on passing rows.
+      const section = toggle.closest?.("section");
+      const tools = toggle.closest?.(".directory-tools");
+      const below =
+        section && tools
+          ? [...section.children].filter(
+              (element) =>
+                element !== tools &&
+                element.tagName !== "TEMPLATE" &&
+                !element.hidden &&
+                element.getClientRects?.().length,
+            )
+          : [];
+      const before = below.map((element) => {
+        const rect = element.getBoundingClientRect();
+        return { x: rect.left, y: rect.top };
+      });
+      cancelPickerMotion();
       picker(available.hidden);
       save();
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      // Timing stays owned by shared CSS; WAAPI just consumes the tokens.
+      const tokens = getComputedStyle(document.documentElement);
+      const duration =
+        Number.parseFloat(tokens.getPropertyValue("--motion-duration")) || 240;
+      const easing =
+        tokens.getPropertyValue("--motion-easing").trim() || "ease-out";
+      try {
+        below.forEach((element, index) => {
+          if (typeof element.animate !== "function") return;
+          const after = element.getBoundingClientRect();
+          const dx = before[index].x - after.left;
+          const dy = before[index].y - after.top;
+          if (!dx && !dy) return;
+          let animation;
+          try {
+            animation = element.animate(
+              [
+                { transform: `translate(${dx}px, ${dy}px)` },
+                { transform: "none" },
+              ],
+              { duration, easing, id: "picker-slide" },
+            );
+          } catch {
+            return;
+          }
+          element.style.pointerEvents = "none";
+          // A newer flight re-suppresses first; only the last one restores.
+          const release = () => {
+            if (
+              element
+                .getAnimations()
+                .some(
+                  (other) =>
+                    other.id === "picker-slide" &&
+                    other.playState !== "finished" &&
+                    other.playState !== "idle",
+                )
+            )
+              return;
+            element.style.pointerEvents = "";
+          };
+          animation.finished.then(release, release);
+          pickerMotion.push(animation);
+        });
+        if (pickerMotion.length)
+          Promise.allSettled(
+            pickerMotion.map((animation) => animation.finished),
+          ).then(() => {
+            pickerMotion = pickerMotion.filter(
+              (animation) =>
+                animation.playState !== "finished" &&
+                animation.playState !== "idle",
+            );
+          });
+      } catch {}
     });
 
     function tokens(enter = false, defer = composing) {

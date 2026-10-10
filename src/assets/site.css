@@ -18,6 +18,10 @@
   --disabled-bg: light-dark(#f7f7f7, #000);
   --disabled-wash: light-dark(#ebebeb, #181818);
   --wash: light-dark(#e8eeeb, #111b16);
+  --motion-duration: 240ms;
+  --motion-highlight-duration: 140ms;
+  --tag-track-height: 4rem;
+  --motion-easing: ease-out;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -153,6 +157,18 @@ button {
     var(--bg)
   );
 }
+.theme-toggle:active:not(:disabled),
+.visit:active:not(:disabled),
+.download:active:not(:disabled),
+.tags:active,
+.tag-chip:active {
+  background: color-mix(
+    in srgb,
+    var(--button-tone, var(--accent)) 26%,
+    var(--bg)
+  );
+}
+
 .theme-toggle:disabled,
 .visit:disabled,
 .download:disabled {
@@ -221,6 +237,8 @@ p {
   display: inline-block;
 }
 .count-label {
+  display: inline-block;
+  min-width: 6ch;
   white-space: nowrap;
 }
 .directory-actions {
@@ -230,6 +248,13 @@ p {
   gap: 0.65rem;
   flex: 1;
   min-width: 0;
+}
+.directory-actions:has(.search:not([hidden])) {
+  grid-template-rows: minmax(var(--tag-track-height), auto);
+}
+#tag-toggle {
+  inline-size: 6.5rem;
+  flex-shrink: 0;
 }
 .directory-toggles {
   grid-column: 3;
@@ -247,6 +272,8 @@ p {
 }
 .tag-track {
   display: flex;
+  align-items: center;
+  min-block-size: var(--tag-track-height);
   gap: 0.5rem;
   overflow-x: auto;
   overscroll-behavior-x: contain;
@@ -693,6 +720,21 @@ main.minimal-document {
   .directory-toggles {
     grid-column: 1;
   }
+  .directory-actions:has(.search:not([hidden])) #selected-tags {
+    grid-row: 1;
+  }
+  .directory-actions:has(.search:not([hidden])) .search {
+    grid-row: 2;
+  }
+  .directory-actions:has(.search:not([hidden])) .directory-toggles {
+    grid-row: 3;
+  }
+  .directory-actions:has(.search:not([hidden])) #available-tags {
+    grid-row: 4;
+  }
+  .directory-actions:has(.search:not([hidden])) #tag-error {
+    grid-row: 5;
+  }
   .link-row {
     gap: 0.5rem;
   }
@@ -716,6 +758,70 @@ main.minimal-document {
     grid-template-columns:
       max-content max-content minmax(3rem, 1fr)
       max-content max-content;
+  }
+}
+@keyframes feedback-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes count-change {
+  from {
+    opacity: 0.45;
+    transform: translateY(-0.15em);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tag-panel:popover-open,
+  .action-feedback p:not(:empty),
+  .tag-chip:not([hidden]) {
+    animation: feedback-appear var(--motion-duration) var(--motion-easing);
+  }
+  .count-number.count-changing {
+    animation: count-change var(--motion-duration) var(--motion-easing);
+  }
+  main[data-app-page][data-entering] {
+    animation: feedback-appear 280ms var(--motion-easing);
+  }
+  .link-row,
+  .links summary,
+  .theme-toggle:not(:disabled),
+  .visit:not(:disabled),
+  .download:not(:disabled),
+  .tags,
+  .tag-label,
+  .tag-chip {
+    transition:
+      background-color var(--motion-highlight-duration) var(--motion-easing),
+      border-color var(--motion-highlight-duration) var(--motion-easing),
+      transform var(--motion-highlight-duration) var(--motion-easing);
+  }
+  .theme-toggle:active:not(:disabled),
+  .visit:active:not(:disabled),
+  .download:active:not(:disabled),
+  .tags:active,
+  .tag-chip:active {
+    transform: scale(0.96);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .link-row:hover .destination {
+      transition: opacity 220ms ease-out;
+    }
+    .link-row:focus-within .destination {
+      transition: none;
+    }
+  }
+  @media (any-pointer: coarse) {
+    .link-row:hover .destination {
+      transition: none;
+    }
   }
 }
 @media (prefers-reduced-motion: reduce) {
