@@ -1004,6 +1004,8 @@ async function browserControls(t, chrome, cwd) {
     "--no-sandbox",
     "--disable-gpu",
     "--remote-debugging-port=0",
+    // Extension load/unload flushes BFCache, including during native restore.
+    "--disable-extensions",
     "--disable-features=OverscrollHistoryNavigation",
     `--user-data-dir=${join(cwd, "keyboard-profile")}`,
     "about:blank",
@@ -1035,6 +1037,8 @@ async function browserControls(t, chrome, cwd) {
   let id = 0;
   socket.onmessage = (event) => {
     const response = JSON.parse(event.data);
+    if (response.method === "Page.backForwardCacheNotUsed")
+      console.error("BFCache not used:", JSON.stringify(response.params));
     if (events.has(response.method)) {
       events.get(response.method)(response.params);
       events.delete(response.method);
