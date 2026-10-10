@@ -871,6 +871,21 @@ main.minimal-document {
   }
 }
 @media (prefers-reduced-motion: no-preference) {
+  /* Fade only the old snapshot: the new page stays live and hit-testable. */
+  :root[data-theme-fading="updated"] {
+    view-transition-name: none;
+  }
+  :root[data-theme-fading]::view-transition {
+    pointer-events: none;
+  }
+  :root[data-theme-fading]::view-transition-group(root) {
+    /* Preserve inherited fill so the old snapshot stays transparent at the end. */
+    animation-name: none;
+  }
+  :root[data-theme-fading]::view-transition-old(root) {
+    animation-duration: var(--motion-duration);
+    animation-timing-function: var(--motion-easing);
+  }
   .tag-panel:popover-open,
   .action-feedback p:not(:empty),
   .tag-chip:not([hidden]) {
