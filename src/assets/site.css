@@ -859,9 +859,6 @@ main.minimal-document {
   from {
     opacity: 0;
   }
-  to {
-    opacity: 1;
-  }
 }
 @keyframes count-change {
   from {

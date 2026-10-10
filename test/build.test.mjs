@@ -1490,8 +1490,26 @@ test("directory motion respects reduced motion, focus, touch and repeated post-n
             const number = document.querySelector('.count-number');
             document.querySelector('#tag-toggle').click();
             const available = document.querySelector('#available-tags button[data-tag=shell]');
+            const settlesWithoutFlash = async animations => {
+              const samples = [];
+              if (animations.length) {
+                const animation = animations[0], duration = animation.effect.getTiming().duration;
+                animation.pause();
+                for (const fraction of [0, .5, .99]) {
+                  animation.currentTime = duration * fraction;
+                  samples.push(Number(getComputedStyle(available).opacity));
+                }
+                animation.play();
+              }
+              await Promise.all(animations.map(a => a.finished));
+              samples.push(Number(getComputedStyle(available).opacity));
+              const interpolates = !animations.length ||
+                (samples[0] === 0 && samples[1] > 0 && samples[1] < .7);
+              return interpolates && samples.at(-1) === .7 && samples.every((opacity, i) =>
+                opacity <= .7 && (i === 0 || opacity >= samples[i - 1]));
+            };
             const entrance = available.getAnimations().filter(a => a.animationName === 'feedback-appear');
-            await Promise.all(entrance.map(a => a.finished));
+            const openingWithoutFlash = await settlesWithoutFlash(entrance);
             available.click();
             const selected = document.querySelector('#selected-tags button');
             const selectedEntrance = selected.getAnimations().filter(a => a.animationName === 'feedback-appear');
@@ -1518,9 +1536,25 @@ test("directory motion respects reduced motion, focus, touch and repeated post-n
             input.value = ''; input.dispatchEvent(new Event('input'));
             selected.click();
             const returned = available.getAnimations().filter(a => a.animationName === 'feedback-appear');
+            const returningWithoutFlash = await settlesWithoutFlash(returned);
+            // Focus during a fresh entrance must change its final opacity too.
+            document.querySelector('#tag-toggle').click();
+            document.querySelector('#tag-toggle').click();
+            const focusedEntrance = available.getAnimations().find(a => a.animationName === 'feedback-appear');
+            if (focusedEntrance) {
+              focusedEntrance.pause(); focusedEntrance.currentTime = 120;
+            }
+            available.focus();
+            if (focusedEntrance) focusedEntrance.play();
+            await Promise.all(available.getAnimations().map(a => a.finished));
+            const focusedOpacity = getComputedStyle(available).opacity;
+            input.focus();
+            await Promise.all(available.getAnimations().map(a => a.finished));
+            const blurredOpacity = getComputedStyle(available).opacity;
             await Promise.all(number.getAnimations().map(a => a.finished));
             await new Promise(r => requestAnimationFrame(r));
             return { entrance: entrance.length, selected: selectedEntrance.length, returned: returned.length,
+              openingWithoutFlash, returningWithoutFlash, focusedOpacity, blurredOpacity,
               chipIntermediate, countIntermediate, cleared: !number.classList.contains('count-changing'),
               countAnimated: !!first, restarted: !!restarted, immediate, zero, restored: number.textContent === '3' };
           })()`);
@@ -1530,6 +1564,10 @@ test("directory motion respects reduced motion, focus, touch and repeated post-n
               entrance: motion === "reduce" ? 0 : 1,
               selected: motion === "reduce" ? 0 : 1,
               returned: motion === "reduce" ? 0 : 1,
+              openingWithoutFlash: true,
+              returningWithoutFlash: true,
+              focusedOpacity: "1",
+              blurredOpacity: "0.7",
               countAnimated: motion !== "reduce",
               restarted: motion !== "reduce",
               chipIntermediate: motion !== "reduce",
