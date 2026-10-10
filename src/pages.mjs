@@ -6,6 +6,7 @@ import {
   GUIDE_NAV,
   pageTitle,
 } from "./layout.mjs";
+import { guideExampleListing } from "./directory.mjs";
 
 const shellString = (value) => "'" + value.replace(/'/g, "'\\''") + "'";
 
@@ -99,119 +100,76 @@ export const guidePage = (source) =>
             JSON or YAML; GitHub Pages hosts the site. No database or built-in
             click tracking.
           </li>
-          <li>
-            <strong>Your theme.</strong> Follow system light/dark mode or save
-            your own choice.
-          </li>
         </ul>
       </section>
       <section id="how-to-use">
         <h2>How to use</h2>
-        <ol>
-          <li>
-            Create a repository with these files and a <code>main</code> branch.
-            In Settings → Pages, choose <strong>GitHub Actions</strong> as
-            Source.
-          </li>
-          <li>
-            Edit <code>${esc(source)}</code> on a branch. Use absolute HTTP(S)
-            destinations:
-          </li>
-        </ol>
-        <pre><code>${esc(
-          source === "links.json"
-            ? JSON.stringify(
-                {
-                  gh: "https://github.com/",
-                  docs: {
-                    url: "https://docs.github.com/en/pages",
-                    title: "GitHub Pages docs",
-                    tags: ["documentation"],
-                  },
-                },
-                null,
-                2,
-              )
-            : `gh: https://github.com/
+        <p>
+          This site builds from <code>${esc(source)}</code>. Keep exactly one
+          link file with absolute HTTP(S) destinations.
+        </p>
+        <h3>links.yaml</h3>
+        <pre data-format="yaml"><code>${esc(
+          `gh: https://github.com/
 docs:
   url: https://docs.github.com/en/pages
   title: GitHub Pages docs
   tags: [documentation]`,
         )}</code></pre>
-        <ol start="3">
-          <li>
-            Open a pull request, pass checks, and merge. After deployment, use
-            <code>https://&lt;user&gt;.github.io/&lt;repo&gt;/gh/</code>.
-          </li>
-        </ol>
-        <p>
-          Edit a URL to retarget its code; delete an entry to remove it. Nest
-          entries for folders.
-        </p>
-        <p>
-          Plain text searches as one broad substring. Use Show tags to select
-          filters, or commit <code>#tag</code> with space, comma or Enter. Every
-          selected tag and the remaining text must match. Remove a selected tag
-          to return it to the picker. Unknown tokens remain with “Tag not
-          found”. Configured tags must not contain whitespace, commas, Unicode
-          uppercase/titlecase characters or emoji (including flags and keycaps).
-          Explicitly rename invalid names; the build never lowercases or strips
-          them automatically. Lowercase/uncased languages, digits and ordinary
-          punctuation remain valid. Uppercase search tokens still match known
-          lowercase names.
-        </p>
-        <p>
-          Descriptive tags use stable light/dark HSL inks generated from their
-          string seeds. Broken, script and disabled tags reuse shared link-state
-          colors; hidden uses theme-aware neutral gray. All labels and filter
-          chips keep matching tinted backgrounds and borders. There is no finite
-          palette or unique-color promise; row-state precedence remains
-          separate.
-        </p>
-        <p>
-          Add <code>script</code> to <code>tags</code> for a
-          <code>&lt;path&gt;.sh</code> launcher. Use exact casing, no trailing
-          slash, and only scripts you trust. See the
-          <a href="https://github.com/ratrat64/shl#running-bash-scripts"
-            >script commands</a
-          >.
-        </p>
-        <p>
-          Download saves the current destination script, not the Bash launcher,
-          without executing it. It needs JavaScript and a destination host that
-          allows CORS. Failed requests show a download error and save no file.
-          The filename comes from the destination URL, falling back to
-          <code>&lt;code&gt;.sh</code> when no usable basename exists.
-        </p>
-        <p>Add state names to a link object's <code>tags</code>:</p>
+        <h3>links.json</h3>
+        <pre data-format="json"><code>${esc(
+          JSON.stringify(
+            {
+              gh: "https://github.com/",
+              docs: {
+                url: "https://docs.github.com/en/pages",
+                title: "GitHub Pages docs",
+                tags: ["documentation"],
+              },
+            },
+            null,
+            2,
+          ),
+        )}</code></pre>
         <ul>
           <li>
-            <code>hidden</code> omits it from default listings, counts and
-            search.
+            Edit a URL to retarget its code; delete an entry to remove it. Nest
+            entries for folders.
           </li>
-          <li><code>broken</code> adds a warning without blocking actions.</li>
           <li>
-            <code>disabled</code> shows an explanation instead of forwarding;
-            Open, Download and script execution are blocked. Both URLs remain
-            copyable.
+            Search matches codes, titles, destinations and tags as one broad
+            substring. Pick tags with Show tags, or type
+            <code>#tag</code> plus space, comma or Enter; every selection must
+            match. Unknown tokens show “Tag not found”.
+          </li>
+          <li>
+            Tag names must not contain whitespace, commas, uppercase/titlecase
+            characters or emoji; the build rejects them for explicit renaming.
           </li>
         </ul>
+        <h3>Script links</h3>
         <p>
-          State names match exactly, ignoring case. The old
-          <code>hidden</code> and <code>script</code> properties are rejected.
+          Add <code>script</code> to <code>tags</code> for a
+          <code>&lt;path&gt;.sh</code> launcher (exact casing, trusted scripts
+          only). Download saves the destination script without running it; it
+          needs JavaScript and a host that allows CORS.
         </p>
-        <p>
-          Selecting hidden, broken or disabled admits only matching hidden links
-          and their ancestors, still constrained by all filters. Selecting
-          script alone never reveals hidden links. Show tags includes all
-          subtree tags, even at zero results. Clearing text or hiding the picker
-          retains selections. Search text, ordered selected tags and picker
-          visibility persist across directories, Guide, 404, reload and
-          Back/Forward for this browser-tab session, independently per site
-          base. Tags absent from a directory remain removable filters and can
-          yield zero matches. If session storage is unavailable, in-app
-          navigation retains document-memory state.
-        </p>
+        <h3>Special tags</h3>
+        <p>Examples use placeholder destinations.</p>
+        ${guideExampleListing()}
+        <ul>
+          <li>
+            <code>hidden</code> looks dimmed here; it is omitted from listings,
+            counts and search unless a selected hidden, broken or disabled tag
+            admits it. Script alone never reveals hidden links.
+          </li>
+          <li><code>broken</code> warns without blocking actions.</li>
+          <li>
+            <code>disabled</code> shows an explanation instead of forwarding;
+            Open and Download are unavailable, but both URLs stay copyable.
+          </li>
+          <li><code>script</code> shows Download alongside Open.</li>
+        </ul>
         <p>
           Search, copying and tag filters need JavaScript. Without it, enabled
           visible links still open normally.
@@ -219,15 +177,25 @@ docs:
       </section>
       <section id="how-it-works">
         <h2>How it works</h2>
+        <ol>
+          <li>Edit the link file on a branch.</li>
+          <li>
+            Open a pull request; checks validate codes, destinations, collisions
+            and tags, then build.
+          </li>
+          <li>
+            Merge to <code>main</code>; Actions rebuilds and publishes
+            <code>dist/</code> to GitHub Pages.
+          </li>
+          <li>
+            Open a short URL; the browser forwards to its destination.
+            Wrong-case paths fall back to 404 recovery.
+          </li>
+        </ol>
         <p>
-          The build validates codes and URL syntax, then generates directory and
-          redirect or disabled pages. Merges to <code>main</code> deploy through
-          GitHub Actions; the 404 page recovers differently capitalized paths.
-        </p>
-        <p>
-          All destinations are public; hiding or disabling does not block access
-          outside shl. Redirects happen in the browser, not through HTTP 301/302
-          responses; destination reachability is not checked.
+          All destinations stay public; hiding or disabling never blocks access
+          outside shl. Redirects run in the browser, not as HTTP 301/302
+          responses; reachability is not checked.
         </p>
         <p>
           See the

@@ -4963,9 +4963,18 @@ test("information pages use relative navigation and shared theme assets", async 
     if (formatFixture !== f) assert.equal(formatFixture.build().status, 0);
     const guide = await formatFixture.read("guide/index.html");
     assert.ok(guide.includes(`<code>${source}</code>`));
+    const format = source === "links.json" ? "json" : "yaml";
     const sample = guide
-      .match(/<pre><code>([\s\S]*?)<\/code><\/pre>/)[1]
-      .replaceAll("&quot;", '"');
+      .match(
+        new RegExp(
+          `<pre data-format="${format}"><code>([\\s\\S]*?)</code></pre>`,
+        ),
+      )[1]
+      .replaceAll("&quot;", '"')
+      .replaceAll("&#39;", "'")
+      .replaceAll("&lt;", "<")
+      .replaceAll("&gt;", ">")
+      .replaceAll("&amp;", "&");
     const sampleFixture = await fixture(
       t,
       source === "links.json" ? JSON.parse(sample) : sample,
@@ -4975,6 +4984,14 @@ test("information pages use relative navigation and shared theme assets", async 
     const map = JSON.parse(await sampleFixture.read("links.json"));
     assert.equal(map.gh, "https://github.com/");
     assert.deepEqual(map.docs.tags, ["documentation"]);
+    for (const code of [
+      "hidden-demo",
+      "broken-demo",
+      "disabled-demo",
+      "script-demo",
+    ])
+      assert.ok(guide.includes(code), code + " example renders");
+    assert.match(guide, /guide-examples/);
   }
   assert.match(
     await f.read("aboutme/index.html"),
