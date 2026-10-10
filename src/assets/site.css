@@ -697,6 +697,19 @@ button.destination:has(.destination-end:empty) .destination-start {
 .prose strong {
   color: var(--ink);
 }
+.prose ul.links,
+.prose ul.links li {
+  padding-left: 0;
+  margin-bottom: 0;
+  list-style: none;
+}
+.prose ul.links {
+  padding: 0;
+  margin: 1rem 0;
+}
+.prose ul.links li {
+  color: inherit;
+}
 pre {
   overflow-x: auto;
   background: var(--panel);

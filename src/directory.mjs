@@ -115,6 +115,31 @@ const listing = (nodes) =>
     ${nodes.map((node) => (node.isDirectory ? renderDirectoryNode(node) : renderLinkRow(node))).join("")}
   </ul>`;
 
+export const guideExampleListing = () => {
+  const nodes = entryTree({
+    "hidden-demo": {
+      url: "https://example.com/hidden-demo",
+      tags: ["hidden"],
+    },
+    "broken-demo": {
+      url: "https://example.com/broken-demo",
+      tags: ["broken"],
+    },
+    "disabled-demo": {
+      url: "https://example.com/disabled-demo",
+      tags: ["disabled"],
+    },
+    "script-demo": {
+      url: "https://example.com/setup.sh",
+      title: "Setup script",
+      tags: ["script"],
+    },
+  });
+  return listing(nodes)
+    .replaceAll('data-hidden="true" hidden', 'data-hidden="true"')
+    .replace('<ul class="links">', '<ul class="links guide-examples">');
+};
+
 const searchableListing = () =>
   /* HTML */ `<div class="search" hidden>
     <label class="sr-only" for="link-search">Search links</label>
