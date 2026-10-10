@@ -20,7 +20,11 @@
   if (!button) return;
   const update = () => {
     const state = root.dataset.theme || "system";
-    button.textContent = button.getAttribute("data-label-" + state);
+    const label = button.querySelector(".btn-label");
+    if (label) label.textContent = button.getAttribute("data-label-" + state);
+    button.setAttribute("aria-label", "Theme: " + state);
+    for (const icon of button.querySelectorAll("[data-theme-icon]"))
+      icon.hidden = icon.getAttribute("data-theme-icon") !== state;
   };
   update();
   button.addEventListener("click", () => {

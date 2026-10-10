@@ -22,9 +22,16 @@ export const GUIDE_NAV = NAV_ITEMS.find(({ key }) => key === "guide");
 
 const countLabels = { singular: "Link", plural: "Links" };
 const themeLabels = {
-  system: "Theme: system",
-  light: "Theme: light",
-  dark: "Theme: dark",
+  system: "system",
+  light: "light",
+  dark: "dark",
+};
+export const iconSvgAttrs =
+  'viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
+const themeIcons = {
+  system: `<svg ${iconSvgAttrs}><rect x="2.5" y="3" width="11" height="7.5" rx="1"/><path d="M6.5 13.5h3M8 10.5v3"/></svg>`,
+  light: `<svg ${iconSvgAttrs}><circle cx="8" cy="8" r="2.8"/><path d="M8 1.8v1.4M8 12.8v1.4M1.8 8h1.4M12.8 8h1.4M3.6 3.6l1 1M11.4 11.4l1 1M12.4 3.6l-1 1M4.6 11.4l-1 1"/></svg>`,
+  dark: `<svg ${iconSvgAttrs}><path d="M13.5 8.5A5.5 5.5 0 1 1 7.5 2.5a4.5 4.5 0 0 0 6 6z"/></svg>`,
 };
 
 export const pageTitle = (title, count) => /* HTML */ `
@@ -51,9 +58,14 @@ const header = (active, depth) =>
           .map(([state, label]) => `data-label-${state}="${esc(label)}"`)
           .join(" ")}
         type="button"
-        aria-label="Change color theme"
+        aria-label="Theme: ${esc(themeLabels.system)}"
       >
-        ${themeLabels.system}
+        ${Object.entries(themeIcons)
+          .map(
+            ([state, icon]) =>
+              `<span data-theme-icon="${state}"${state === "system" ? "" : " hidden"}>${icon}</span>`,
+          )
+          .join("")}<span class="btn-label">${esc(themeLabels.system)}</span>
       </button>
     </div>
   </header>`;

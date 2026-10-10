@@ -20,9 +20,21 @@ import { tagColors, indexPage } from "../src/directory.mjs";
 
 function themeLabelAttributes(html) {
   const control = html.match(/<button\b[^>]*data-theme-control[^>]*>/)[0];
+  const getAttribute = (name) =>
+    control.match(new RegExp(`${name}="([^"]*)"`))?.[1] ?? null;
+  const label = { textContent: getAttribute("data-label-system") ?? "" };
+  const icons = ["system", "light", "dark"].map((state) => ({
+    hidden: state !== "system",
+    getAttribute: (name) => (name === "data-theme-icon" ? state : null),
+  }));
   return {
-    getAttribute: (name) =>
-      control.match(new RegExp(`${name}="([^"]*)"`))?.[1] ?? null,
+    getAttribute,
+    querySelector: (selector) => (selector === ".btn-label" ? label : null),
+    querySelectorAll: (selector) =>
+      selector === "[data-theme-icon]" ? icons : [],
+    setAttribute(name, value) {
+      this.attributes = { ...(this.attributes ?? {}), [name]: value };
+    },
   };
 }
 
@@ -2365,7 +2377,10 @@ test("homepage lists sorted links safely with project-relative URLs and handles 
     /<h1 id="link-count" class="page-title" aria-live="polite" aria-atomic="true"[^>]*>\s*<span class="count-number">0<\/span\s*><span class="count-label"> Links<\/span>\s*<\/h1>/,
   );
   assert.equal([...emptyHtml.matchAll(/<h1\b/g)].length, 1);
-  assert.match(emptyHtml, /id="tag-toggle"[^>]*disabled\s*>\s*Show tags/);
+  assert.match(
+    emptyHtml,
+    /id="tag-toggle"[^>]*aria-label="Show tags"[^>]*disabled/,
+  );
   assert.match(emptyHtml, /No links available yet\./);
 });
 
@@ -2398,7 +2413,7 @@ test("nested JSON and YAML build themed directory pages and redirects", async (t
   for (const page of [home, tools])
     assert.match(
       page,
-      /<div class="directory-toggles">\s*<button\s+id="tag-toggle"[^>]*disabled\s*>\s*Show tags\s*<\/button>\s*<\/div>/,
+      /<div class="directory-toggles">\s*<button\s+id="tag-toggle"[^>]*aria-label="Show tags"[^>]*disabled[^>]*>[\s\S]*?<svg[\s\S]*?<span class="btn-label">tags<\/span>[\s\S]*?<svg class="chev"[\s\S]*?<\/button>\s*<\/div>/,
     );
   assert.match(
     home,
@@ -2830,7 +2845,8 @@ for (const prefix of ["/", "/project/"])
       "assets/recovery.js",
       "assets/navigation.js",
     ]);
-    assert.equal(themeButton.textContent, "Theme: dark");
+    assert.equal(themeButton.querySelector(".btn-label").textContent, "dark");
+    assert.equal(themeButton.attributes["aria-label"], "Theme: dark");
     assert.equal(typeof themeButton.click, "function");
     assert.equal(brand.href, base);
     assert.equal(guide.href, base + "guide/");
@@ -3348,7 +3364,7 @@ test("hidden links and hidden-only folders are hidden by default but keep their 
     );
     assert.match(
       html,
-      /id="tag-toggle"[^>]*aria-expanded="false"[^>]*hidden\s*>\s*Show tags/,
+      /id="tag-toggle"[^>]*aria-expanded="false"[^>]*aria-label="Show tags"[^>]*hidden/,
     );
     assert.doesNotMatch(html, /data-visible=|data-total=/);
     assert.match(
@@ -3410,7 +3426,7 @@ test("hidden links and hidden-only folders are hidden by default but keep their 
     );
     assert.match(html, /<p id="empty-directory">No links listed here\.<\/p>/);
     assert.match(html, /<div hidden><ul class="links">/);
-    assert.match(html, /id="tag-toggle"[^>]*hidden\s*>\s*Show tags/);
+    assert.match(html, /id="tag-toggle"[^>]*aria-label="Show tags"[^>]*hidden/);
     assert.match(html, /id="link-search"/);
   }
   assert.match(
@@ -3477,7 +3493,7 @@ test("long destinations keep their trailing path beside single-line short codes"
   );
   assert.match(
     html,
-    /class="destination-end" aria-hidden="true">oh-my-posh\/setup\.sh<\/span><\/a><\/div><span class="link-actions"><a class="visit" href="https:\/\/raw\.githubusercontent\.com\/ratrat64[^>]*>Open<\/a><\/span>/,
+    /class="destination-end" aria-hidden="true">oh-my-posh\/setup\.sh<\/span><\/a><\/div><span class="link-actions"><a class="visit" href="https:\/\/raw\.githubusercontent\.com\/ratrat64[^>]*><svg[\s\S]*?<span class="btn-label">Open<\/span><\/a><\/span>/,
   );
   assert.doesNotMatch(html, /class="link-title"/);
 });
@@ -3506,7 +3522,7 @@ test("directory clicks copy full short or long URLs while Open follows the desti
     );
     assert.match(
       html,
-      /class="visit" href="https:\/\/example\.com\/a\/b\/setup\.sh\?q=&lt;tag&gt;&amp;x=&#39;&quot;"[^>]*>Open<\/a>/,
+      /class="visit" href="https:\/\/example\.com\/a\/b\/setup\.sh\?q=&lt;tag&gt;&amp;x=&#39;&quot;"[^>]*><svg[\s\S]*?<span class="btn-label">Open<\/span><\/a>/,
     );
 
     const copied = [];
@@ -4021,6 +4037,10 @@ test("destination download filenames are safe and shared by nested listings", as
       const html = await f.read(page);
       assert.ok(html.includes(`data-download-name="${filename}"`), url);
       assert.match(html, /class="download" disabled/);
+      assert.match(
+        html,
+        /<button type="button" class="download" disabled[^>]*><svg[\s\S]*?<span class="btn-label">Download<\/span><\/button>/,
+      );
       assert.doesNotMatch(html, /class="download" href=/);
       assert.match(html, /download-status[^>]*role="status"/);
     }
@@ -4055,7 +4075,10 @@ test("search filters nested links on the homepage and directory pages", async (t
       new RegExp(`src="${depth.replaceAll(".", "\\.")}assets/search\\.js"`),
     );
     assert.match(html, /id="search-status"[^>]*role="status" hidden/);
-    assert.match(html, /id="tag-toggle"[^>]*disabled\s*>\s*Show tags/);
+    assert.match(
+      html,
+      /id="tag-toggle"[^>]*aria-label="Show tags"[^>]*disabled/,
+    );
   }
 
   runInNewContext((await f.read("assets/search.js")) + "\ninitSearch();", {
@@ -4274,7 +4297,15 @@ test("information pages use relative navigation and shared theme assets", async 
     },
   });
   assert.equal(root.dataset.theme, "dark");
-  assert.equal(button.textContent, "Theme: dark");
+  assert.equal(button.querySelector(".btn-label").textContent, "dark");
+  assert.equal(button.attributes["aria-label"], "Theme: dark");
+  assert.deepEqual(
+    button
+      .querySelectorAll("[data-theme-icon]")
+      .filter((icon) => !icon.hidden)
+      .map((icon) => icon.getAttribute("data-theme-icon")),
+    ["dark"],
+  );
   assert.match(
     await f.read("guide/index.html"),
     /github\.com\/ratrat64\/shl#readme/,
@@ -4409,6 +4440,10 @@ test("every document shares theme foundations, including minimal forwards and as
       assert.match(html, /<header class="site-head">/);
       assert.match(html, /<footer class="footer">/);
       assert.match(html, /data-theme-control/);
+      assert.match(html, /data-theme-icon="system"/);
+      assert.match(html, /data-theme-icon="light" hidden/);
+      assert.match(html, /data-theme-icon="dark" hidden/);
+      assert.match(html, /<span class="btn-label">system<\/span>/);
     }
   }
   for (const saved of ["light", "dark", "invalid", null, "blocked"]) {
@@ -4445,12 +4480,30 @@ test("every document shares theme foundations, including minimal forwards and as
       );
       if (control) {
         assert.equal(
-          button.textContent,
+          button.querySelector(".btn-label").textContent,
+          root.dataset.theme || "system",
+        );
+        assert.equal(
+          button.attributes["aria-label"],
           "Theme: " + (root.dataset.theme || "system"),
         );
         button.click();
         assert.equal(root.dataset.theme, saved === "light" ? "dark" : "light");
-        assert.equal(button.textContent, "Theme: " + root.dataset.theme);
+        assert.equal(
+          button.querySelector(".btn-label").textContent,
+          root.dataset.theme,
+        );
+        assert.equal(
+          button.attributes["aria-label"],
+          "Theme: " + root.dataset.theme,
+        );
+        assert.deepEqual(
+          button
+            .querySelectorAll("[data-theme-icon]")
+            .filter((icon) => !icon.hidden)
+            .map((icon) => icon.getAttribute("data-theme-icon")),
+          [root.dataset.theme],
+        );
       }
     }
   }
@@ -4549,7 +4602,11 @@ test("shared shell renders consistently across direct/native loads and app navig
           });
         });
         const equal = (actual, expected, label) => {
-          if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+          // Round sub-pixel geometry to 0.001px: SVG bboxes measured on
+          // scrolled pages carry ~1e-5 float dust that exact comparison
+          // would flag as a visual change. Still catches every visible shift.
+          const snap = (value) => JSON.stringify(value, (key, v) => (typeof v === "number" ? Math.round(v * 1000) / 1000 : v));
+          if (snap(actual) !== snap(expected)) {
            const a = [actual].flat(2), b = [expected].flat(2);
             const index = a.findIndex((value, i) => JSON.stringify(value) !== JSON.stringify(b[i]));
             throw new Error('Chrome mismatch: ' + label + ' node ' + index + ': ' + JSON.stringify(a[index]) + ' expected ' + JSON.stringify(b[index]));
@@ -4562,9 +4619,9 @@ test("shared shell renders consistently across direct/native loads and app navig
             equal(title.querySelector('.count-label').textContent, ' ' + (count === 1 ? title.dataset.labelSingular : title.dataset.labelPlural), 'static count label metadata');
           }
           const toggle = doc.querySelector('#tag-toggle');
-          if (toggle) equal(toggle.textContent.trim(), toggle.getAttribute('aria-expanded') === 'true' ? toggle.dataset.labelExpanded : toggle.dataset.labelCollapsed, 'picker label metadata');
+          if (toggle) equal(toggle.getAttribute('aria-label'), toggle.getAttribute('aria-expanded') === 'true' ? toggle.dataset.labelExpanded : toggle.dataset.labelCollapsed, 'picker label metadata');
           const theme = doc.querySelector('[data-theme-control]');
-          equal(theme.textContent.trim(), theme.getAttribute('data-label-' + (native ? 'system' : doc.documentElement.dataset.theme || 'system')), 'static theme label metadata');
+          equal(theme.querySelector('.btn-label').textContent.trim(), theme.getAttribute('data-label-' + (native ? 'system' : doc.documentElement.dataset.theme || 'system')), 'static theme label metadata');
           const routes = [...doc.querySelectorAll('[data-nav]')];
           const guide = routes.find(link => link.dataset.nav === 'guide');
           const footerGuide = doc.querySelector('.footer [data-site-path]');
@@ -4592,11 +4649,11 @@ test("shared shell renders consistently across direct/native loads and app navig
           }
           for (const expanded of [true, false]) {
             toggle.click();
-            equal([toggle.textContent, toggle.getAttribute('aria-expanded')], [expanded ? toggle.dataset.labelExpanded : toggle.dataset.labelCollapsed, String(expanded)], 'picker consumes published labels');
+            equal([toggle.getAttribute('aria-label'), toggle.getAttribute('aria-expanded')], [expanded ? toggle.dataset.labelExpanded : toggle.dataset.labelCollapsed, String(expanded)], 'picker consumes published labels');
           }
           for (let n = 0; n < 2; n++) {
             theme.click();
-            equal(theme.textContent, theme.getAttribute('data-label-' + doc.documentElement.dataset.theme), 'theme consumes published labels');
+            equal(theme.querySelector('.btn-label').textContent, theme.getAttribute('data-label-' + doc.documentElement.dataset.theme), 'theme consumes published labels');
           }
           [title.dataset.labelSingular, title.dataset.labelPlural, toggle.dataset.labelCollapsed, toggle.dataset.labelExpanded, theme.dataset.labelLight, theme.dataset.labelDark] = saved;
           search.dispatchEvent(new win.Event('input', { bubbles: true }));
@@ -4618,6 +4675,18 @@ test("shared shell renders consistently across direct/native loads and app navig
         };
         const controlStates = doc => {
           const win = frame.contentWindow, button = doc.querySelector('[data-theme-control]');
+          const icons = [...button.querySelectorAll('[data-theme-icon]')].filter(icon => !icon.hidden);
+          if (icons.length !== 1 || icons[0].dataset.themeIcon !== (doc.documentElement.dataset.theme || 'system')) throw new Error('Theme icon does not reflect current state');
+          const svg = icons[0].querySelector('svg');
+          const iconRect = svg.getBoundingClientRect();
+          const buttonRect = button.getBoundingClientRect();
+          const center = rect => rect.top + rect.height / 2;
+          if (Math.abs(center(iconRect) - center(buttonRect)) > .5) throw new Error('Theme icon is not vertically centered');
+          if (win.innerWidth > 740 && Math.abs(center(iconRect) - center(button.querySelector('.btn-label').getBoundingClientRect())) > .5) throw new Error('Theme icon and text are misaligned');
+          if (icons[0].dataset.themeIcon === 'dark') {
+            const bounds = svg.querySelector('path').getBBox();
+            if (bounds.width < 9.6 || bounds.height < 9.6) throw new Error('Moon is too small to read as a crescent');
+          }
           const state = () => { const s = win.getComputedStyle(button); return [s.color, s.backgroundColor, s.borderColor, s.outlineWidth, s.outlineStyle, s.outlineColor, s.outlineOffset]; };
           const normal = state();
           button.focus();
@@ -4736,7 +4805,7 @@ test("shared shell renders consistently across direct/native loads and app navig
               if (hiddenState[1] !== 'true') throw new Error('Hidden toggle did not activate');
               themeControl.click();
               const toggled = theme === 'light' ? 'dark' : 'light';
-              if (frame.contentDocument.documentElement.dataset.theme !== toggled || themeControl.textContent !== 'Theme: ' + toggled || localStorage.getItem('shortlink-theme') !== toggled) throw new Error('Theme button did not change theme');
+              if (frame.contentDocument.documentElement.dataset.theme !== toggled || themeControl.querySelector('.btn-label').textContent !== toggled || localStorage.getItem('shortlink-theme') !== toggled) throw new Error('Theme button did not change theme');
               checkPalette(frame.contentDocument, toggled);
                equal([hiddenToggle.textContent, hiddenToggle.getAttribute('aria-expanded'), frame.contentDocument.querySelector('#link-count').textContent], hiddenState, 'theme does not change picker state');
               themeControl.click();
@@ -4825,7 +4894,7 @@ test("script launchers are opt-in, quote URLs, forward arguments and statuses, a
   assert.doesNotMatch(home, /class="script-label"/);
   assert.match(
     home,
-    /class="download" data-download-url="https:\/\/example\.com\/setup\.sh[^>]*data-download-name="setup.sh"[^>]*>Download<\/button><a class="visit" href="https:\/\/example\.com\/setup\.sh/,
+    /class="download" data-download-url="https:\/\/example\.com\/setup\.sh[^>]*data-download-name="setup.sh"[^>]*><svg[\s\S]*?<span class="btn-label">Download<\/span><\/button><a class="visit" href="https:\/\/example\.com\/setup\.sh/,
   );
   assert.match(home, /data-search="[^"]*#shell #hidden #script"/);
   assert.match(
@@ -4834,11 +4903,11 @@ test("script launchers are opt-in, quote URLs, forward arguments and statuses, a
   );
   assert.match(
     home,
-    /class="download" data-download-url="[^"]+" data-download-name="setup.sh" aria-label="Download script for Nested">Download<\/button><a class="visit"/,
+    /class="download" data-download-url="[^"]+" data-download-name="setup.sh" aria-label="Download script for Nested"><svg[\s\S]*?<span class="btn-label">Download<\/span><\/button><a class="visit"/,
   );
   assert.match(
     await f.read("tools/index.html"),
-    /class="download" data-download-url="[^"]+" data-download-name="setup.sh" aria-label="Download script for Nested">Download<\/button><a class="visit"/,
+    /class="download" data-download-url="[^"]+" data-download-name="setup.sh" aria-label="Download script for Nested"><svg[\s\S]*?<span class="btn-label">Download<\/span><\/button><a class="visit"/,
   );
   assert.doesNotMatch(home, /class="download" href="\.\/disabled\.sh"/);
   assert.match(
@@ -4853,7 +4922,7 @@ test("script launchers are opt-in, quote URLs, forward arguments and statuses, a
   assert.match(await f.read("assets/site.css"), /\.download\s*\{/);
   assert.match(
     home,
-    /<span class="link-actions"><button type="button" class="download"[^>]*>Download<\/button><a class="visit"/,
+    /<span class="link-actions"><button type="button" class="download"[^>]*><svg[\s\S]*?<span class="btn-label">Download<\/span><\/button><a class="visit"/,
   );
   assert.match(home, /<\/a><\/div><span class="link-actions"><a class="visit"/);
   assert.match(
