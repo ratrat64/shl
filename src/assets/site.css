@@ -559,8 +559,9 @@ button.destination:has(.destination-end:empty) .destination-start {
   padding: 0.2rem 0.55rem;
   text-decoration: none;
 }
-/* Pass-through on desktop so the grid sees the buttons directly. */
-.link-actions {
+/* Pass-through on desktop so the grid sees the row content directly. */
+.link-actions,
+.link-main {
   display: contents;
 }
 .download {
@@ -742,20 +743,29 @@ main.minimal-document {
   .link-row {
     gap: 0.5rem;
   }
-  /* Narrow rows scroll under one pinned action group: Open/Download stay
-     first, opaque, and stuck to the leading edge instead of scrolling away
-     with long codes, tags, and destinations. */
+  /* Narrow rows keep trailing actions fixed while the content strip
+     scrolls beneath: Open/Download stay visible on the right instead of
+     scrolling away with long codes, tags, and destinations. */
   .link-row {
     display: flex;
     align-items: center;
   }
-  .link-row .code,
-  .link-row .tags,
+  .link-main {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .link-main .code,
+  .link-main .tags,
   .link-actions {
     flex: none;
   }
-  /* Keep the tappable destination reserve while the row scrolls. */
-  .link-row .destination {
+  /* Keep the tappable destination reserve while the strip scrolls. */
+  .link-main .destination {
     flex: 1 1 auto;
     min-width: 3rem;
   }
@@ -763,15 +773,6 @@ main.minimal-document {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    order: -1;
-    position: sticky;
-    left: 0;
-    z-index: 1;
-    background: var(--bg);
-  }
-  .link-row:hover .link-actions,
-  .link-row:focus-within .link-actions {
-    background: var(--wash);
   }
   .footer .wrap {
     display: block;

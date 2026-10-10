@@ -22,7 +22,14 @@ context: []
 
 - Wrapped Download/Open in `span.link-actions` (`src/directory.mjs`); `display:contents` on desktop so the grid is untouched (desktop screenshots byte-identical to main).
 - Below 740px rows become flex; the action group is `order:-1`, sticky to the leading edge, opaque (`--bg`, `--wash` on hover/focus-within, tracking disabled/broken scopes via redefined tokens), `z-index:1`. Destination keeps a 3rem flex reserve after a `Destination reserve` failure at 390px.
-- Updated one adjacency regex and added static pinning-contract asserts (`test/build.test.mjs`). Full suite: 47 pass, 0 fail with `SHL_REQUIRE_BROWSER=1`; real-Chrome screenshots verified mobile pinning and desktop parity.
+- Follow-up: actions moved to the trailing (right) side. Rows now contain a
+  `link-main` content strip (code/tags/destination, `display:contents` on
+  desktop) that scrolls independently below 740px while the `link-actions`
+  group stays fixed on the right in natural DOM order — no sticky
+  positioning or visual reordering needed. Three adjacency regexes updated
+  for the new wrappers. Full suite: 47 pass, 0 fail with
+  `SHL_REQUIRE_BROWSER=1`; real-Chrome screenshots verified trailing
+  actions on mobile and byte-identical desktop vs main.
 
 ## Review Triage Log
 
