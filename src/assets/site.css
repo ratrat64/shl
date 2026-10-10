@@ -882,7 +882,8 @@ main.minimal-document {
   .count-number.count-changing {
     animation: count-change var(--motion-duration) var(--motion-easing);
   }
-  main[data-app-page][data-entering] {
+  main[data-app-page][data-entering],
+  [data-directory-content][data-entering] {
     animation: feedback-appear 280ms var(--motion-easing);
   }
   .link-row,
