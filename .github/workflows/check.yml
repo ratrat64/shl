@@ -104,3 +104,28 @@ jobs:
         run: bun ci
       - name: Build
         run: bun build.mjs
+
+  check:
+    name: PR validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [changes, lint, test, build]
+    if: always()
+    steps:
+      - name: Verify required checks
+        run: |
+          if [ "${{ needs.changes.result }}" != "success" ]; then
+            echo "Change detection did not succeed"
+            exit 1
+          fi
+          if [ "${{ needs.changes.outputs.run_checks }}" != "true" ]; then
+            echo "Docs-only change; required checks skipped by design"
+            exit 0
+          fi
+          for result in "${{ needs.lint.result }}" "${{ needs.test.result }}" "${{ needs.build.result }}"; do
+            if [ "$result" != "success" ]; then
+              echo "Required check result: $result"
+              exit 1
+            fi
+          done
+          echo "All required checks passed"
