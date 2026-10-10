@@ -128,6 +128,17 @@ button {
   border-radius: 4px;
   font-size: 0.85rem;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+.theme-toggle svg,
+.visit svg,
+.download svg {
+  width: 1em;
+  height: 1em;
+  flex: none;
 }
 .theme-toggle {
   color: var(--ink);
@@ -255,6 +266,16 @@ p {
 #tag-toggle {
   inline-size: 6.5rem;
   flex-shrink: 0;
+}
+#tag-toggle[aria-expanded="true"] {
+  background: color-mix(
+    in srgb,
+    var(--button-tone, var(--accent)) 18%,
+    var(--bg)
+  );
+}
+#tag-toggle[aria-expanded="true"] svg.chev {
+  transform: rotate(180deg);
 }
 .directory-toggles {
   grid-column: 3;
@@ -563,7 +584,7 @@ button.destination:has(.destination-end:empty) .destination-start {
 }
 .visit,
 .download {
-  padding: 0.2rem 0.55rem;
+  padding: 0.2rem 0.45rem;
   text-decoration: none;
 }
 /* Pass-through on desktop so the grid sees the row content directly. */
@@ -786,6 +807,27 @@ main.minimal-document {
   .disabled-row .link-actions {
     display: none;
   }
+  /* Icon-only controls: hide labels (accessible names stay), keep hit boxes. */
+  #tag-toggle {
+    inline-size: auto;
+  }
+  [data-theme-control] {
+    min-width: 0;
+  }
+  .visit .btn-label,
+  .download .btn-label,
+  #tag-toggle .btn-label,
+  [data-theme-control] .btn-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
   .footer .wrap {
     display: block;
   }
@@ -858,6 +900,9 @@ main.minimal-document {
   .tags:active,
   .tag-chip:active {
     transform: scale(0.96);
+  }
+  #tag-toggle svg.chev {
+    transition: transform var(--motion-highlight-duration) var(--motion-easing);
   }
   @media (hover: hover) and (pointer: fine) {
     .link-row:hover .destination {

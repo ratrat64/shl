@@ -2,7 +2,7 @@
 name: Shortlink
 description: A clear, static directory for short links.
 status: final
-updated: 2026-10-08
+updated: 2026-10-10
 colors:
   action-light: "#006b60"
   action-dark: "#64b6a4"
@@ -92,7 +92,7 @@ Follow AD-7–AD-9 in the [architecture spine](../../architecture/architecture-s
 
 ### Navigation
 
-The header brand reads `/shl/`: `shl` uses ink, the leading slash uses teal action, and the trailing slash uses amber script. The header has only Links and Guide navigation. Current links are underlined. Buttons have subdued edges mixed from 25% of their action color and the page background; keep the visible keyboard focus outline. Theme, Show tags and Open controls have a subtle teal background; broken enabled rows use orange-red for Open text, edges, and fills. Download uses amber. Mix 10% of the action color into the page background, increasing to 18% on hover; broken Open uses 12% on hover to preserve hidden-row text contrast. Disabled controls retain the muted wash.
+The header brand reads `/shl/`: `shl` uses ink, the leading slash uses teal action, and the trailing slash uses amber script. The header has only Links and Guide navigation. Current links are underlined. Buttons have subdued edges mixed from 25% of their action color and the page background; keep the visible keyboard focus outline. Theme, Show tags and Open controls have a subtle teal background; broken enabled rows use orange-red for Open text, edges, and fills. Download uses amber. Mix 10% of the action color into the page background, increasing to 18% on hover; broken Open uses 12% on hover to preserve hidden-row text contrast. Disabled controls retain the muted wash. Action icons are 1em inline SVG with 1.5px stroke, round caps and currentColor: Open uses an external-arrow, Download a down-to-line, Show tags a tag plus chevron, theme sun/moon/monitor. Desktop pairs icon+text at the same box (gap .35rem; `.visit`/`.download` horizontal padding ~.45rem); toggles stay compact icon+short text. Fixed widths are retained (`#tag-toggle` 6.5rem, theme `min-width` 11ch). Icons inherit the existing `--accent`/`--script`/`--ink` roles per control in both themes; disabled icons stay grey on the muted wash. Keep the visible focus outline; no new animation. Visual reference: [icon actions](mockups/icon-actions.html).
 
 ### Directory tools
 
@@ -110,7 +110,7 @@ An empty site has no search; every nonempty subtree has enhanced search, includi
 
 ### Directory rows
 
-A code copies its full short URL on click; enabled script codes use amber and have Download without a SCRIPT label. Destinations copy their full URL; Open follows enabled destinations. Disabled code native links reach the explanation; disabled destinations are copy-only buttons with full accessible/selectable text and no external href. Open/Download stay visible as disabled buttons with muted wash and no actionable href. Folder names link to their browseable pages while disclosure expands the list. Titles appear on hover and remain searchable. Destinations display their ends without wrapping, retaining full copy/accessibility values.
+A code copies its full short URL on click; enabled script codes use amber and have Download without a SCRIPT label. Destinations copy their full URL; Open follows enabled destinations. Disabled code native links reach the explanation; disabled destinations are copy-only buttons with full accessible/selectable text and no external href. Open/Download stay visible as disabled buttons with muted wash and no actionable href. Folder names link to their browseable pages while disclosure expands the list. Titles appear on hover and remain searchable. Destinations display their ends without wrapping, retaining full copy/accessibility values. Open/Download pair icon+text at the same box defined in Navigation, inheriting the row's teal/amber/disabled treatment.
 
 Broken enabled destination text uses the short code's orange-red palette on hover, retaining its underline and copy behavior.
 

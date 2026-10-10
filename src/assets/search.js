@@ -265,9 +265,12 @@
     function picker(open) {
       available.hidden = !open;
       toggle.setAttribute("aria-expanded", String(!available.hidden));
-      toggle.textContent = available.hidden
-        ? toggle.dataset.labelCollapsed
-        : toggle.dataset.labelExpanded;
+      toggle.setAttribute(
+        "aria-label",
+        available.hidden
+          ? toggle.dataset.labelCollapsed
+          : toggle.dataset.labelExpanded,
+      );
     }
     listen(toggle, "click", () => {
       // Slide content below the toolbar with the picker: record positions,

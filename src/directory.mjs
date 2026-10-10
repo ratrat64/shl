@@ -1,4 +1,4 @@
-import { esc, page, pageTitle } from "./layout.mjs";
+import { esc, iconSvgAttrs, page, pageTitle } from "./layout.mjs";
 import { entryTree, entryCounts } from "./links.mjs";
 
 const fixed = {
@@ -27,6 +27,10 @@ const tagStyle = (identity) => {
 // JSON string contents survive HTML's NUL replacement and preserve UTF-16.
 const tagIdentity = (identity) => esc(JSON.stringify(identity).slice(1, -1));
 const tagToggleLabels = { collapsed: "Show tags", expanded: "Hide tags" };
+const iconOpen = `<svg ${iconSvgAttrs}><path d="M6.5 3.5H3.5v9h9V9.5M9 3h4v4M13 3 7.5 8.5"/></svg>`;
+const iconDownload = `<svg ${iconSvgAttrs}><path d="M8 2.5v8m0 0 3-3m-3 3-3-3M2.5 13.5h11"/></svg>`;
+const iconTag = `<svg ${iconSvgAttrs}><path d="M2.5 2.5H8l5.5 5.5-5.5 5.5-5.5-5.5zM5.5 5.5h.01"/></svg>`;
+const iconChevron = `<svg class="chev" ${iconSvgAttrs}><path d="m4.5 6 3.5 3.5L11.5 6"/></svg>`;
 const tagLabel = (label) =>
   `<span class="tag-label" data-tag="${tagIdentity(label.toLowerCase())}" ${tagStyle(label.toLowerCase())}>#${esc(label)}</span>`;
 const tagCatalog = (nodes, catalog = new Map()) => {
@@ -93,12 +97,14 @@ const renderLinkRow = ({
     /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(filename)
   )
     filename = `${code}.sh`;
-  const action = (kind, label, target, accessible) =>
-    disabled
-      ? `<button type="button" class="${kind}" disabled aria-label="${esc(accessible)}">${label}</button>`
+  const action = (kind, label, target, accessible) => {
+    const content = `${kind === "download" ? iconDownload : iconOpen}<span class="btn-label">${esc(label)}</span>`;
+    return disabled
+      ? `<button type="button" class="${kind}" disabled aria-label="${esc(accessible)}">${content}</button>`
       : kind === "download"
-        ? `<button type="button" class="download" data-download-url="${esc(url)}" data-download-name="${esc(filename)}" aria-label="${esc(accessible)}">${label}</button>`
-        : `<a class="${kind}" href="${esc(target)}" aria-label="${esc(accessible)}">${label}</a>`;
+        ? `<button type="button" class="download" data-download-url="${esc(url)}" data-download-name="${esc(filename)}" aria-label="${esc(accessible)}">${content}</button>`
+        : `<a class="${kind}" href="${esc(target)}" aria-label="${esc(accessible)}">${content}</a>`;
+  };
   return /* HTML */ `
        <li${hidden ? ' data-hidden="true" hidden' : ""}${title ? ` data-title="${esc(title)}"` : ""} data-tags="${esc(JSON.stringify(tags.map((tag) => tag.toLowerCase())))}" data-search="${esc(searchText)}"><div class="link-row${script ? " script-row" : ""}${broken ? " broken-row" : ""}${disabled ? " disabled-row" : ""}"${title ? ` title="${esc(title)}"` : ""}><div class="link-main"><a class="code${script ? " script-link" : ""}" href="${esc(href)}"${title ? ` title="${esc(title)}"` : ""}>${esc(code)}</a>
               ${tags.length ? `<button class="tags" type="button" popovertarget="${esc(tagId)}" title="${esc(tagText)}" aria-label="${esc(tagText)}. Show all tags for ${esc(code)}">${coloredTags}</button>` : ""}${destination}</div><span class="link-actions">${script ? action("download", "Download", url, `Download script for ${code}`) : ""}${action("visit", "Open", url, `Open destination for ${code}`)}</span></div>${tags.length ? `<div class="tag-panel" id="${esc(tagId)}" popover tabindex="0" role="region" aria-label="Tags for ${esc(code)}">${coloredTags}</div>` : ""}</li>`;
@@ -152,11 +158,12 @@ const directoryContents = (
             type="button"
             aria-expanded="false"
             aria-controls="available-tags"
+            aria-label="${esc(tagToggleLabels.collapsed)}"
             data-label-collapsed="${esc(tagToggleLabels.collapsed)}"
             data-label-expanded="${esc(tagToggleLabels.expanded)}"
             ${catalog.length ? "hidden" : "disabled"}
           >
-            ${tagToggleLabels.collapsed}
+            ${iconTag}<span class="btn-label">tags</span>${iconChevron}
           </button>
         </div>
         <div
