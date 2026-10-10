@@ -1599,6 +1599,9 @@ test("directory motion respects reduced motion, focus, touch and repeated post-n
               ": picker/chip appearance and immediate restartable counter",
           );
           if (width === 1440) {
+            // Hold transitions while CDP round trips inspect their midpoints.
+            await send("Animation.enable");
+            await send("Animation.setPlaybackRate", { playbackRate: 0 });
             for (const selector of [
               "[data-theme-control]",
               ".visit",
@@ -1645,6 +1648,15 @@ test("directory motion respects reduced motion, focus, touch and repeated post-n
                 x: 0,
                 y: 0,
               });
+              // Exceed the 140ms highlight duration once to prove that slow
+              // runner/CDP responses cannot finish the transition under test.
+              if (
+                selector === ".visit" &&
+                page === "root" &&
+                theme === "light" &&
+                motion === "no-preference"
+              )
+                await new Promise((r) => setTimeout(r, 200));
               assert.equal(
                 await evaluate(
                   `document.querySelector('${selector}').getAnimations().some(a => a.transitionProperty === 'background-color')`,
@@ -1653,6 +1665,7 @@ test("directory motion respects reduced motion, focus, touch and repeated post-n
                 label + ": highlight exit " + selector,
               );
             }
+            await send("Animation.setPlaybackRate", { playbackRate: 1 });
           }
           assert.equal(
             await evaluate(`(async () => {
