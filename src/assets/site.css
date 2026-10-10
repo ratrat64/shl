@@ -326,6 +326,13 @@ p {
   border-color: color-mix(in srgb, var(--tag-tone) 45%, var(--panel));
   background: color-mix(in srgb, var(--tag-tone) 8%, var(--panel));
 }
+#available-tags .tag-chip {
+  opacity: 0.7;
+}
+#available-tags .tag-chip:hover,
+#available-tags .tag-chip:focus {
+  opacity: 1;
+}
 .search input {
   width: 100%;
   font: inherit;
@@ -801,6 +808,7 @@ main.minimal-document {
     transition:
       background-color var(--motion-highlight-duration) var(--motion-easing),
       border-color var(--motion-highlight-duration) var(--motion-easing),
+      opacity var(--motion-highlight-duration) var(--motion-easing),
       transform var(--motion-highlight-duration) var(--motion-easing);
   }
   .theme-toggle:active:not(:disabled),
