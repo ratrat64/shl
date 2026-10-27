@@ -1,4 +1,46 @@
+import { createSSRApp, h, nextTick } from "vue";
+import { Directory } from "../directory-components.mjs";
+import { createDirectoryState } from "../directory-state.mjs";
+
 (() => {
+  globalThis.directoryTick = nextTick;
+  let island;
+  globalThis.readDirectoryModel = (main, url) => {
+    const script = main.querySelector("[data-directory-model]");
+    if (!script) return null;
+    const model = JSON.parse(script.textContent);
+    const resolve = (nodes) => {
+      for (const node of nodes) {
+        node.href = new URL(node.href, url).href;
+        if (node.children) resolve(node.children);
+      }
+    };
+    // Initial hydration uses exactly the SSR attributes; fetched data is rebased.
+    if (url) {
+      resolve(model.nodes);
+      const template = document.createElement("template");
+      template.innerHTML = model.breadcrumbs;
+      for (const a of template.content.querySelectorAll("a[href]"))
+        a.href = new URL(a.getAttribute("href"), url).href;
+      model.breadcrumbs = template.innerHTML;
+    }
+    const count = main.querySelector("#link-count"),
+      toggle = main.querySelector("#tag-toggle");
+    if (count) {
+      model.labels.singular = count.dataset.labelSingular;
+      model.labels.plural = count.dataset.labelPlural;
+    }
+    if (toggle) {
+      model.labels.collapsed = toggle.dataset.labelCollapsed;
+      model.labels.expanded = toggle.dataset.labelExpanded;
+    }
+    return model;
+  };
+  globalThis.unmountDirectory = () => {
+    globalThis.cleanupSearch?.();
+    island?.app.unmount();
+    island = null;
+  };
   const records = new Map();
   const unsaved = new Map();
   const trackPositions = new WeakMap();
@@ -16,51 +58,47 @@
     // Keep the requested offset when a smaller catalog clamps the applied one.
     trackPositions.set(track, { requested, applied: track.scrollLeft });
   };
-  globalThis.initSearch = (refreshStorage = false, directoryTools = null) => {
+  globalThis.initSearch = (refreshStorage = false, incoming = null) => {
     globalThis.cleanupSearch?.();
+    const root = document.querySelector("[data-directory-island]");
+    if (!root) return;
+    if (!island || island.root !== root) {
+      island?.app.unmount();
+      const controller = createDirectoryState(
+        incoming ||
+          globalThis.readDirectoryModel(document.querySelector("main")),
+      );
+      const app = createSSRApp({ render: () => h(Directory, { controller }) });
+      app.mount(root);
+      island = { app, root, controller };
+    }
+    const { state } = island.controller;
+    if (refreshStorage) {
+      state.selectionEpoch = (state.selectionEpoch || 0) + 1;
+    }
+    const retained = !!incoming;
+    const selectedTrack = document.querySelector("#selected-tags"),
+      availableTrack = document.querySelector("#available-tags");
+    const trackScroll = [selectedTrack, availableTrack].map(rememberTrack);
+    if (incoming) {
+      state.model = incoming;
+      state.contentKey = (state.contentKey || 0) + 1;
+    }
+    const model = state.model;
     const input = document.querySelector("#link-search");
     if (!input) return;
-    const list = document.querySelector(".links");
-    const status = document.querySelector("#search-status");
     const toggle = document.querySelector("#tag-toggle");
     const countLabel = document.querySelector("#link-count");
-    const empty = document.querySelector("#empty-directory");
     const available = document.querySelector("#available-tags");
     const selected = document.querySelector("#selected-tags");
-    const error = document.querySelector("#tag-error");
-    const notice = document.querySelector("#tag-notice");
-    if (!list || !status || !countLabel || !available || !selected) return;
     const base = document.querySelector("main[data-site-base]")?.dataset
       .siteBase;
     if (!base) return;
-    const trackScroll = [selected, available].map(rememberTrack);
-    if (directoryTools) {
-      available.replaceChildren(
-        ...directoryTools.querySelector("#available-tags").childNodes,
-      );
-      const incomingToggle = directoryTools.querySelector("#tag-toggle");
-      toggle.dataset.labelCollapsed = incomingToggle.dataset.labelCollapsed;
-      toggle.dataset.labelExpanded = incomingToggle.dataset.labelExpanded;
-      const incomingCount = directoryTools.querySelector("#link-count");
-      countLabel.dataset.labelSingular = incomingCount.dataset.labelSingular;
-      countLabel.dataset.labelPlural = incomingCount.dataset.labelPlural;
-    }
     const key = "shl:filters:v1:" + new URL(base, location.href).pathname;
     const identity = (button) => JSON.parse(`"${button.dataset.tag}"`);
-    const metadata = new Map(
-      [
-        ...document
-          .querySelector("#restoration-tags")
-          .content.querySelectorAll("button"),
-      ].map((button) => [identity(button), button]),
-    );
-    const catalog = new Map(
-      [...available.querySelectorAll("button")].map((button) => [
-        identity(button),
-        button,
-      ]),
-    );
-    const selections = new Map();
+    const metadata = new Map(model.metadata.map((tag) => [tag.identity, tag]));
+    const catalog = new Map(model.catalog.map((tag) => [tag.identity, tag]));
+    const selections = state.selections;
     const valid = (record) =>
       record?.version === 1 &&
       typeof record.text === "string" &&
@@ -90,7 +128,7 @@
     if (!valid(restored))
       restored = { version: 1, text: "", tags: [], picker: false };
     records.set(key, restored);
-    let pickerOpen = restored.picker;
+    state.picker = restored.picker;
     let active = true;
     globalThis.pauseSearch = () => {
       active = false;
@@ -107,7 +145,7 @@
         version: 1,
         text: input.value,
         tags: [...selections.keys()],
-        picker: pickerOpen,
+        picker: state.picker,
       };
       records.set(key, record);
       try {
@@ -121,20 +159,13 @@
         }
       }
     };
-    if (directoryTools) {
-      for (const button of selected.querySelectorAll("button")) {
-        const tag = identity(button);
-        if (restored.tags.includes(tag)) selections.set(tag, button);
-        else button.remove();
-      }
-    } else selected.replaceChildren();
-    for (const button of catalog.values()) button.hidden = false;
+    for (const tag of selections.keys())
+      if (!restored.tags.includes(tag)) selections.delete(tag);
     if (input.value !== restored.text) input.value = restored.text;
     input.readOnly = false;
     let unknown = [];
     let previousInput = input.value;
     let edit;
-    const opened = new Map();
     const listeners = [];
     let composing = false;
     const listen = (target, name, callback) => {
@@ -160,9 +191,7 @@
       globalThis.cleanupSearch = null;
       globalThis.pauseSearch = globalThis.resumeSearch = null;
     };
-    input.parentElement.hidden = false;
-    toggle.disabled = !catalog.size;
-    toggle.hidden = false;
+    state.enhanced = true;
     countLabel
       .querySelector(".count-number")
       .classList.remove("count-changing");
@@ -175,96 +204,41 @@
           event.target.classList.remove("count-changing");
       });
 
-    function filter(group, query, revealHidden, active, path = "") {
-      let count = 0;
-      for (const item of group.children) {
-        const details = item.firstElementChild;
-        if (details.tagName === "DETAILS") {
-          const next =
-            path + details.querySelector("summary").textContent + "/";
-          const found = filter(
-            details.querySelector(".links"),
-            query,
-            revealHidden,
-            active,
-            next,
-          );
-          item.hidden = !found;
-          if (active && found && !details.open) {
-            opened.set(details, false);
-            details.open = true;
-          }
-          count += found;
-        } else {
-          const tags = JSON.parse(item.dataset.tags || "[]");
-          const found =
-            (item.dataset.hidden !== "true" || revealHidden) &&
-            [...selections.keys()].every((tag) => tags.includes(tag)) &&
-            query !== "#" &&
-            (
-              path +
-              (item.dataset.search || item.textContent) +
-              " " +
-              (item.dataset.title || "")
-            )
-              .toLowerCase()
-              .includes(query);
-          item.hidden = !found;
-          count += Number(found);
-        }
+    function update(published = true) {
+      if (published) {
+        state.model.labels.singular = countLabel.dataset.labelSingular;
+        state.model.labels.plural = countLabel.dataset.labelPlural;
       }
-      return count;
-    }
-    function update() {
-      for (const [details, wasOpen] of opened) details.open = wasOpen;
-      opened.clear();
-      const query = input.value.trim().toLowerCase();
-      const active = !!query || !!selections.size;
-      const revealHidden = ["hidden", "broken", "disabled"].some((tag) =>
-        selections.has(tag),
-      );
-      const count = filter(list, query, revealHidden, active);
-      status.hidden = !active || !!count;
-      status.textContent =
-        active && !count ? "No links match your search." : "";
-      if (empty) empty.hidden = active || !!count;
-      list.parentElement.hidden = !count;
+      state.text = input.value;
+      const count = island.controller.results.value.count;
       const number = countLabel.querySelector(".count-number");
-      const label = countLabel.querySelector(".count-label");
       const changed = number.textContent !== String(count);
-      number.textContent = count;
-      label.textContent =
-        " " +
-        (count === 1
-          ? countLabel.dataset.labelSingular
-          : countLabel.dataset.labelPlural);
-      if (changed && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
-        number.classList.remove("count-changing");
-        // Commit the resting style so rapid edits restart the CSS-owned animation.
-        void getComputedStyle(number).animationName;
-        number.classList.add("count-changing");
-      }
-    }
-    function chips() {
-      selected.hidden = !selections.size;
-      document.querySelector("#all-tags-selected").hidden = [
-        ...catalog.values(),
-      ].some((button) => !button.hidden);
+      nextTick(() => {
+        if (
+          active &&
+          changed &&
+          !matchMedia("(prefers-reduced-motion: reduce)").matches
+        ) {
+          number.classList.remove("count-changing");
+          // Commit the resting style so rapid edits restart the CSS-owned animation.
+          void getComputedStyle(number).animationName;
+          number.classList.add("count-changing");
+        }
+      });
     }
     function select(identity) {
       if (selections.has(identity)) {
-        notice.textContent = "Tag already selected.";
+        state.notice = "Tag already selected.";
         return;
       }
-      const original = catalog.get(identity) || metadata.get(identity);
-      if (catalog.has(identity)) catalog.get(identity).hidden = true;
-      const button = original.cloneNode(true);
-      button.hidden = false;
-      button.setAttribute("aria-label", `Remove ${button.textContent} filter`);
-      button.setAttribute("aria-pressed", "true");
-      selected.append(button);
-      selections.set(identity, button);
-      chips();
+      const published = [...available.querySelectorAll("button")].find(
+        (button) => JSON.parse(`"${button.dataset.tag}"`) === identity,
+      );
+      const original = {
+        ...(catalog.get(identity) || metadata.get(identity)),
+        ...(published ? { style: published.getAttribute("style") } : {}),
+      };
+      selections.set(identity, original);
     }
     function focusChip(button) {
       button.focus({ preventScroll: true });
@@ -276,39 +250,46 @@
       select(identity(button));
       update();
       save();
-      focusChip(selections.get(identity(button)));
+      nextTick(() => {
+        if (active)
+          focusChip(
+            [...selected.querySelectorAll("button")].find(
+              (chip) => identity(chip) === identity(button),
+            ),
+          );
+      });
     });
     listen(selected, "click", (event) => {
       const button = event.target.closest("button[data-tag]");
       if (!button) return;
       const next = button.nextElementSibling || button.previousElementSibling;
       selections.delete(identity(button));
-      if (catalog.has(identity(button)))
-        catalog.get(identity(button)).hidden = false;
-      button.remove();
-      chips();
       update();
       save();
-      if (next) focusChip(next);
-      else input.focus();
+      nextTick(() => {
+        if (!active) return;
+        if (next) focusChip(next);
+        else input.focus();
+      });
     });
     for (const track of [available, selected])
       listen(track, "focusin", (event) => {
         if (event.target.matches("button"))
           event.target.scrollIntoView({ block: "nearest", inline: "nearest" });
       });
-    function picker(open) {
-      pickerOpen = open;
-      available.hidden = !open || !catalog.size;
-      if (!available.hidden)
-        restoreTrack(available, trackPositions.get(available)?.requested || 0);
-      toggle.setAttribute("aria-expanded", String(!available.hidden));
-      toggle.setAttribute(
-        "aria-label",
-        available.hidden
-          ? toggle.dataset.labelCollapsed
-          : toggle.dataset.labelExpanded,
-      );
+    function picker(open, published = true) {
+      if (published) {
+        state.model.labels.collapsed = toggle.dataset.labelCollapsed;
+        state.model.labels.expanded = toggle.dataset.labelExpanded;
+      }
+      state.picker = open;
+      nextTick(() => {
+        if (active && !available.hidden)
+          restoreTrack(
+            available,
+            trackPositions.get(available)?.requested || 0,
+          );
+      });
     }
     listen(toggle, "click", () => {
       rememberTrack(available);
@@ -329,64 +310,68 @@
         return { x: rect.left, y: rect.top };
       });
       cancelPickerMotion();
-      picker(available.hidden);
+      picker(!state.picker);
       save();
-      if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-      // Timing stays owned by shared CSS; WAAPI just consumes the tokens.
-      const tokens = getComputedStyle(document.documentElement);
-      const duration =
-        Number.parseFloat(tokens.getPropertyValue("--motion-duration")) || 240;
-      const easing =
-        tokens.getPropertyValue("--motion-easing").trim() || "ease-out";
-      try {
-        below.forEach((element, index) => {
-          if (typeof element.animate !== "function") return;
-          const after = element.getBoundingClientRect();
-          const dx = before[index].x - after.left;
-          const dy = before[index].y - after.top;
-          if (!dx && !dy) return;
-          let animation;
-          try {
-            animation = element.animate(
-              [
-                { transform: `translate(${dx}px, ${dy}px)` },
-                { transform: "none" },
-              ],
-              { duration, easing, id: "picker-slide" },
-            );
-          } catch {
-            return;
-          }
-          element.style.pointerEvents = "none";
-          // A newer flight re-suppresses first; only the last one restores.
-          const release = () => {
-            if (
-              element
-                .getAnimations()
-                .some(
-                  (other) =>
-                    other.id === "picker-slide" &&
-                    other.playState !== "finished" &&
-                    other.playState !== "idle",
-                )
-            )
+      nextTick(() => {
+        if (!active) return;
+        if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        // Timing stays owned by shared CSS; WAAPI just consumes the tokens.
+        const tokens = getComputedStyle(document.documentElement);
+        const duration =
+          Number.parseFloat(tokens.getPropertyValue("--motion-duration")) ||
+          240;
+        const easing =
+          tokens.getPropertyValue("--motion-easing").trim() || "ease-out";
+        try {
+          below.forEach((element, index) => {
+            if (typeof element.animate !== "function") return;
+            const after = element.getBoundingClientRect();
+            const dx = before[index].x - after.left;
+            const dy = before[index].y - after.top;
+            if (!dx && !dy) return;
+            let animation;
+            try {
+              animation = element.animate(
+                [
+                  { transform: `translate(${dx}px, ${dy}px)` },
+                  { transform: "none" },
+                ],
+                { duration, easing, id: "picker-slide" },
+              );
+            } catch {
               return;
-            element.style.pointerEvents = "";
-          };
-          animation.finished.then(release, release);
-          pickerMotion.push(animation);
-        });
-        if (pickerMotion.length)
-          Promise.allSettled(
-            pickerMotion.map((animation) => animation.finished),
-          ).then(() => {
-            pickerMotion = pickerMotion.filter(
-              (animation) =>
-                animation.playState !== "finished" &&
-                animation.playState !== "idle",
-            );
+            }
+            element.style.pointerEvents = "none";
+            // A newer flight re-suppresses first; only the last one restores.
+            const release = () => {
+              if (
+                element
+                  .getAnimations()
+                  .some(
+                    (other) =>
+                      other.id === "picker-slide" &&
+                      other.playState !== "finished" &&
+                      other.playState !== "idle",
+                  )
+              )
+                return;
+              element.style.pointerEvents = "";
+            };
+            animation.finished.then(release, release);
+            pickerMotion.push(animation);
           });
-      } catch {}
+          if (pickerMotion.length)
+            Promise.allSettled(
+              pickerMotion.map((animation) => animation.finished),
+            ).then(() => {
+              pickerMotion = pickerMotion.filter(
+                (animation) =>
+                  animation.playState !== "finished" &&
+                  animation.playState !== "idle",
+              );
+            });
+        } catch {}
+      });
     });
 
     function tokens(enter = false, defer = composing) {
@@ -394,7 +379,7 @@
       const start = input.selectionStart ?? value.length;
       const end = input.selectionEnd ?? start;
       const removals = [];
-      notice.textContent = "";
+      state.notice = "";
       const urls = [...value.matchAll(/https?:\/\/[^\s]+/gi)];
       const candidates = [
         ...value.matchAll(/(?<![^\s,])#([^\s,]+)([\s,]|$)/g),
@@ -485,9 +470,7 @@
           position(match.index + 1 + match[1].length),
         ]);
       previousInput = remaining;
-      error.hidden = !unknown.length;
-      error.textContent = unknown.length ? "Tag not found" : "";
-      input.setAttribute("aria-invalid", String(!!unknown.length));
+      state.error = unknown.length ? "Tag not found" : "";
       update();
       save();
     }
@@ -539,18 +522,16 @@
     });
     for (const tag of restored.tags) {
       if (!selections.has(tag)) select(tag);
-      if (catalog.has(tag)) catalog.get(tag).hidden = true;
     }
-    picker(restored.picker);
-    error.hidden = true;
-    error.textContent = "";
-    notice.textContent = "";
-    input.setAttribute("aria-invalid", "false");
-    chips();
-    update();
-    if (directoryTools) {
-      restoreTrack(selected, trackScroll[0]);
-      restoreTrack(available, trackScroll[1]);
-    }
+    picker(restored.picker, false);
+    state.error = state.notice = "";
+    update(false);
+    nextTick(() => {
+      if (!active) return;
+      if (retained) {
+        restoreTrack(selected, trackScroll[0]);
+        restoreTrack(available, trackScroll[1]);
+      }
+    });
   };
 })();

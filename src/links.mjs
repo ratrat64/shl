@@ -1,5 +1,19 @@
 import { readFile } from "node:fs/promises";
 import { parseDocument } from "yaml";
+import {
+  isDirectory,
+  linkUrl,
+  linkStates,
+  linkFields,
+} from "./directory-model.mjs";
+export {
+  isDirectory,
+  linkUrl,
+  linkStates,
+  linkFields,
+  entryTree,
+  entryCounts,
+} from "./directory-model.mjs";
 
 export const CODE_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 export const RESERVED_NAMES = new Set([
@@ -15,60 +29,6 @@ export const RESERVED_NAMES = new Set([
   "links.json",
   "cname",
 ]);
-
-export const isDirectory = (value) =>
-  value !== null &&
-  typeof value === "object" &&
-  !Array.isArray(value) &&
-  !("url" in value);
-export const linkUrl = (value) =>
-  typeof value === "string" ? value : value?.url;
-
-// Pure and serialized into recovery; malformed fetched metadata adds no states.
-export const linkStates = (value) => {
-  const tags = Array.isArray(value?.tags)
-    ? value.tags
-        .filter((tag) => typeof tag === "string")
-        .map((tag) => tag.trim().toLowerCase())
-    : [];
-  return {
-    script: tags.includes("script"),
-    hidden: tags.includes("hidden"),
-    broken: tags.includes("broken"),
-    disabled: tags.includes("disabled"),
-  };
-};
-
-// Consumers call this only after validating the original fields below.
-export const linkFields = (value) => ({
-  url: linkUrl(value),
-  title: typeof value === "string" ? "" : (value.title ?? ""),
-  ...linkStates(value),
-  tags: value?.tags ?? [],
-});
-
-export const entryCounts = (nodes) => ({
-  total: nodes.reduce((n, node) => n + node.total, 0),
-  visible: nodes.reduce((n, node) => n + node.visible, 0),
-});
-
-export const entryTree = (entries, prefix = "") =>
-  Object.entries(entries)
-    .sort(([a], [b]) => (a.toLowerCase() < b.toLowerCase() ? -1 : 1))
-    .map(([code, value]) => {
-      const node = {
-        code,
-        prefix,
-        href: `./${prefix}${code}/`,
-        isDirectory: isDirectory(value),
-      };
-      if (!node.isDirectory) {
-        const fields = linkFields(value);
-        return { ...node, ...fields, total: 1, visible: fields.hidden ? 0 : 1 };
-      }
-      const children = entryTree(value, `${prefix}${code}/`);
-      return { ...node, children, ...entryCounts(children) };
-    });
 
 export function validateCode(code, path, seen) {
   const problems = [];

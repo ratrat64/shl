@@ -10,16 +10,19 @@
   // The header and footer survive page swaps, so their relative links must not drift.
   for (const link of document.querySelectorAll(".site-head a, .footer a"))
     link.href = link.href;
-  const mount = (refreshStorage = false, directoryTools = null) => {
+  const mount = async (refreshStorage = false, directoryTools = null) => {
+    const intent = request;
     globalThis.initSearch(refreshStorage, directoryTools);
+    await globalThis.directoryTick();
+    if (intent !== request) return;
     globalThis.initCopy();
     globalThis.initDownload();
     globalThis.initRecovery(navigate);
   };
 
-  const cleanup = () => {
+  const cleanup = (retained = false) => {
     globalThis.cleanupCopy?.();
-    globalThis.cleanupSearch?.();
+    if (!retained) globalThis.unmountDirectory?.();
     globalThis.cleanupDownload?.();
     globalThis.cleanupRecovery?.();
   };
@@ -119,9 +122,9 @@
       if (current !== request) return;
       globalThis.finishThemeTransition?.();
       rebase(main, url);
+      const incoming = globalThis.readDirectoryModel(main, url);
       for (const script of main.querySelectorAll("script")) script.remove();
       scroll.set(displayed, window.scrollY);
-      cleanup();
       const outgoing = document.querySelector("main");
       let directoryTools = null;
       let entrance = main;
@@ -134,14 +137,19 @@
         main.querySelector("[data-directory-content]") &&
         outgoing.querySelector("[data-directory-content]")
       ) {
-        directoryTools = main.querySelector(".directory-tools");
-        entrance = main.querySelector("[data-directory-content]");
+        cleanup(true);
+        directoryTools = incoming;
         delete outgoing.dataset.entering;
-        outgoing
-          .querySelector("[data-directory-content]")
-          .replaceWith(entrance);
         main = outgoing;
-      } else outgoing.replaceWith(main);
+      } else {
+        cleanup();
+        outgoing.replaceWith(main);
+        directoryTools = incoming;
+      }
+      await mount(false, directoryTools);
+      if (current !== request) return;
+      if (main === outgoing && directoryTools)
+        entrance = main.querySelector("[data-directory-content]");
       if (!matchMedia("(prefers-reduced-motion: reduce)").matches)
         entrance.dataset.entering = "";
       document.title = title.textContent;
@@ -153,7 +161,6 @@
       if (push) history.pushState(null, "", url);
       else if (replace) history.replaceState(null, "", url);
       displayed = url;
-      mount(false, directoryTools);
       place(url, !push);
     } catch {
       if (current === request) {
@@ -216,7 +223,7 @@
     scroll.set(displayed, window.scrollY);
     navigate(location.href, false);
   });
-  window.addEventListener("pageshow", (event) => {
+  window.addEventListener("pageshow", async (event) => {
     if (!event.persisted) return;
     globalThis.finishThemeTransition?.();
     const focusedTag = document.activeElement.closest("#selected-tags button")
@@ -227,12 +234,14 @@
       behavior: "instant",
     };
     ++request;
+    const current = request;
     pending?.abort();
-    cleanup();
+    cleanup(true);
     for (const details of document.querySelectorAll("main details"))
       details.open = false;
     displayed = location.href;
-    mount(true);
+    await mount(true);
+    if (current !== request) return;
     if (focusedTag !== undefined) {
       const chip = [...document.querySelectorAll("#selected-tags button")].find(
         (button) => button.dataset.tag === focusedTag,
@@ -243,7 +252,12 @@
       window.scrollTo(position);
     }
   });
-  rebase(document.querySelector("main"), location.href);
+  const initial = document.querySelector("main");
+  if (initial.dataset.siteBase)
+    initial.dataset.siteBase = new URL(
+      initial.dataset.siteBase,
+      location.href,
+    ).href;
   mount();
   if (new URL(displayed).hash) place(displayed, false);
 })();

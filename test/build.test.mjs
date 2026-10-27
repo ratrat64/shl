@@ -17,6 +17,99 @@ import { stringify, parse } from "yaml";
 import { linkFields, entryTree } from "../src/links.mjs";
 import { scriptString } from "../src/layout.mjs";
 import { tagColors, indexPage } from "../src/directory.mjs";
+import { directoryScript } from "../src/browser.mjs";
+import { directoryModel, filterDirectory } from "../src/directory-model.mjs";
+
+test("directory policy is pure, hidden-inclusive and AND/text constrained", () => {
+  const entries = {
+    folder: {
+      visible: {
+        url: "https://example.com/",
+        title: "setup notes",
+        tags: ["shell", "shell"],
+      },
+      secret: {
+        url: "https://example.com/hidden",
+        tags: ["hidden", "script", "broken", "shell"],
+      },
+    },
+  };
+  const before = JSON.stringify(entries),
+    model = directoryModel(entries, "", "");
+  assert.equal(filterDirectory(model.nodes, "", []).count, 1);
+  assert.equal(filterDirectory(model.nodes, "", ["script"]).count, 0);
+  assert.equal(
+    filterDirectory(model.nodes, "folder", ["broken", "shell"]).count,
+    1,
+  );
+  assert.equal(filterDirectory(model.nodes, "setup notes", ["shell"]).count, 1);
+  assert.equal(
+    filterDirectory(model.nodes, "setup  notes", ["shell"]).count,
+    0,
+  );
+  assert.equal(filterDirectory(model.nodes, "#", []).count, 0);
+  assert.equal(filterDirectory(model.nodes, "shell shell", []).count, 0); // Match the deduplicated published row search text.
+  assert.deepEqual(
+    model.catalog.map((tag) => tag.identity),
+    ["broken", "hidden", "script", "shell"],
+  );
+  assert.equal(JSON.stringify(entries), before);
+});
+
+test("Vue SSR hydrates lossless hostile models without warnings, replacements or initialization saves", async (t) => {
+  const chrome = availableChrome(t);
+  if (!chrome) return;
+  const tags = ["a\0b", "</script>", "shell"];
+  const title =
+    "title\rwith\0nul </script><script>globalThis.injected=true</script>";
+  const f = await fixture(t, {
+    folder: {
+      hostile: { url: "https://example.com/?q=</script>", title, tags },
+    },
+  });
+  assert.equal(f.build().status, 0);
+  const html = await f.read("index.html");
+  const model = JSON.parse(
+    html.match(/data-directory-model>([\s\S]*?)<\/script>/)[1],
+  );
+  assert.deepEqual(model.nodes[0].children[0].tags, tags);
+  assert.equal(model.nodes[0].children[0].title, title);
+  assert.ok(!directoryScript.includes("</script"));
+  assert.doesNotMatch(directoryScript, /2166136261/); // Published inks only: no browser hashing.
+  assert.doesNotMatch(
+    directoryScript,
+    /from ["'](?:vue|node:|yaml)|import\s*\(/,
+  );
+  assert.equal(
+    behaviorScript(await f.read("404.html"), "search"),
+    await f.read("assets/search.js"),
+  );
+  const probe = `<script>window.hydrationWarnings=[];for(const name of ['warn','error'])console[name]=(...args)=>hydrationWarnings.push(args.join(' '));window.ssrNodes=[...document.querySelector('[data-directory-island]').querySelectorAll('*')];window.filterWrites=0;const set=Storage.prototype.setItem;Storage.prototype.setItem=function(key,...args){if(key.startsWith('shl:filters:'))filterWrites++;return set.call(this,key,...args)};</script>`;
+  for (const path of ["index.html", "folder/index.html"])
+    await writeFile(
+      join(f.cwd, "dist", path),
+      (await f.read(path)).replace("</body>", probe + "</body>"),
+    );
+  const origin = await browserServer(t, f.cwd);
+  const { evaluate, navigate } = await browserControls(t, chrome, f.cwd);
+  for (const prefix of ["/", "/project/"])
+    for (const path of ["", "folder/"]) {
+      await navigate(origin + prefix + path);
+      assert.deepEqual(
+        await evaluate(
+          `(async()=>{await directoryTick();return {warnings:hydrationWarnings,connected:ssrNodes.every(node=>node.isConnected),writes:filterWrites,injected:!!globalThis.injected}})()`,
+        ),
+        { warnings: [], connected: true, writes: 0, injected: false },
+      );
+      assert.equal(
+        await evaluate(
+          `(async()=>{const input=document.querySelector('#link-search');input.value='#a'+String.fromCharCode(0)+'b ';input.dispatchEvent(new Event('input'));if(filterWrites!==1)throw Error('Save was deferred');const record=JSON.parse(sessionStorage.getItem('shl:filters:v1:'+new URL(document.querySelector('main').dataset.siteBase).pathname));if(record.tags[0]!=='a'+String.fromCharCode(0)+'b')throw Error('Identity lost');await directoryTick();return document.querySelector('.count-number').textContent==='1'&&document.querySelector('#selected-tags button').dataset.tag==='a\\\\u0000b'})()`,
+        ),
+        true,
+      );
+      await evaluate("sessionStorage.clear()");
+    }
+});
 
 function themeLabelAttributes(html) {
   const control = html.match(/<button\b[^>]*data-theme-control[^>]*>/)[0];
@@ -283,79 +376,79 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
       const count = () => Number(doc.querySelector('.count-number').textContent);
       const pool = () => [...picker.querySelectorAll('button')].filter(b => !b.hidden).map(b => b.dataset.tag).join(',');
       const choices = () => [...selected.querySelectorAll('button')].map(b => b.dataset.tag).join(',');
-      const pick = tag => picker.querySelector('button[data-tag="' + tag + '"]').click();
-      const remove = tag => selected.querySelector('button[data-tag="' + tag + '"]').click();
-      const clear = () => { for (const b of [...selected.querySelectorAll('button')]) b.click(); type(''); };
-      const type = (value, caret = value.length, event = 'input') => { input.value = value; input.setSelectionRange(caret, caret); input.dispatchEvent(new win.Event(event)); };
-      const enter = () => input.dispatchEvent(new win.KeyboardEvent('keydown', {key: 'Enter', cancelable: true}));
+      const pick = async tag => { picker.querySelector('button[data-tag="' + tag + '"]').click(); await win.directoryTick(); };
+      const remove = async tag => { selected.querySelector('button[data-tag="' + tag + '"]').click(); await win.directoryTick(); };
+      const clear = async () => { for (const b of [...selected.querySelectorAll('button')]) b.click(); await type(''); };
+      const type = async (value, caret = value.length, event = 'input') => { input.value = value; input.setSelectionRange(caret, caret); input.dispatchEvent(new win.Event(event)); await win.directoryTick(); };
+      const enter = async () => { input.dispatchEvent(new win.KeyboardEvent('keydown', {key: 'Enter', cancelable: true})); await win.directoryTick(); };
       const shown = () => [...doc.querySelectorAll('.link-row')].filter(r => !r.closest('li').hidden && r.getClientRects().length).map(r => r.querySelector('.code').textContent).sort().join(',');
       const baseline = page ? 5 : 7;
       check(count() === baseline && choices() === '' && picker.hidden && selected.hidden, 'Fresh mount');
        const catalog = pool(); check(catalog.includes('hidden') && catalog.includes('disabled') && (page ? !catalog.includes('outside') : catalog.includes('outside')), 'Subtree scope');
-       const publishedColors = new Map([...picker.querySelectorAll('button')].map(b => [b.dataset.tag, b.getAttribute('style')]));
+       const publishedColors = new Map([...picker.querySelectorAll('button')].map(b => [b.dataset.tag, b.style.cssText]));
        // Browser selection must consume metadata, even if the renderer changes a fixed ink.
        for (const tag of ['hidden','broken','script','disabled']) {
          const original = picker.querySelector('button[data-tag="' + tag + '"]');
          original.style.setProperty('--tag-light', 'var(--ink)'); original.style.setProperty('--tag-dark', 'var(--ink)');
-         pick(tag);
+         await pick(tag);
          const clone = selected.querySelector('button');
-         check(clone.getAttribute('style') === original.getAttribute('style') && win.getComputedStyle(clone).color === win.getComputedStyle(original).color, 'Fixed selection must consume published metadata');
-         remove(tag); original.setAttribute('style', publishedColors.get(tag));
+         check(clone.style.cssText === original.style.cssText && win.getComputedStyle(clone).color === win.getComputedStyle(original).color, 'Fixed selection must consume published metadata');
+         await remove(tag); original.setAttribute('style', publishedColors.get(tag));
        }
-      toggle.click(); check(!picker.hidden && toggle.getAttribute('aria-expanded') === 'true' && count() === baseline, 'Opening changed results');
+      toggle.click(); await win.directoryTick(); check(!picker.hidden && toggle.getAttribute('aria-expanded') === 'true' && count() === baseline, 'Opening changed results');
       const availableOrder = [...picker.querySelectorAll('button')];
       check(availableOrder.every((b, i) => !i || b.getBoundingClientRect().left > availableOrder[i - 1].getBoundingClientRect().left), 'Available visual catalog order');
-      pick('shell'); check(doc.activeElement === selected.querySelector('button') && choices() === 'shell' && count() === 4, 'Picker move/focus');
+      await pick('shell'); check(doc.activeElement === selected.querySelector('button') && choices() === 'shell' && count() === 4, 'Picker move/focus');
       const selectedBounds = selected.getBoundingClientRect(), selectedChip = selected.querySelector('button').getBoundingClientRect();
       check(Math.abs(selectedBounds.right - selectedChip.right - parseFloat(win.getComputedStyle(selected).paddingRight)) < 2, 'Selected tags right alignment');
       for (const track of [selected, picker]) check(win.getComputedStyle(track).maskImage.includes('linear-gradient'), 'Tag track edge fades');
       if (width > 740) check(doc.querySelector('.directory-actions').getBoundingClientRect().width > doc.querySelector('#link-count').getBoundingClientRect().width * 2, 'Tools width priority');
-      pick('setup'); check(count() === 2 && choices() === 'shell,setup', 'Ordinary AND');
+      await pick('setup'); check(count() === 2 && choices() === 'shell,setup', 'Ordinary AND');
       check(selected.querySelectorAll('button')[1].getAttribute('aria-label') === 'Remove #setup filter' && selected.querySelector('button').getAttribute('aria-pressed') === 'true', 'Removal accessibility');
-      type('setup notes'); check(count() === 1 && shown() === 'Both', 'AND with broad title');
-      type('setup  notes'); check(count() === 0 && !doc.querySelector('#search-status').hidden && !picker.hidden, 'Prose split or choices lost');
+      await type('setup notes'); check(count() === 1 && shown() === 'Both', 'AND with broad title');
+      await type('setup  notes'); check(count() === 0 && !doc.querySelector('#search-status').hidden && !picker.hidden, 'Prose split or choices lost');
       check(pool() === catalog.split(',').filter(t => !['shell','setup'].includes(t)).join(','), 'Result-dependent pool');
-      type('deeper'); check(count() === 1 && shown() === 'Nested', 'Ancestor text/AND');
-      type(''); toggle.click(); check(picker.hidden && count() === 2 && choices() === 'shell,setup', 'Collapse/clear lost filters');
-      remove('shell'); check(doc.activeElement.dataset.tag === 'setup', 'Removal next focus');
-      remove('setup'); check(doc.activeElement === input && selected.hidden && pool() === catalog, 'Removal search/order');
-      type('#hidden'); check(count() === 0 && !choices(), 'Pending hidden revealed');
-      enter(); check(count() === (page ? 4 : 5) && input.value === '' && choices() === 'hidden', 'Enter commit'); clear();
-      type('#broken '); check(count() === 3 && !shown().includes('Hidden') && !shown().includes('Disabled'), 'Broken admission');
-      type('#shell,#setup '); check(count() === 1 && shown() === 'Combined', 'Reserved plus ordinary AND');
-      type('combined'); check(count() === 1, 'Reserved AND with text'); type('both'); check(count() === 0, 'Reserved text leaked hidden sibling');
-      remove('shell'); remove('setup'); type('');
-      type('#disabled,'); check(count() === 1 && shown() === 'Combined', 'Reserved AND');
-      remove('broken'); check(count() === 2 && shown() === 'Combined,Disabled', 'Disabled admission');
-      remove('disabled'); check(count() === baseline, 'Last reserved removal');
-      type('#script '); check(count() === 1 && shown() === 'Both', 'Script revealed hidden'); clear();
-      type('#shell,#setup '); check(choices() === 'shell,setup' && input.value === '' && count() === 2, 'Pasted multi tokens');
-      type('#SHELL '); check(choices() === 'shell,setup' && input.value === '' && doc.querySelector('#tag-notice').textContent === 'Tag already selected.', 'Duplicate toggled');
-      clear(); type('#missing, #shell '); check(input.value === '#missing, ' && choices() === 'shell' && doc.querySelector('#tag-error').textContent === 'Tag not found' && count() === 0, 'Unknown retention/known elsewhere');
-      type('#setup, '); check(input.value === ' ' && choices() === 'shell,setup' && doc.querySelector('#tag-error').hidden, 'Correction');
-      type('#absent '); check(!doc.querySelector('#tag-error').hidden, 'Unknown missing error');
-      type(''); check(doc.querySelector('#tag-error').hidden && choices() === 'shell,setup', 'Clear error lost selection');
-      clear(); type('#absent'); enter(); check(!doc.querySelector('#tag-error').hidden && input.value === '#absent', 'Unknown Enter');
-      type('#shell'); check(!doc.querySelector('#tag-error').hidden && !choices(), 'Pending correction cleared error');
-      enter(); check(doc.querySelector('#tag-error').hidden && choices() === 'shell', 'Committed correction error');
-      clear(); type('#missing, #setup'); type('#setup'); check(doc.querySelector('#tag-error').hidden && !choices(), 'Removed error retained by unrelated pending token');
-      clear(); pick('shell'); pick('setup'); pick('script'); remove('setup'); check(doc.activeElement.dataset.tag === 'script', 'Middle removal next'); remove('script'); check(doc.activeElement.dataset.tag === 'shell', 'Last removal previous'); clear();
-      clear(); type('setup #shell tail', 13); check(input.value === 'setup tail' && input.selectionStart === 6 && choices() === 'shell', 'Mid-input caret/prose');
-      clear(); type('prefix#shell '); check(!choices() && input.value === 'prefix#shell ', 'Inside-word token');
-      type('https://example.com/#shell '); check(!choices() && input.value === 'https://example.com/#shell ', 'URL fragment token');
-      type('https://example.com/a,#shell '); enter(); check(!choices() && input.value === 'https://example.com/a,#shell ', 'Comma inside URL span');
-      type('https://example.com/a,#shell #setup '); check(choices() === 'setup' && input.value === 'https://example.com/a,#shell ', 'URL retained alongside real token'); clear();
-      type('prose #shell', 2); enter(); check(!choices() && input.value === 'prose #shell', 'Enter outside unfinished candidate');
-      input.setSelectionRange(9, 9); enter(); check(choices() === 'shell' && input.value === 'prose ' && input.selectionStart === 6, 'Enter inside unfinished candidate'); clear();
-      type('#'); check(count() === 0 && !choices(), 'Bare prefix');
-      type('#shell'); check(count() === 4 && !choices(), 'Pending token uses broad recorded text');
-      type('##literal '); check(choices() === '#literal' && input.value === '', 'Exactly one prefix'); clear();
-      input.dispatchEvent(new win.CompositionEvent('compositionstart')); type('#shell '); enter(); check(!choices() && input.value === '#shell ', 'IME premature');
-      input.dispatchEvent(new win.CompositionEvent('compositionend')); check(choices() === 'shell' && input.value === '', 'IME completion'); clear();
-      type('#CAFÉ '); check(choices() === 'café', 'Uppercase Unicode input resolves lowercase source'); clear();
+      await type('deeper'); check(count() === 1 && shown() === 'Nested', 'Ancestor text/AND');
+      await type(''); toggle.click(); await win.directoryTick(); check(picker.hidden && count() === 2 && choices() === 'shell,setup', 'Collapse/clear lost filters');
+      await remove('shell'); check(doc.activeElement.dataset.tag === 'setup', 'Removal next focus');
+      await remove('setup'); check(doc.activeElement === input && selected.hidden && pool() === catalog, 'Removal search/order');
+      await type('#hidden'); check(count() === 0 && !choices(), 'Pending hidden revealed');
+      await enter(); check(count() === (page ? 4 : 5) && input.value === '' && choices() === 'hidden', 'Enter commit'); await clear();
+      await type('#broken '); check(count() === 3 && !shown().includes('Hidden') && !shown().includes('Disabled'), 'Broken admission');
+      await type('#shell,#setup '); check(count() === 1 && shown() === 'Combined', 'Reserved plus ordinary AND');
+      await type('combined'); check(count() === 1, 'Reserved AND with text'); await type('both'); check(count() === 0, 'Reserved text leaked hidden sibling');
+      await remove('shell'); await remove('setup'); await type('');
+      await type('#disabled,'); check(count() === 1 && shown() === 'Combined', 'Reserved AND');
+      await remove('broken'); check(count() === 2 && shown() === 'Combined,Disabled', 'Disabled admission');
+      await remove('disabled'); check(count() === baseline, 'Last reserved removal');
+      await type('#script '); check(count() === 1 && shown() === 'Both', 'Script revealed hidden'); await clear();
+      await type('#shell,#setup '); check(choices() === 'shell,setup' && input.value === '' && count() === 2, 'Pasted multi tokens');
+      await type('#SHELL '); check(choices() === 'shell,setup' && input.value === '' && doc.querySelector('#tag-notice').textContent === 'Tag already selected.', 'Duplicate toggled');
+      await clear(); await type('#missing, #shell '); check(input.value === '#missing, ' && choices() === 'shell' && doc.querySelector('#tag-error').textContent === 'Tag not found' && count() === 0, 'Unknown retention/known elsewhere');
+      await type('#setup, '); check(input.value === ' ' && choices() === 'shell,setup' && doc.querySelector('#tag-error').hidden, 'Correction');
+      await type('#absent '); check(!doc.querySelector('#tag-error').hidden, 'Unknown missing error');
+      await type(''); check(doc.querySelector('#tag-error').hidden && choices() === 'shell,setup', 'Clear error lost selection');
+      await clear(); await type('#absent'); await enter(); check(!doc.querySelector('#tag-error').hidden && input.value === '#absent', 'Unknown Enter');
+      await type('#shell'); check(!doc.querySelector('#tag-error').hidden && !choices(), 'Pending correction cleared error');
+      await enter(); check(doc.querySelector('#tag-error').hidden && choices() === 'shell', 'Committed correction error');
+      await clear(); await type('#missing, #setup'); await type('#setup'); check(doc.querySelector('#tag-error').hidden && !choices(), 'Removed error retained by unrelated pending token');
+      await clear(); await pick('shell'); await pick('setup'); await pick('script'); await remove('setup'); check(doc.activeElement.dataset.tag === 'script', 'Middle removal next'); await remove('script'); check(doc.activeElement.dataset.tag === 'shell', 'Last removal previous'); await clear();
+      await clear(); await type('setup #shell tail', 13); check(input.value === 'setup tail' && input.selectionStart === 6 && choices() === 'shell', 'Mid-input caret/prose');
+      await clear(); await type('prefix#shell '); check(!choices() && input.value === 'prefix#shell ', 'Inside-word token');
+      await type('https://example.com/#shell '); check(!choices() && input.value === 'https://example.com/#shell ', 'URL fragment token');
+      await type('https://example.com/a,#shell '); await enter(); check(!choices() && input.value === 'https://example.com/a,#shell ', 'Comma inside URL span');
+      await type('https://example.com/a,#shell #setup '); check(choices() === 'setup' && input.value === 'https://example.com/a,#shell ', 'URL retained alongside real token'); await clear();
+      await type('prose #shell', 2); await enter(); check(!choices() && input.value === 'prose #shell', 'Enter outside unfinished candidate');
+      input.setSelectionRange(9, 9); await enter(); check(choices() === 'shell' && input.value === 'prose ' && input.selectionStart === 6, 'Enter inside unfinished candidate'); await clear();
+      await type('#'); check(count() === 0 && !choices(), 'Bare prefix');
+      await type('#shell'); check(count() === 4 && !choices(), 'Pending token uses broad recorded text');
+      await type('##literal '); check(choices() === '#literal' && input.value === '', 'Exactly one prefix'); await clear();
+      input.dispatchEvent(new win.CompositionEvent('compositionstart')); await type('#shell '); await enter(); check(!choices() && input.value === '#shell ', 'IME premature');
+      input.dispatchEvent(new win.CompositionEvent('compositionend')); await win.directoryTick(); check(choices() === 'shell' && input.value === '', 'IME completion'); await clear();
+      await type('#CAFÉ '); check(choices() === 'café', 'Uppercase Unicode input resolves lowercase source'); await clear();
        // Every surface consumes the same renderer-owned theme pair and tinted treatment.
-      toggle.click();
-      check(doc.documentElement.scrollWidth <= doc.documentElement.clientWidth && input.getBoundingClientRect().width >= 150, 'Viewport/search collapse');
+      toggle.click(); await win.directoryTick();
+      check(doc.documentElement.scrollWidth <= doc.documentElement.clientWidth && input.getBoundingClientRect().width >= 150, 'Viewport/search collapse: '+[...doc.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>doc.documentElement.clientWidth&&!e.closest('.links,.tag-track')).map(e=>e.tagName+'.'+e.className+':'+Math.round(e.getBoundingClientRect().right)).join(','));
       for (const chip of picker.querySelectorAll('button')) {
         check(win.getComputedStyle(chip).whiteSpace === 'nowrap' && chip.scrollWidth <= chip.clientWidth, 'Wrapped/truncated chip');
         chip.focus(); check(win.getComputedStyle(chip).outlineWidth === '2px', 'Chip focus');
@@ -369,12 +462,12 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
           picker.scrollLeft = offset + a.width - picker.clientWidth;
           check(chip.getBoundingClientRect().right <= track.right + 1, 'Long label end unreachable');
         }
-        for (const span of doc.querySelectorAll('.tag-label')) if (span.dataset.tag === chip.dataset.tag) check(span.getAttribute('style') === chip.getAttribute('style') && win.getComputedStyle(span).color === win.getComputedStyle(chip).color, 'Surface seed/color mismatch');
+        for (const span of doc.querySelectorAll('.tag-label')) if (span.dataset.tag === chip.dataset.tag) check(span.style.cssText === chip.style.cssText && win.getComputedStyle(span).color === win.getComputedStyle(chip).color, 'Surface seed/color mismatch');
       }
-       for (const button of [...picker.querySelectorAll('button')]) button.click();
+       for (const button of [...picker.querySelectorAll('button')]) button.click(); await win.directoryTick();
        for (const chip of selected.querySelectorAll('button')) {
          const original = picker.querySelector('button[data-tag="' + chip.dataset.tag + '"]');
-         check(chip.getAttribute('style') === original.getAttribute('style') && win.getComputedStyle(chip).color === win.getComputedStyle(original).color, 'Selected color metadata cloning');
+         check(chip.style.cssText === original.style.cssText && win.getComputedStyle(chip).color === win.getComputedStyle(original).color, 'Selected color metadata cloning');
        }
       check(!doc.querySelector('#all-tags-selected').hidden && !toggle.disabled && !picker.hidden, 'All-selected state');
       check(selected.scrollWidth > selected.clientWidth && selected.getBoundingClientRect().width > 0, 'Selected scroll track');
@@ -383,38 +476,38 @@ test("colored tag filters execute catalog, AND/text, tokens, focus, lifecycle an
         check(Math.abs(selected.getBoundingClientRect().top - input.getBoundingClientRect().top) < 15, 'Selected not beside search');
         check(selected.getBoundingClientRect().right <= input.getBoundingClientRect().left, 'Selected not LEFT of search');
       } else check(selected.getBoundingClientRect().bottom <= input.getBoundingClientRect().top, 'Selected mobile track must be above search');
-      check(picker.getBoundingClientRect().top >= input.getBoundingClientRect().bottom, 'Picker not below search'); clear();
+      check(picker.getBoundingClientRect().top >= input.getBoundingClientRect().bottom, 'Picker not below search'); await clear();
       for (const button of picker.querySelectorAll('button')) if (!['shell', 'setup'].includes(button.dataset.tag)) button.click();
-      picker.scrollLeft = 0;
+      await win.directoryTick(); picker.scrollLeft = 0;
       const remaining = [...picker.querySelectorAll('button')].filter(b => !b.hidden);
       const bounds = picker.getBoundingClientRect(), last = remaining.at(-1).getBoundingClientRect();
       check(remaining.map(b => b.dataset.tag).join(',') === 'setup,shell' && remaining[0].getBoundingClientRect().left < last.left, 'Available remaining order');
       check(Math.abs(bounds.right - last.right - parseFloat(win.getComputedStyle(picker).paddingRight)) < 2, 'Available tags right alignment');
-      clear();
+      await clear();
       // Disclosure restoration, same-page retention, exactly one mount, stale listeners.
       const details = [...doc.querySelectorAll('details')].find(d => d.querySelector('summary').textContent === (page ? 'deeper' : 'tools')); if (details) {
-        details.open = false; type('deeper'); check(details.open, 'Search did not expand'); type(''); check(!details.open, 'Disclosure restore');
-        details.open = true; type('deeper'); type(''); check(details.open, 'Visitor disclosure lost');
+        details.open = false; await type('deeper'); check(details.open, 'Search did not expand'); await type(''); check(!details.open, 'Disclosure restore');
+        details.open = true; await type('deeper'); await type(''); check(details.open, 'Visitor disclosure lost');
       }
-      toggle.click(); pick('shell'); type('setup');
+      toggle.click(); await pick('shell'); await type('setup');
       const navigate = async path => { const a = doc.createElement('a'); a.href = path; a.dataset.appLink = ''; doc.querySelector('main').append(a); a.click(); for (let i = 0; win.location.pathname + win.location.hash !== path && i < 100; i++) await wait(); };
       const oldMain = doc.querySelector('main');
       await navigate(prefix + page + '#link-count'); check(doc.querySelector('main') === oldMain && choices() === 'shell' && input.value === 'setup', 'Same-page reset');
-      let mounts = 0; const original = win.initSearch; win.initSearch = () => { mounts++; return original(); };
+      let mounts = 0; const original = win.initSearch; win.initSearch = (...args) => { mounts++; return original(...args); };
       await navigate(prefix + 'guide/'); check(mounts === 1 && !doc.querySelector('#link-search'), 'Guide mount');
-      const oldValue = input.value; type('#setup '); check(input.value === '#setup ' && choices() === 'shell', 'Outgoing input listener');
+      const oldValue = input.value; await type('#setup '); check(input.value === '#setup ' && choices() === 'shell', 'Outgoing input listener');
       picker.querySelector('button[data-tag="setup"]').click(); check(choices() === 'shell', 'Outgoing picker listener');
       win.history.back(); for (let i = 0; !doc.querySelector('#link-search') && i < 100; i++) await wait();
         check(mounts === 2 && doc.querySelector('#link-search').value === 'setup' && doc.querySelector('#selected-tags button').dataset.tag === 'shell' && doc.querySelector('#available-tags').hidden, 'Back restore/mount');
        for (const chip of doc.querySelectorAll('#available-tags button')) {
-         check(chip.getAttribute('style') === publishedColors.get(chip.dataset.tag), 'App mount color metadata');
-         for (const label of doc.querySelectorAll('.tag-label')) if (label.dataset.tag === chip.dataset.tag) check(label.getAttribute('style') === chip.getAttribute('style') && win.getComputedStyle(label).color === win.getComputedStyle(chip).color, 'App mount tag color consistency');
+         check(chip.style.cssText === publishedColors.get(chip.dataset.tag), 'App mount color metadata');
+         for (const label of doc.querySelectorAll('.tag-label')) if (label.dataset.tag === chip.dataset.tag) check(label.style.cssText === chip.style.cssText && win.getComputedStyle(label).color === win.getComputedStyle(chip).color, 'App mount tag color consistency');
        }
       win.history.forward(); for (let i = 0; doc.querySelector('#link-search') && i < 100; i++) await wait(); check(mounts === 3, 'Forward mount');
     }
      sessionStorage.clear(); await load('/noTags/'); check(frame.contentDocument.querySelector('#tag-toggle').disabled && !frame.contentDocument.querySelector('.search').hidden, 'Untagged search');
     await load('/onlyHidden/'); check(frame.contentDocument.querySelector('.count-number').textContent === '0' && !frame.contentDocument.querySelector('#empty-directory').hidden, 'All-hidden baseline');
-    frame.contentDocument.querySelector('#tag-toggle').click(); frame.contentDocument.querySelector('#available-tags button').click(); check(frame.contentDocument.querySelector('.count-number').textContent === '1', 'All-hidden selection');
+    frame.contentDocument.querySelector('#tag-toggle').click(); frame.contentDocument.querySelector('#available-tags button').click(); await frame.contentWindow.directoryTick(); check(frame.contentDocument.querySelector('.count-number').textContent === '1', 'All-hidden selection');
     document.body.dataset.filtersCheck = 'passed';
   } catch(error) { document.body.dataset.filtersCheck = error.message; } })();
   </script></body></html>`,
@@ -466,9 +559,9 @@ test("session filters preserve exact restoration, absent chips, native history, 
       const type=value=>{const input=document.querySelector('#link-search');input.value=value;input.dispatchEvent(new Event('input'))};
       const tags=()=>[...document.querySelectorAll('#selected-tags button')].map(b=>b.dataset.tag);
       const shell=[document.documentElement,document.querySelector('header'),document.querySelector('footer'),document.querySelector('[data-theme-control]')];
-      document.querySelector('#tag-toggle').click(); type('#shell,#café ');
+       document.querySelector('#tag-toggle').click(); type('#shell,#café '); await directoryTick();
       const colors=[...document.querySelectorAll('#selected-tags button')].map(b=>[b.textContent,b.getAttribute('style'),getComputedStyle(b).color]);
-      type('#missing, #shell'); check(!document.querySelector('#tag-error').hidden,'Unknown feedback');
+       type('#missing, #shell'); await directoryTick(); check(!document.querySelector('#tag-error').hidden,'Unknown feedback');
       await go('alpha/');
       check(document.querySelector('#link-search').value==='#missing, #shell'&&document.querySelector('#tag-error').hidden&&tags().join(',')==='shell,café','Noncommitting ordered restoration');
       await go('beta/');
@@ -476,15 +569,15 @@ test("session filters preserve exact restoration, absent chips, native history, 
       check(document.querySelector('.count-number').textContent==='0','Absent AND');
       check([...document.querySelectorAll('#available-tags button')].filter(b=>!b.hidden).map(b=>b.dataset.tag).join(',')==='script,setup','Local order');
       check(document.querySelector('#all-tags-selected').hidden,'Foreign selections exhausted local picker');
-      for(const b of document.querySelectorAll('#available-tags button'))b.click();
+       for(const b of document.querySelectorAll('#available-tags button'))b.click(); await directoryTick();
       check(!document.querySelector('#all-tags-selected').hidden&&tags().join(',')==='shell,café,script,setup','Local exhaustion with foreign selections');
       for(const b of [...document.querySelectorAll('#selected-tags button')].slice(2))b.click();
-      type('#SHELL, #café ');
+       type('#SHELL, #café '); await directoryTick();
       check(document.querySelector('#link-search').value===' '&&tags().join(',')==='shell,café'&&document.querySelector('#tag-error').hidden&&document.querySelector('#tag-notice').textContent==='Tag already selected.','Absent duplicate consumption/idempotence');
       check([...document.querySelectorAll('#available-tags button')].map(b=>b.dataset.tag).join(',')==='script,setup','Absent duplicate changed local catalog');
-      type(''); check(tags().length===2&&JSON.parse(sessionStorage.getItem(key)).text==='','Clear save');
+       type(''); check(JSON.parse(sessionStorage.getItem(key)).text==='','Clear synchronous save'); await directoryTick(); check(tags().length===2,'Clear selections');
       for(const b of [...document.querySelectorAll('#selected-tags button')])b.click();
-      check(document.querySelector('.count-number').textContent==='2'&&JSON.parse(sessionStorage.getItem(key)).tags.length===0,'Absent removal/save');
+       check(JSON.parse(sessionStorage.getItem(key)).tags.length===0,'Absent removal synchronous save'); await directoryTick(); check(document.querySelector('.count-number').textContent==='2','Absent removal');
       type('#setup ');type('#missing, ');
       const saved=sessionStorage.getItem(key),oldInput=document.querySelector('#link-search'),oldToggle=document.querySelector('#tag-toggle');
       await go('guide/');oldInput.value='#shell ';oldInput.dispatchEvent(new Event('input'));oldToggle.click();
@@ -520,14 +613,14 @@ test("session filters preserve exact restoration, absent chips, native history, 
       check(document.querySelector('#link-search').value==='quota fallback','Readable stale storage overrode memory');
       initSearch(true);
       check(document.querySelector('#link-search').value==='quota fallback','Persisted refresh lost unsaved memory');
-      sessionStorage.removeItem(key);initSearch(true);
+       sessionStorage.removeItem(key);initSearch(true); await directoryTick();
       check(document.querySelector('#link-search').value===''&&tags().length===0,'Removed record retained unsaved memory');
       type('first quota edit');initSearch(true);
       check(document.querySelector('#link-search').value==='first quota edit','Empty readable storage lost unsaved memory');
       Storage.prototype.setItem=set;
       sessionStorage.setItem(key,JSON.stringify({version:1,text:'newer native edit',tags:[],picker:false}));initSearch(true);
       check(document.querySelector('#link-search').value==='newer native edit','Newer native storage did not supersede unsaved memory');
-      type('saved again');sessionStorage.removeItem(key);initSearch(true);
+       type('saved again');sessionStorage.removeItem(key);initSearch(true); await directoryTick();
       check(document.querySelector('#link-search').value===''&&tags().length===0&&document.querySelector('#available-tags').hidden,'Removed record resurrected memory');
       type('read failure');Object.defineProperty(window,'sessionStorage',{configurable:true,get(){throw Error('denied')}});initSearch(true);
       check(document.querySelector('#link-search').value==='read failure','Unavailable refresh lost memory');
@@ -609,7 +702,7 @@ test("session filters preserve exact restoration, absent chips, native history, 
         )
           await new Promise((r) => setTimeout(r, 10));
         await evaluate(
-          `if(document!==window.cachedDocument||document.documentElement!==cachedRoot||document.querySelector('header')!==cachedHeader||persistedShows.join(',')!=='true')throw Error('Native Back did not restore actual BFCache document');if(restorationMounts!==1||document.querySelector('#link-search').value!==''||document.querySelector('.count-number').textContent!=='1')throw Error('BFCache latest filters/single mount');if(document.activeElement===cachedChip||document.activeElement.dataset.tag!=='café'||scrollY!==cachedScroll)throw Error('BFCache chip focus/scroll lost');document.querySelector('#tag-toggle').click();if(document.querySelector('#tag-toggle').getAttribute('aria-expanded')!=='false')throw Error('BFCache duplicate listeners')`,
+          `(async()=>{if(document!==window.cachedDocument||document.documentElement!==cachedRoot||document.querySelector('header')!==cachedHeader||persistedShows.join(',')!=='true')throw Error('Native Back did not restore actual BFCache document');if(restorationMounts!==1||document.querySelector('#link-search').value!==''||document.querySelector('.count-number').textContent!=='1')throw Error('BFCache latest filters/single mount');if(document.activeElement===cachedChip||document.activeElement.dataset.tag!=='café'||scrollY!==cachedScroll)throw Error('BFCache chip focus/scroll lost');document.querySelector('#tag-toggle').click();await directoryTick();if(document.querySelector('#tag-toggle').getAttribute('aria-expanded')!=='false')throw Error('BFCache duplicate listeners')})()`,
         );
         await evaluate(`window.cachedScroll=scrollY`);
         await traverse(1);
@@ -647,7 +740,7 @@ test("session filters preserve exact restoration, absent chips, native history, 
   const rootHTML = await f.read("index.html");
   await writeFile(
     join(f.cwd, "dist", "index.html"),
-    indexPage({ raw: {}, links: [], source: "links.json" }),
+    await indexPage({ raw: {}, links: [], source: "links.json" }),
   );
   await navigate(origin + "/");
   assert.equal(
@@ -742,7 +835,7 @@ test("stable directory tools retain identity, caret, tracks, metadata and conten
             const prefix=${JSON.stringify(prefix)}, motion=${JSON.stringify(motion)}, key='shl:filters:v1:'+prefix;
             const check=(yes,message)=>{if(!yes)throw Error(message)};
             const wait=async predicate=>{for(let n=0;!predicate()&&n<200;n++)await new Promise(r=>setTimeout(r,10));check(predicate(),'Navigation incomplete: '+location.href)};
-            sessionStorage.clear();initSearch(true);document.documentElement.dataset.theme=${JSON.stringify(theme)};
+             sessionStorage.clear();initSearch(true);await directoryTick();document.documentElement.dataset.theme=${JSON.stringify(theme)};
             const input=document.querySelector('#link-search'), toggle=document.querySelector('#tag-toggle'), selected=document.querySelector('#selected-tags'), available=document.querySelector('#available-tags');
             const main=document.querySelector('main'), tools=document.querySelector('.directory-tools'), section=tools.parentElement;
             const removedRetained=(records,nodes)=>records.some(record=>[...record.removedNodes].some(removed=>nodes.some(node=>removed===node||removed.contains(node))));
@@ -755,8 +848,8 @@ test("stable directory tools retain identity, caret, tracks, metadata and conten
             for(const tag of ${JSON.stringify(["shell", longTags[0], longTags[1]])})available.querySelector('button[data-tag="'+tag+'"]').click();
             type('  #missing, #shell');
             for(const details of document.querySelectorAll('details'))details.open=true;
-            input.setSelectionRange(3,9,'backward');
-            await Promise.all(document.getAnimations().map(a=>a.finished.catch(()=>{})));
+             input.setSelectionRange(3,9,'backward');
+             await directoryTick();await Promise.all(document.getAnimations().map(a=>a.finished.catch(()=>{})));
             const buttons=[...selected.querySelectorAll('button')], metadata=buttons.map(b=>[b.textContent,b.getAttribute('style'),b.getAttribute('aria-label'),b.getAttribute('aria-pressed')]);
             selected.scrollLeft=19;available.scrollLeft=23;
             const offsets=[selected.scrollLeft,available.scrollLeft];
@@ -812,9 +905,9 @@ test("stable directory tools retain identity, caret, tracks, metadata and conten
             check(selected.scrollLeft===offsets[0]&&available.scrollLeft===offsets[1],'No-tag return lost track scroll');
             check(buttons.every((b,i)=>selected.children[i]===b)&&reentrances===0,'Existing chip entrance replay');
             // Every live control has one effective listener and saves synchronously once per mutation.
-            let before=writes;toggle.click();check(available.hidden&&writes===before+1&&JSON.parse(sessionStorage.getItem(key)).picker===false,'Duplicate toggle listener/save');
-            before=writes;type('Two');check(writes===before+1&&JSON.parse(sessionStorage.getItem(key)).text==='Two'&&document.querySelector('.count-number').textContent==='1','Duplicate input listener/save');
-            before=writes;buttons[0].click();check(writes===before+1&&JSON.parse(sessionStorage.getItem(key)).tags.length===2&&!buttons[0].isConnected,'Duplicate removal listener/save');
+             let before=writes;toggle.click();check(writes===before+1&&JSON.parse(sessionStorage.getItem(key)).picker===false,'Duplicate toggle listener/save');await directoryTick();check(available.hidden,'Toggle visibility');
+             before=writes;type('Two');check(writes===before+1&&JSON.parse(sessionStorage.getItem(key)).text==='Two','Duplicate input listener/save');await directoryTick();check(document.querySelector('.count-number').textContent==='1','Input result count');
+             before=writes;buttons[0].click();check(writes===before+1&&JSON.parse(sessionStorage.getItem(key)).tags.length===2,'Duplicate removal listener/save');await directoryTick();check(!buttons[0].isConnected,'Removed chip connected');
             // Superseded HTML and outgoing local actions cannot touch the retained tools or incoming results.
             const nativeFetch=fetch, requests=[];globalThis.fetch=(url,options)=>new Promise(resolve=>requests.push({signal:options.signal,release:()=>nativeFetch(url).then(resolve)}));
             const saved=sessionStorage.getItem(key);activate('alpha/');await wait(()=>requests.length===1);check(input.readOnly,'Outgoing input not paused');
@@ -838,9 +931,9 @@ test("stable directory tools retain identity, caret, tracks, metadata and conten
             pageLoaded();await wait(()=>location.pathname===prefix+'alpha/'&&!outgoingContent.isConnected);
             check(document.querySelector('#link-search')===input&&sessionStorage.getItem(key)===saved&&document.querySelector('#copy-status').textContent===''&&document.querySelector('#download-status').textContent===''&&saves===0,'Stale local action changed incoming directory');
             globalThis.fetch=nativeFetch;URL.createObjectURL=createURL;
-            type('One');
+             type('One'); await directoryTick();
             check(document.querySelector('.count-number').textContent==='1'&&document.querySelector('.count-label').textContent.trim()==='Entry','Incoming singular count label ignored');
-            if(available.hidden)toggle.click();toggle.click();
+             if(available.hidden){toggle.click();await directoryTick();}toggle.click();await directoryTick();
             check(available.hidden&&toggle.getAttribute('aria-label')==='Browse directory tags','Incoming collapsed toggle label ignored');
             await Promise.all(document.getAnimations().map(a=>a.finished.catch(()=>{})));
             Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{}}});
@@ -850,8 +943,8 @@ test("stable directory tools retain identity, caret, tracks, metadata and conten
             globalThis.fetch=nativeFetch;
             const feedback=copyStatus.parentElement, beforeFeedback=feedback.getBoundingClientRect().toJSON();
             check(feedback===downloadStatus.parentElement&&!document.querySelector('[data-directory-content]').contains(feedback),'Feedback inside directory mover');
-            toggle.click();
-            const slides=document.querySelector('[data-directory-content]').getAnimations().filter(a=>a.id==='picker-slide');
+             toggle.click();await directoryTick();
+             const slides=document.querySelector('[data-directory-content]').getAnimations().filter(a=>a.id==='picker-slide');
             check(slides.length===(motion==='reduce'?0:1)&&feedback.getAnimations().every(a=>a.id!=='picker-slide'),'Feedback included in picker movers');
             if(slides.length){slides[0].currentTime=120;slides[0].playbackRate=0.01;check(slides[0].playState==='running'&&getComputedStyle(document.querySelector('[data-directory-content]')).transform!=='none','Picker slide not running');}
             const feedbackStyle=getComputedStyle(feedback), rect=feedback.getBoundingClientRect();
@@ -867,7 +960,8 @@ test("stable directory tools retain identity, caret, tracks, metadata and conten
             input.dispatchEvent(new CompositionEvent('compositionend'));
             check(input.value==='#script '&&pendingTags.every((b,i)=>selected.children[i]===b)&&sessionStorage.getItem(key)===pending&&writes===pendingWrites,'Composition handoff committed pending syntax or saved');
             check(copyStatus===document.querySelector('#copy-status')&&downloadStatus===document.querySelector('#download-status')&&copyStatus.textContent===''&&downloadStatus.textContent==='','Retained status ownership/cleanup lost');
-            input.dispatchEvent(new CompositionEvent('compositionstart'));input.dispatchEvent(new CompositionEvent('compositionend'));
+             input.dispatchEvent(new CompositionEvent('compositionstart'));input.dispatchEvent(new CompositionEvent('compositionend'));
+             check(writes===pendingWrites+1,'Composition synchronous save');await directoryTick();
             check(input.value===''&&selected.querySelector('[data-tag="script"]')&&writes===pendingWrites+1,'Paired new composition did not commit once');
             Storage.prototype.setItem=set;
           })()`);
@@ -913,7 +1007,7 @@ test("stable directory tools retain identity, caret, tracks, metadata and conten
   );
   await writeFile(
     join(f.cwd, "dist", "index.html"),
-    indexPage({ raw: {}, links: [], source: "links.json" }),
+    await indexPage({ raw: {}, links: [], source: "links.json" }),
   );
   assert.equal(
     await evaluate(
@@ -1506,8 +1600,9 @@ test("directory motion respects reduced motion, focus, touch and repeated post-n
           );
           const tagsAndCount = await evaluate(`(async () => {
             const number = document.querySelector('.count-number');
-            document.querySelector('#tag-toggle').click();
-            const available = document.querySelector('#available-tags button[data-tag=shell]');
+             document.querySelector('#tag-toggle').click();
+             await directoryTick();
+             const available = document.querySelector('#available-tags button[data-tag=shell]');
             const settlesWithoutFlash = async animations => {
               const samples = [];
               if (animations.length) {
@@ -1528,8 +1623,9 @@ test("directory motion respects reduced motion, focus, touch and repeated post-n
             };
             const entrance = available.getAnimations().filter(a => a.animationName === 'feedback-appear');
             const openingWithoutFlash = await settlesWithoutFlash(entrance);
-            available.click();
-            const selected = document.querySelector('#selected-tags button');
+             available.click();
+             await directoryTick();
+             const selected = document.querySelector('#selected-tags button');
             const selectedEntrance = selected.getAnimations().filter(a => a.animationName === 'feedback-appear');
             let chipIntermediate = false, countIntermediate = false;
             if (selectedEntrance.length) {
@@ -1547,17 +1643,21 @@ test("directory motion respects reduced motion, focus, touch and repeated post-n
             }
             const immediate = number.textContent === '1' && document.querySelector('.count-label').textContent.trim() === 'Link';
             const input = document.querySelector('#link-search');
-            input.value = 'no-match'; input.dispatchEvent(new Event('input'));
+             input.value = 'no-match'; input.dispatchEvent(new Event('input'));
+             await directoryTick();
             const second = number.getAnimations().find(a => a.animationName === 'count-change');
             const restarted = first && second && first !== second && first.playState === 'idle';
             const zero = number.textContent === '0';
             input.value = ''; input.dispatchEvent(new Event('input'));
-            selected.click();
+             selected.click();
+             await directoryTick();
             const returned = available.getAnimations().filter(a => a.animationName === 'feedback-appear');
             const returningWithoutFlash = await settlesWithoutFlash(returned);
             // Focus during a fresh entrance must change its final opacity too.
-            document.querySelector('#tag-toggle').click();
-            document.querySelector('#tag-toggle').click();
+             document.querySelector('#tag-toggle').click();
+             await directoryTick();
+             document.querySelector('#tag-toggle').click();
+             await directoryTick();
             const focusedEntrance = available.getAnimations().find(a => a.animationName === 'feedback-appear');
             if (focusedEntrance) {
               focusedEntrance.pause(); focusedEntrance.currentTime = 120;
@@ -1999,8 +2099,9 @@ test("directory toolbar stays anchored when toggling and selecting full scrollin
   await evaluate(
     "if (!document.querySelector('#available-tags').hidden) document.querySelector('#tag-toggle').click()",
   );
-  const sliding = await evaluate(`(() => {
+  const sliding = await evaluate(`(async () => {
     document.querySelector('#tag-toggle').click();
+    await directoryTick();
     return [...document.querySelector('section').children]
       .filter(el => !el.classList.contains('directory-tools') && el.tagName !== 'TEMPLATE' && !el.hidden && el.getClientRects().length)
       .map(el => el.getAnimations().filter(a => a.id === 'picker-slide' && a.playState === 'running').map(a => ({
@@ -2142,7 +2243,7 @@ test("native track scrolling uses Tab focus and horizontal touch gestures withou
     // Set up both tracks with the same oversized first label; activation itself
     // has independent native Enter/Space/touch coverage above.
     await evaluate(
-      `for(const b of [...document.querySelectorAll('#available-tags button')]) b.click(); const h=document.querySelector('h1'); h.tabIndex=-1; h.focus();`,
+      `(async()=>{for(const b of [...document.querySelectorAll('#available-tags button')]) b.click(); await directoryTick(); const h=document.querySelector('h1'); h.tabIndex=-1; h.focus();})()`,
     );
     await key("Tab", "Tab", 9);
     await visible();
@@ -2470,10 +2571,13 @@ test("native assets are copied module-relatively and embedded documents preserve
     "download.js",
     "navigation.js",
   ]) {
-    const source = await readFile(
-      new URL(`../src/assets/${name}`, import.meta.url),
-      "utf8",
-    );
+    const source =
+      name === "search.js"
+        ? directoryScript
+        : await readFile(
+            new URL(`../src/assets/${name}`, import.meta.url),
+            "utf8",
+          );
     assert.equal(
       await f.read(`assets/${name}`),
       source,
@@ -3129,14 +3233,19 @@ for (const prefix of ["/", "/project/"])
       const src = tag[1].match(/src="([^"]+)"/)[1];
       const asset = new URL(src, location.href).href.slice(base.length);
       assetOrder.push(asset);
-      runInContext(await f.read(asset), context);
+      if (asset !== "assets/search.js")
+        runInContext(await f.read(asset), context);
       // This VM isolates navigation's mount ownership; real search integration
       // (including outgoing listener cleanup) executes in the browser matrix.
-      if (asset === "assets/search.js")
+      if (asset === "assets/search.js") {
+        context.readDirectoryModel = () => null;
+        context.directoryTick = async () => {};
+        context.unmountDirectory = () => context.cleanupSearch?.();
         context.initSearch = () => {
           const input = document.querySelector("#link-search");
           if (input) input.addEventListener("input", () => {});
         };
+      }
       if (asset === "assets/recovery.js")
         context.initRecovery = (navigate) => {
           context.recoveryNavigate = navigate;
@@ -3991,7 +4100,7 @@ test("directory clicks copy full short or long URLs while Open follows the desti
   assert.equal(timerCount, 0);
   assert.equal(pendingList.click, null);
   runInNewContext(script + "\ninitCopy();", {
-    document: { querySelector: () => null },
+    document: { createElement: () => ({}), querySelector: () => null },
   });
 });
 
@@ -4387,10 +4496,11 @@ test("search filters nested links on the homepage and directory pages", async (t
   }
 
   runInNewContext((await f.read("assets/search.js")) + "\ninitSearch();", {
-    document: { querySelector: () => null },
+    document: { createElement: () => ({}), querySelector: () => null },
   });
   runInNewContext((await f.read("assets/search.js")) + "\ninitSearch();", {
     document: {
+      createElement: () => ({}),
       querySelector: (selector) => (selector === "#link-search" ? {} : null),
     },
   });
@@ -5316,7 +5426,7 @@ test("shared shell renders consistently across direct/native loads and app navig
           const footerGuide = doc.querySelector('.footer [data-site-path]');
           equal([footerGuide.textContent, footerGuide.dataset.sitePath], [guide.textContent, guide.dataset.sitePath], 'Guide navigation owner');
         };
-        const consumePublishedLabels = doc => {
+        const consumePublishedLabels = async doc => {
           const win = frame.contentWindow;
           const title = doc.querySelector('#link-count');
           const search = doc.querySelector('#link-search');
@@ -5333,11 +5443,13 @@ test("shared shell renders consistently across direct/native loads and app navig
           for (const query of ['git', 'unmatched', '']) {
             search.value = query;
             search.dispatchEvent(new win.Event('input', { bubbles: true }));
+            await win.directoryTick();
             const label = Number(title.querySelector('.count-number').textContent) === 1 ? title.dataset.labelSingular : title.dataset.labelPlural;
             equal(title.querySelector('.count-label').textContent, ' ' + label, 'count consumes published labels');
           }
           for (const expanded of [true, false]) {
             toggle.click();
+            await win.directoryTick();
             equal([toggle.getAttribute('aria-label'), toggle.getAttribute('aria-expanded')], [expanded ? toggle.dataset.labelExpanded : toggle.dataset.labelCollapsed, String(expanded)], 'picker consumes published labels');
           }
           for (let n = 0; n < 2; n++) {
@@ -5346,7 +5458,7 @@ test("shared shell renders consistently across direct/native loads and app navig
           }
           [title.dataset.labelSingular, title.dataset.labelPlural, toggle.dataset.labelCollapsed, toggle.dataset.labelExpanded, theme.dataset.labelLight, theme.dataset.labelDark] = saved;
           search.dispatchEvent(new win.Event('input', { bubbles: true }));
-          toggle.click(); toggle.click();
+          toggle.click(); await win.directoryTick(); toggle.click(); await win.directoryTick();
           theme.click(); theme.click(); theme.blur();
         };
         const shellGeometry = doc => {
@@ -5477,7 +5589,7 @@ test("shared shell renders consistently across direct/native loads and app navig
               }
               frame.setAttribute('sandbox', 'allow-same-origin allow-scripts');
                await load(prefix);
-               consumePublishedLabels(frame.contentDocument);
+                await consumePublishedLabels(frame.contentDocument);
               const header = frame.contentDocument.querySelector('header');
               const footer = frame.contentDocument.querySelector('footer');
               const themeControl = frame.contentDocument.querySelector('[data-theme-control]');
@@ -5485,11 +5597,13 @@ test("shared shell renders consistently across direct/native loads and app navig
                const search = frame.contentDocument.querySelector('#link-search');
                for (const [query, count, label] of [['git', '1', 'Link'], ['unmatched', '0', 'Links'], ['', '3', 'Links']]) {
                  search.value = query;
-                 search.dispatchEvent(new frame.contentWindow.Event('input', { bubbles: true }));
+                  search.dispatchEvent(new frame.contentWindow.Event('input', { bubbles: true }));
+                  await frame.contentWindow.directoryTick();
                  equal([frame.contentDocument.querySelector('.count-number').textContent, frame.contentDocument.querySelector('.count-label').textContent.trim()], [count, label], 'dynamic page title');
                  equal(titleGeometry(frame.contentDocument), titleBaseline, 'stable filtered title');
                }
-              hiddenToggle.click();
+               hiddenToggle.click();
+               await frame.contentWindow.directoryTick();
                const hiddenState = [hiddenToggle.textContent, hiddenToggle.getAttribute('aria-expanded'), frame.contentDocument.querySelector('#link-count').textContent];
               if (hiddenState[1] !== 'true') throw new Error('Hidden toggle did not activate');
               themeControl.click();
@@ -5517,7 +5631,7 @@ test("shared shell renders consistently across direct/native loads and app navig
                 equal(controlStates(doc), controls, 'app control states');
                  equal(snapshot(doc), baseline, 'app ' + path + '/' + width + '/' + theme);
                  publishedLabels(doc, false);
-                 if (expected === 'links') consumePublishedLabels(doc);
+                  if (expected === 'links') await consumePublishedLabels(doc);
               }
             }
           }
@@ -5993,7 +6107,8 @@ test("Chrome 404 browsing and history preserve document/shell identity at both p
           document.querySelector('#tag-toggle').click();
           document.querySelector('#available-tags button').click();
           input.value = '#missing ';
-          input.dispatchEvent(new Event('input', { bubbles: true }));
+           input.dispatchEvent(new Event('input', { bubbles: true }));
+           await directoryTick();
           check(document.querySelector('#selected-tags button') && !document.querySelector('#tag-error').hidden, 'Filters did not initialize');
           scrollTo({ top: 230, behavior: 'instant' });
           const fragment = document.createElement('a'); fragment.href = '#link-count'; fragment.dataset.appLink = ''; main.append(fragment); fragment.click();
@@ -6004,8 +6119,9 @@ test("Chrome 404 browsing and history preserve document/shell identity at both p
           await transition(() => document.querySelector('summary a[data-app-link]').click(), 'tools/', 'links', 'tools');
            check(document.querySelector('#link-search').value === '#missing ' && !document.querySelector('#selected-tags').hidden && !document.querySelector('#available-tags').hidden && document.querySelector('#tag-error').hidden, 'Cross-page filters did not restore');
           // One mount owns each control: a duplicate listener would toggle twice.
-          document.querySelector('#tag-toggle').click();
-           check(document.querySelector('#tag-toggle').getAttribute('aria-expanded') === 'false', 'Controls mounted more than once');
+           document.querySelector('#tag-toggle').click();
+           await directoryTick();
+            check(document.querySelector('#tag-toggle').getAttribute('aria-expanded') === 'false', 'Controls mounted more than once');
           document.querySelector('#tag-toggle').click();
           scrollTo({ top: 480, behavior: 'instant' });
           check(scrollY === 480, 'Directory fixture is not scrollable');
@@ -6815,7 +6931,7 @@ for (const prefix of ["/", "/project/"])
         const fill = style.backgroundColor === 'rgba(0, 0, 0, 0)' ? background : rgb(style.backgroundColor);
         check(contrast(blend(rgb(style.color), backdrop, opacity), blend(fill, backdrop, opacity)) >= 4.5, 'Disabled contrast: ' + element.className + '/' + (pseudo || 'text'));
       };
-      const query = (doc, value) => { const input = doc.querySelector('#link-search'); input.value = value; input.dispatchEvent(new frame.contentWindow.Event('input')); };
+      const query = async (doc, value) => { const input = doc.querySelector('#link-search'); input.value = value; input.dispatchEvent(new frame.contentWindow.Event('input')); await frame.contentWindow.directoryTick(); };
       const count = doc => Number(doc.querySelector('.count-number').textContent);
       const row = (doc, code) => [...doc.querySelectorAll('.link-row')].find(row => row.querySelector('.code').textContent === code);
       const shown = doc => [...doc.querySelectorAll('.link-row')].filter(row => !row.closest('li').hidden && row.getClientRects().length).map(row => row.querySelector('.code').textContent).sort().join(',');
@@ -6834,7 +6950,8 @@ for (const prefix of ["/", "/project/"])
             for (const details of doc.querySelectorAll('details')) details.open = true;
            } else {
              toggle.click();
-             doc.querySelector('#available-tags button[data-tag="hidden"]').click();
+              doc.querySelector('#available-tags button[data-tag="hidden"]').click();
+              await win.directoryTick();
              // Project all variants for style inspection, then reset before predicates.
              for (const li of doc.querySelectorAll('li[hidden]')) li.hidden = false;
              for (const details of doc.querySelectorAll('details')) details.open = true;
@@ -6882,10 +6999,11 @@ for (const prefix of ["/", "/project/"])
              for (const chip of doc.querySelectorAll('#available-tags button')) {
                tagSurface(chip);
                if (chip.hidden) continue;
-               chip.click();
+                chip.click();
+                await frame.contentWindow.directoryTick();
                const moved = [...doc.querySelectorAll('#selected-tags button')].find(b => b.dataset.tag === chip.dataset.tag);
-               check(moved.getAttribute('style') === chip.getAttribute('style'), 'Selected metadata must clone catalog');
-               tagSurface(moved); selectedSeeds.add(moved.dataset.tag); moved.click();
+                check(moved.style.cssText === chip.style.cssText, 'Selected metadata must clone catalog');
+                tagSurface(moved); selectedSeeds.add(moved.dataset.tag); moved.click(); await win.directoryTick();
              }
               check(representatives.every(tag => selectedSeeds.has(tag)), 'Selected fixture must cover generated hues');
               check(fixedTags.every(tag => selectedSeeds.has(tag)), 'Selected fixture must cover all fixed inks' + matrixContext());
@@ -6894,7 +7012,7 @@ for (const prefix of ["/", "/project/"])
                 const chip = doc.querySelector('#available-tags button[data-tag="' + tag + '"]');
                 if (!chip.hidden) chip.click();
               }
-              const disabledScript = row(doc, 'State7'), panel = disabledScript.nextElementSibling;
+               await win.directoryTick(); const disabledScript = row(doc, 'State7'), panel = disabledScript.nextElementSibling;
               panel.showPopover();
               const surfaces = [...doc.querySelectorAll('#available-tags button, #selected-tags button'), ...disabledScript.querySelectorAll('.tag-label'), ...panel.querySelectorAll('.tag-label')].filter(e => fixedTags.includes(e.dataset.tag));
               const metadata = surfaces.map(e => e.getAttribute('style'));
@@ -6911,7 +7029,8 @@ for (const prefix of ["/", "/project/"])
                 });
               }
               panel.hidePopover();
-              for (const chip of [...doc.querySelectorAll('#selected-tags button')]) if (chip.dataset.tag !== 'hidden') chip.click();
+               for (const chip of [...doc.querySelectorAll('#selected-tags button')]) if (chip.dataset.tag !== 'hidden') chip.click();
+               await win.directoryTick();
               for (const li of doc.querySelectorAll('li[hidden]')) li.hidden = false;
              for (const details of doc.querySelectorAll('details')) details.open = true;
            }
@@ -7029,16 +7148,18 @@ for (const prefix of ["/", "/project/"])
           }
           for (const [rule, selector] of hoverRules) rule.selectorText = selector;
           if (!native) {
+              // Recreate the view after the deliberately DOM-mutated visual projection.
+              await load(prefix); doc = frame.contentDocument; win = frame.contentWindow;
+              doc.querySelector('#selected-tags button').click();
+              await query(doc, '  #DOCS  '); check(count(doc) === 8, 'Selected docs excludes hidden');
              doc.querySelector('#selected-tags button').click();
-             query(doc, '  #DOCS  '); check(count(doc) === 8, 'Selected docs excludes hidden');
+              await query(doc, '#release-notes '); check(count(doc) === 9, 'Selected renamed tag');
              doc.querySelector('#selected-tags button').click();
-             query(doc, '#release-notes '); check(count(doc) === 9, 'Selected renamed tag');
-             doc.querySelector('#selected-tags button').click();
-            query(doc, '#'); check(count(doc) === 0 && !doc.querySelector('#search-status').hidden, 'Bare tag');
-            query(doc, 'docs guide'); check(count(doc) === 1 && shown(doc) === 'Literal', 'Plain substring split');
-             query(doc, '#broken #disabled '); check(count(doc) === 4, 'Reserved AND');
+             await query(doc, '#'); check(count(doc) === 0 && !doc.querySelector('#search-status').hidden, 'Bare tag');
+             await query(doc, 'docs guide'); check(count(doc) === 1 && shown(doc) === 'Literal', 'Plain substring split');
+              await query(doc, '#broken #disabled '); check(count(doc) === 4, 'Reserved AND');
              for (const chip of [...doc.querySelectorAll('#selected-tags button')]) chip.click();
-             query(doc, '#disabled '); check(count(doc) === 10, 'State exception');
+              await query(doc, '#disabled '); check(count(doc) === 10, 'State exception');
             // Actual clipboard success/failure through both disabled copy controls, including hidden combination.
             const copied = []; let fail = false;
             Object.defineProperty(win.navigator, 'clipboard', { configurable: true, value: { writeText: async value => { if (fail) throw Error('denied'); copied.push(value); } } });
@@ -7061,24 +7182,24 @@ for (const prefix of ["/", "/project/"])
           if (!native) {
             check(!doc.querySelector('.search').hidden && count(doc) === 0 && !doc.querySelector('#empty-directory').hidden, 'All-hidden search unreachable');
             const details = doc.querySelector('details'); check(!details.open, 'Initial hidden disclosure');
-             query(doc, '#broken '); check(count(doc) === 1 && shown(doc) === 'Broken', 'Hidden ancestors/siblings');
+              await query(doc, '#broken '); check(count(doc) === 1 && shown(doc) === 'Broken', 'Hidden ancestors/siblings');
             check(details.open, 'State search did not expand ancestor');
              const toggle = doc.querySelector('#tag-toggle'); check(toggle.getAttribute('aria-expanded') === 'false', 'Token mutated picker');
             toggle.click(); check(count(doc) === 1 && shown(doc) === 'Broken', 'Toggle changed state matches');
-             query(doc, ''); check(count(doc) === 1, 'Clearing lost selection');
+              await query(doc, ''); check(count(doc) === 1, 'Clearing lost selection');
              check(details.open, 'Selection should retain auto-expanded ancestor');
              doc.querySelector('#selected-tags button').click();
-             toggle.click(); check(count(doc) === 0 && !doc.querySelector('#empty-directory').hidden, 'Removing last reserved restores empty state');
-            for (const value of ['broken', '#docs-api', '#missing']) { query(doc, value); check(count(doc) === 0 && !doc.querySelector('#search-status').hidden && doc.querySelector('#empty-directory').hidden && !doc.querySelector('.search').hidden, 'All-hidden zero results'); }
-             query(doc, '#disabled '); check(count(doc) === 1 && shown(doc) === 'Disabled', 'Hidden disabled selection');
+              toggle.click(); await frame.contentWindow.directoryTick(); check(count(doc) === 0 && !doc.querySelector('#empty-directory').hidden, 'Removing last reserved restores empty state');
+             for (const value of ['broken', '#docs-api', '#missing']) { await query(doc, value); check(count(doc) === 0 && !doc.querySelector('#search-status').hidden && doc.querySelector('#empty-directory').hidden && !doc.querySelector('.search').hidden, 'All-hidden zero results'); }
+              await query(doc, '#disabled '); check(count(doc) === 1 && shown(doc) === 'Disabled', 'Hidden disabled selection');
              doc.querySelector('#selected-tags button').click();
-             query(doc, '#hidden '); check(count(doc) === 3, 'Hidden selection');
+              await query(doc, '#hidden '); check(count(doc) === 3, 'Hidden selection');
              doc.querySelector('#selected-tags button').click();
-            query(doc, ''); check(count(doc) === 0 && !doc.querySelector('#empty-directory').hidden, 'Hidden clearing');
+             await query(doc, ''); check(count(doc) === 0 && !doc.querySelector('#empty-directory').hidden, 'Hidden clearing');
             check(!details.open, 'Hidden state clear retained auto-expanded ancestor');
-             details.open = true; query(doc, '#broken '); query(doc, '#disabled ');
+              details.open = true; await query(doc, '#broken '); await query(doc, '#disabled ');
              for (const chip of [...doc.querySelectorAll('#selected-tags button')]) chip.click();
-             query(doc, '');
+              await query(doc, '');
             check(details.open, 'State-search switch/clear collapsed visitor-opened ancestor');
           }
           if (native) {

@@ -60,7 +60,7 @@ export const redirectPage = ({ url, title, disabled }) =>
           <p><a href="${esc(url)}">Continue now</a></p>`,
       );
 
-export const guidePage = (source) =>
+export const guidePage = async (source) =>
   shell(
     GUIDE_NAV.label,
     GUIDE_NAV.key,
@@ -156,7 +156,7 @@ docs:
         </p>
         <h3>Special tags</h3>
         <p>Examples use placeholder destinations.</p>
-        ${guideExampleListing()}
+        ${await guideExampleListing()}
         <ul>
           <li>
             <code>hidden</code> looks dimmed here; it is omitted from listings,

@@ -30,7 +30,7 @@ One JSON or YAML link map is the source of truth. The build validates it and gen
 - Destinations appear on row hover or focus-within only in hover-capable, fine-pointer mode with no coarse input available, with their layout space reserved. Any available coarse pointer, including hybrid touch/mouse devices, forces destinations visible; touch and non-hover modes always show them too. Long URLs stay on one line with middle truncation, preserving the full accessible and copy value.
 - All published destinations, including hidden and disabled links, remain public in `links.json` and directory text. Enabled redirect pages and launchers also include destinations; disabled explanations and inert launchers do not. The legacy `script` property is rejected; use `tags: [..., "script"]` instead. Hiding controls discoverability, not secrecy, and disabling controls shl forwarding/execution, not external access. There is no backend, database, anonymous submission, click tracking, or HTTP 301/302 redirect.
 - Short codes are case-insensitively unique and follow the documented reserved-name rules. Destination syntax is validated, not reachability.
-- Bun 1.4.2 runs the build and checks after `bun ci` installs the YAML parser; no frontend framework is wanted.
+- Bun 1.4.2 runs the build and checks after `bun ci` installs the YAML parser and pinned Vue. The approved directory pilot shares Vue render functions between static HTML and hydration, including Guide example rows; the existing shell, navigation, recovery, theme, copy and download services retain ownership. No Nuxt/Router/Pinia/backend or redesign is authorized.
 - Provide dark and light modes and informational pages.
 
 ## Evidence on Hand
