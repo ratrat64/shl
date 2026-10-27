@@ -7,6 +7,8 @@ import {
   mkdir,
   rm,
   unlink,
+  cp,
+  symlink,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -59,9 +61,9 @@ test("directory policy is pure, hidden-inclusive and AND/text constrained", () =
 test("Vue SSR hydrates lossless hostile models without warnings, replacements or initialization saves", async (t) => {
   const chrome = availableChrome(t);
   if (!chrome) return;
-  const tags = ["a\0b", "</script>", "shell"];
+  const tags = ["a\0b", "</script>", "shell", "high-\ud800", "low-\udfff"];
   const title =
-    "title\rwith\0nul </script><script>globalThis.injected=true</script>";
+    "title\rwith\0nul \ud800 and \udfff </script><script>globalThis.injected=true</script>";
   const f = await fixture(t, {
     folder: {
       hostile: { url: "https://example.com/?q=</script>", title, tags },
@@ -107,8 +109,207 @@ test("Vue SSR hydrates lossless hostile models without warnings, replacements or
         ),
         true,
       );
+      assert.equal(
+        await evaluate(
+          `(async()=>{const input=document.querySelector('#link-search');input.value='';input.dispatchEvent(new Event('input'));document.querySelector('#selected-tags button').click();await directoryTick();const chip=[...document.querySelectorAll('#available-tags button')].find(b=>b.textContent==='#high-�');chip.click();const key='shl:filters:v1:'+new URL(document.querySelector('main').dataset.siteBase).pathname;if(JSON.parse(sessionStorage.getItem(key)).tags[0]!==${scriptString(tags[3])})throw Error('Surrogate identity lost');await directoryTick();return document.querySelector('#selected-tags button').textContent==='#high-�'&&hydrationWarnings.length===0})()`,
+        ),
+        true,
+      );
       await evaluate("sessionStorage.clear()");
     }
+});
+
+test("directory bundle resolves encoded-character checkout paths", async (t) => {
+  const cwd = await mkdtemp(join(tmpdir(), "shl encoded #% "));
+  t.after(() => rm(cwd, { recursive: true, force: true }));
+  await cp(new URL("../src/", import.meta.url), join(cwd, "src"), {
+    recursive: true,
+  });
+  await symlink(
+    fileURLToPath(new URL("../node_modules/", import.meta.url)),
+    join(cwd, "node_modules"),
+    "dir",
+  );
+  const result = spawnSync(
+    process.execPath,
+    [
+      "-e",
+      `const {directoryScript}=await import(${JSON.stringify(pathToFileURL(join(cwd, "src/browser.mjs")).href)});if(!directoryScript.includes('initSearch'))throw Error('Missing bundle')`,
+    ],
+    { cwd, encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test("directory review regressions preserve native/BFCache islands, disclosures and ordered sessions, and cancel mount continuations", async (t) => {
+  const chrome = availableChrome(t);
+  if (!chrome) return;
+  const leaf = {
+    url: "https://example.com/setup.sh",
+    tags: ["shell", "script"],
+  };
+  const f = await fixture(t, {
+    alpha: { folder: { One: leaf } },
+    beta: { other: { Two: leaf } },
+    Off: { url: "https://example.com/", tags: ["disabled"] },
+  });
+  assert.equal(f.build().status, 0);
+  const origin = await browserServer(t, f.cwd);
+  const { evaluate, navigate, traverse } = await browserControls(
+    t,
+    chrome,
+    f.cwd,
+  );
+  for (const prefix of ["/", "/project/"]) {
+    await navigate(origin + prefix + "guide/");
+    await evaluate(`(async()=>{
+      window.reviewCheck=(yes,message)=>{if(!yes)throw Error(message)};
+      window.reviewWait=async predicate=>{for(let n=0;!predicate()&&n<200;n++)await new Promise(r=>setTimeout(r,10));reviewCheck(predicate(),'Navigation incomplete')};
+      window.reviewGo=async path=>{const a=document.createElement('a');a.href=${JSON.stringify(prefix)}+path;a.dataset.appLink='';document.querySelector('main').append(a);a.click();a.remove();await reviewWait(()=>location.pathname===${JSON.stringify(prefix)}+path);await directoryTick()};
+      window.reviewType=async text=>{const input=document.querySelector('#link-search');input.value=text;input.dispatchEvent(new Event('input'));await directoryTick()};
+      await reviewGo('alpha/');
+      window.fetchedMain=document.querySelector('main');
+      reviewCheck(!fetchedMain.querySelector('[data-directory-model]'),'Fetched model script was not stripped');
+      await reviewType('example');
+      let details=document.querySelector('details');reviewCheck(details.open,'Initial filter expansion');
+      details.open=false;await reviewType('setup');reviewCheck(details.open,'Matching query did not reopen manually closed folder');
+      await reviewType('');reviewCheck(!details.open,'Pre-filter closed disclosure lost');
+      details.open=true;await reviewType('example');details.open=false;await reviewType('setup');await reviewType('');reviewCheck(details.open,'Pre-filter visitor disclosure lost');
+      // Refresh order without replacing surviving chip nodes or metadata.
+      await reviewType('#shell #script ');
+      const selected=document.querySelector('#selected-tags'),buttons=[...selected.children],styles=buttons.map(b=>b.getAttribute('style'));
+      const key='shl:filters:v1:'+${JSON.stringify(prefix)},record=JSON.parse(sessionStorage.getItem(key));record.tags.reverse();sessionStorage.setItem(key,JSON.stringify(record));
+      initSearch(true);await directoryTick();
+      reviewCheck(selected.children[0]===buttons[1]&&selected.children[1]===buttons[0]&&buttons.every((b,i)=>b.getAttribute('style')===styles[i]),'Restored tag order/identity/metadata');
+      dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));await directoryTick();
+      reviewCheck(document.querySelector('main')===fetchedMain&&document.querySelector('.code').textContent==='One'&&document.querySelector('details').open,'Fetched persisted restore lost model/expansion');
+      const input=document.querySelector('#link-search');input.value='setup';input.dispatchEvent(new Event('input'));
+      reviewCheck(JSON.stringify(JSON.parse(sessionStorage.getItem(key)).tags)==='["script","shell"]','Next synchronous save lost authoritative order');await directoryTick();
+      await reviewGo('beta/');reviewCheck(document.querySelector('main')===fetchedMain,'Retained transition replaced main');
+      window.currentReviewMain=document.querySelector('main');window.currentReviewInput=document.querySelector('#link-search');
+      for(const href of ['mailto:someone@example.com','https://example.com/attachment']){
+        let releaseCopy,releaseDownload,downloadSignal,copies=0,saves=0;
+        const nativeFetch=fetch,createURL=URL.createObjectURL;
+        Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:()=>new Promise(resolve=>{releaseCopy=resolve})}});
+        globalThis.fetch=(url,options)=>String(url).startsWith('https://example.com/')?Promise.resolve({ok:true,blob:()=>new Promise(resolve=>{releaseDownload=resolve;downloadSignal=options.signal})}):nativeFetch(url,options);
+        URL.createObjectURL=blob=>{saves++;return createURL(blob)};
+        document.querySelector('a.code').click();document.querySelector('button[data-download-url]').click();await reviewWait(()=>releaseCopy&&releaseDownload);
+        const nodes=[...currentReviewMain.querySelectorAll('*')],saved=sessionStorage.getItem(key),a=document.createElement('a');a.href=href;currentReviewMain.append(a);
+        // A later native handler stands in for an unresolved protocol/download.
+        document.addEventListener('click',event=>event.preventDefault(),{once:true});a.click();a.remove();await directoryTick();
+        reviewCheck(nodes.every(node=>node.isConnected)&&document.querySelector('#link-search')===currentReviewInput&&sessionStorage.getItem(key)===saved,'Unresolved native navigation destroyed island');
+        reviewCheck(!currentReviewInput.readOnly&&downloadSignal.aborted,'Native intent left input paused or old download active');
+        releaseCopy();releaseDownload(new Blob(['obsolete']));await new Promise(r=>setTimeout(r,10));
+        reviewCheck(saves===0&&document.querySelector('#copy-status').textContent===''&&document.querySelector('#download-status').textContent==='','Stale native-intent action saved or announced');
+        await reviewType('unmatched');reviewCheck(document.querySelector('.count-number').textContent==='0','Native intent disabled filtering');
+        await reviewType('setup');reviewCheck(document.querySelector('.count-number').textContent==='1','Native intent disabled filter clearing');
+        const toggle=document.querySelector('#tag-toggle'),picker=document.querySelector('#available-tags'),wasOpen=!picker.hidden;
+        toggle.click();reviewCheck(JSON.parse(sessionStorage.getItem(key)).picker===!wasOpen,'Native intent disabled synchronous picker save');await directoryTick();
+        reviewCheck(picker.hidden===wasOpen,'Native intent disabled picker');
+        navigator.clipboard.writeText=async()=>{copies++};globalThis.fetch=async()=>({ok:true,blob:async()=>new Blob(['fresh'])});
+        document.querySelector('a.code').click();document.querySelector('button[data-download-url]').click();
+        await reviewWait(()=>document.querySelector('#copy-status').textContent==='Short link copied.'&&document.querySelector('#download-status').textContent==='Script download started.');
+        reviewCheck(copies===1&&saves===1,'Native intent disabled or duplicated new local actions');
+        globalThis.fetch=nativeFetch;URL.createObjectURL=createURL;
+      }
+      window.reviewPersisted=[];window.reviewCachedDocument=document;addEventListener('pageshow',event=>reviewPersisted.push(event.persisted));
+      // Exercise the native click boundary before leaving for a minimal page.
+      const a=document.createElement('a');a.href=${JSON.stringify(prefix + "Off/")};currentReviewMain.append(a);a.click();
+    })()`);
+    for (
+      let n = 0;
+      n < 200 &&
+      !(await evaluate(
+        `document.querySelector('h1')?.textContent==='Link disabled'`,
+      ));
+      n++
+    )
+      await new Promise((r) => setTimeout(r, 10));
+    assert.equal(
+      await evaluate(`document.querySelector('h1')?.textContent`),
+      "Link disabled",
+    );
+    await traverse(-1);
+    await evaluate(`(async()=>{
+      await reviewWait(()=>reviewPersisted.length===1);await directoryTick();
+      reviewCheck(reviewPersisted[0]&&document===reviewCachedDocument&&document.querySelector('main')===currentReviewMain&&document.querySelector('#link-search')===currentReviewInput,'Fetched/retained BFCache identity');
+      reviewCheck(location.pathname===${JSON.stringify(prefix + "beta/")}&&document.querySelector('.code').textContent==='Two'&&document.querySelector('details').open&&document.querySelector('.count-number').textContent==='1','Persisted restore used stale model or failed unchanged expansion');
+      await reviewType('Two');reviewCheck(document.querySelector('.count-number').textContent==='1','Restored controls inactive');
+      // Pause the navigation mount after the incoming instance has updated.
+      const tick=directoryTick;window.releaseReviewFlush=null;window.reviewMountStarted=false;
+      globalThis.directoryTick=()=>{reviewMountStarted=true;return new Promise(resolve=>{releaseReviewFlush=resolve})};
+      const oldTitle=document.title,oldURL=location.href,oldHistory=history.length;
+      const push=history.pushState;let pushes=0;history.pushState=function(...args){pushes++;return push.apply(this,args)};
+      const a=document.createElement('a');a.href=${JSON.stringify(prefix + "alpha/")};a.dataset.appLink='';currentReviewMain.append(a);a.click();a.remove();
+      await reviewWait(()=>reviewMountStarted);await tick();
+      reviewCheck(document.querySelector('.code').textContent==='One','Gate was not after incoming mount');
+      globalThis.directoryTick=tick;
+      await reviewGo('guide/');
+      const title=document.title,url=location.href,length=history.length,nav=document.querySelector('[aria-current=page]'),focus=document.activeElement;
+      reviewCheck(title==='Guide · shl'&&url!==oldURL&&pushes===1&&nav.dataset.nav==='guide','New intent did not complete');
+      releaseReviewFlush();await tick();await new Promise(r=>setTimeout(r,20));
+      reviewCheck(document.title===title&&location.href===url&&history.length===length&&pushes===1&&document.querySelector('[aria-current=page]')===nav&&document.activeElement===focus,'Obsolete mount changed title/history/nav/focus');history.pushState=push;
+      sessionStorage.clear();
+    })()`);
+  }
+});
+
+test("enhanced navigation fallback keeps a nondeparting directory usable and suppresses stale work", async (t) => {
+  const chrome = availableChrome(t);
+  if (!chrome) return;
+  const f = await fixture(t, {
+    One: { url: "https://example.com/setup.sh", tags: ["shell", "script"] },
+  });
+  assert.equal(f.build().status, 0);
+  // Shadow only navigation's native exit boundary; assignment records intent but
+  // leaves the real browser document alive, like a protocol handler/attachment.
+  await writeFile(
+    join(f.cwd, "dist/assets/navigation.js"),
+    `{
+    const location={get href(){return globalThis.location.href},get origin(){return globalThis.location.origin},assign(url){(globalThis.fallbackAssignments??=[]).push(url)},replace(url){(globalThis.fallbackAssignments??=[]).push(url)}};
+    ${await f.read("assets/navigation.js")}
+  }`,
+  );
+  const origin = await browserServer(t, f.cwd);
+  const { evaluate, navigate } = await browserControls(t, chrome, f.cwd);
+  for (const prefix of ["/", "/project/"]) {
+    await navigate(origin + prefix);
+    await evaluate(`(async()=>{
+      const check=(yes,message)=>{if(!yes)throw Error(message)};
+      const wait=async predicate=>{for(let n=0;!predicate()&&n<200;n++)await new Promise(r=>setTimeout(r,10));check(predicate(),'Fallback test timed out')};
+      const nativeFetch=fetch,guide=await (await nativeFetch(${JSON.stringify(prefix + "guide/")})).text(),requests=[];
+      let releaseCopy,releaseDownload,copies=0,saves=0;
+      Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:()=>new Promise(resolve=>{releaseCopy=resolve})}});
+      const createURL=URL.createObjectURL;URL.createObjectURL=blob=>{saves++;return createURL(blob)};
+      globalThis.fetch=(url,options)=>String(url).startsWith('https://example.com/')?Promise.resolve({ok:true,blob:()=>new Promise(resolve=>{releaseDownload=resolve})}):new Promise(resolve=>requests.push({resolve,signal:options.signal}));
+      const main=document.querySelector('main'),input=document.querySelector('#link-search'),nodes=[...main.querySelectorAll('*')],title=document.title,url=location.href,length=history.length,nav=document.querySelector('[aria-current=page]');
+      input.focus();const focus=document.activeElement;
+      const go=path=>{const a=document.createElement('a');a.href=${JSON.stringify(prefix)}+path;a.dataset.appLink='';main.append(a);a.click();a.remove()};
+      go('obsolete/');await wait(()=>requests.length===1);
+      document.querySelector('a.code').click();document.querySelector('button[data-download-url]').click();await wait(()=>releaseCopy&&releaseDownload);
+      go('attachment/');await wait(()=>requests.length===2);
+      requests[1].resolve(new Response('Not an application document',{headers:{'Content-Type':'text/plain'}}));
+      await wait(()=>globalThis.fallbackAssignments?.length===1);
+      check(fallbackAssignments[0]===new URL(${JSON.stringify(prefix + "attachment/")},location.href).href,'Native assign target');
+      check(nodes.every(node=>node.isConnected)&&document.querySelector('#link-search')===input&&!input.readOnly,'Fallback destroyed or paused directory');
+      check(document.title===title&&location.href===url&&history.length===length&&document.querySelector('[aria-current=page]')===nav&&document.activeElement===focus,'Fallback changed title/history/nav/focus');
+      const type=async text=>{input.value=text;input.dispatchEvent(new Event('input'));check(JSON.parse(sessionStorage.getItem('shl:filters:v1:'+${JSON.stringify(prefix)})).text===text,'Fallback deferred filter save');await directoryTick()};
+      await type('unmatched');check(document.querySelector('.count-number').textContent==='0','Fallback disabled filtering');
+      await type('setup');check(document.querySelector('.count-number').textContent==='1','Fallback disabled filter clearing');
+      document.querySelector('#tag-toggle').click();await directoryTick();check(!document.querySelector('#available-tags').hidden,'Fallback disabled picker');
+      releaseCopy();releaseDownload(new Blob(['obsolete']));await new Promise(r=>setTimeout(r,10));
+      check(saves===0&&document.querySelector('#copy-status').textContent===''&&document.querySelector('#download-status').textContent==='','Fallback admitted stale local completion');
+      navigator.clipboard.writeText=async()=>{copies++};globalThis.fetch=async()=>({ok:true,blob:async()=>new Blob(['fresh'])});
+      document.querySelector('a.code').click();document.querySelector('button[data-download-url]').click();
+      await wait(()=>document.querySelector('#copy-status').textContent==='Short link copied.'&&document.querySelector('#download-status').textContent==='Script download started.');
+      check(copies===1&&saves===1,'Fallback disabled or duplicated local actions');
+      const saved=sessionStorage.getItem('shl:filters:v1:'+${JSON.stringify(prefix)}),currentFocus=document.activeElement;
+      requests[0].resolve(new Response(guide,{headers:{'Content-Type':'text/html'}}));await new Promise(r=>setTimeout(r,30));await directoryTick();
+      check(requests.every(request=>request.signal.aborted)&&fallbackAssignments.length===1,'Fallback did not cancel pending intent');
+      check(document.querySelector('main')===main&&document.title===title&&location.href===url&&history.length===length&&document.querySelector('[aria-current=page]')===nav&&document.activeElement===currentFocus&&sessionStorage.getItem('shl:filters:v1:'+${JSON.stringify(prefix)})===saved,'Stale continuation changed title/history/nav/focus/filters');
+      globalThis.fetch=nativeFetch;URL.createObjectURL=createURL;sessionStorage.clear();
+    })()`);
+  }
 });
 
 function themeLabelAttributes(html) {
@@ -702,7 +903,7 @@ test("session filters preserve exact restoration, absent chips, native history, 
         )
           await new Promise((r) => setTimeout(r, 10));
         await evaluate(
-          `(async()=>{if(document!==window.cachedDocument||document.documentElement!==cachedRoot||document.querySelector('header')!==cachedHeader||persistedShows.join(',')!=='true')throw Error('Native Back did not restore actual BFCache document');if(restorationMounts!==1||document.querySelector('#link-search').value!==''||document.querySelector('.count-number').textContent!=='1')throw Error('BFCache latest filters/single mount');if(document.activeElement===cachedChip||document.activeElement.dataset.tag!=='café'||scrollY!==cachedScroll)throw Error('BFCache chip focus/scroll lost');document.querySelector('#tag-toggle').click();await directoryTick();if(document.querySelector('#tag-toggle').getAttribute('aria-expanded')!=='false')throw Error('BFCache duplicate listeners')})()`,
+          `(async()=>{if(document!==window.cachedDocument||document.documentElement!==cachedRoot||document.querySelector('header')!==cachedHeader||persistedShows.join(',')!=='true')throw Error('Native Back did not restore actual BFCache document');if(restorationMounts!==1||document.querySelector('#link-search').value!==''||document.querySelector('.count-number').textContent!=='1')throw Error('BFCache latest filters/single mount');if(document.activeElement!==cachedChip||!cachedChip.isConnected||document.activeElement.dataset.tag!=='café'||scrollY!==cachedScroll)throw Error('BFCache chip focus/scroll lost');document.querySelector('#tag-toggle').click();await directoryTick();if(document.querySelector('#tag-toggle').getAttribute('aria-expanded')!=='false')throw Error('BFCache duplicate listeners')})()`,
         );
         await evaluate(`window.cachedScroll=scrollY`);
         await traverse(1);

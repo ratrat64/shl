@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { isDirectory, linkUrl, linkStates } from "./links.mjs";
 
 const bundle = await Bun.build({
-  entrypoints: [new URL("./assets/search.js", import.meta.url).pathname],
+  entrypoints: [fileURLToPath(new URL("./assets/search.js", import.meta.url))],
   target: "browser",
   format: "iife",
   minify: true,

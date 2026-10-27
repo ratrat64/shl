@@ -20,7 +20,7 @@
     globalThis.initRecovery(navigate);
   };
 
-  const cleanup = (retained = false) => {
+  const cleanup = (retained = true) => {
     globalThis.cleanupCopy?.();
     if (!retained) globalThis.unmountDirectory?.();
     globalThis.cleanupDownload?.();
@@ -60,6 +60,15 @@
     }
   };
   let pending;
+  const nativeExit = () => {
+    ++request;
+    globalThis.finishThemeTransition?.();
+    pending?.abort();
+    cleanup();
+    globalThis.resumeSearch?.();
+    globalThis.initCopy();
+    globalThis.initDownload();
+  };
   async function navigate(url, push, replace = false) {
     globalThis.finishThemeTransition?.();
     const current = ++request;
@@ -71,7 +80,7 @@
     globalThis.initDownload();
     if (samePage(new URL(url), new URL(displayed))) {
       if (replace) {
-        cleanup();
+        nativeExit();
         location.replace(url);
         return;
       }
@@ -142,7 +151,7 @@
         delete outgoing.dataset.entering;
         main = outgoing;
       } else {
-        cleanup();
+        cleanup(false);
         outgoing.replaceWith(main);
         directoryTools = incoming;
       }
@@ -164,7 +173,7 @@
       place(url, !push);
     } catch {
       if (current === request) {
-        cleanup();
+        nativeExit();
         if (replace) location.replace(url);
         else location.assign(url);
       }
@@ -209,10 +218,7 @@
         samePage(url, new URL(displayed))
       )
         return;
-      ++request;
-      globalThis.finishThemeTransition?.();
-      pending?.abort();
-      cleanup();
+      nativeExit();
       return;
     }
     event.preventDefault();

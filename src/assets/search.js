@@ -73,9 +73,7 @@ import { createDirectoryState } from "../directory-state.mjs";
       island = { app, root, controller };
     }
     const { state } = island.controller;
-    if (refreshStorage) {
-      state.selectionEpoch = (state.selectionEpoch || 0) + 1;
-    }
+    if (refreshStorage) state.contentKey = (state.contentKey || 0) + 1;
     const retained = !!incoming;
     const selectedTrack = document.querySelector("#selected-tags"),
       availableTrack = document.querySelector("#available-tags");
@@ -98,7 +96,6 @@ import { createDirectoryState } from "../directory-state.mjs";
     const identity = (button) => JSON.parse(`"${button.dataset.tag}"`);
     const metadata = new Map(model.metadata.map((tag) => [tag.identity, tag]));
     const catalog = new Map(model.catalog.map((tag) => [tag.identity, tag]));
-    const selections = state.selections;
     const valid = (record) =>
       record?.version === 1 &&
       typeof record.text === "string" &&
@@ -128,6 +125,14 @@ import { createDirectoryState } from "../directory-state.mjs";
     if (!valid(restored))
       restored = { version: 1, text: "", tags: [], picker: false };
     records.set(key, restored);
+    const previousSelections = state.selections;
+    state.selections = new Map(
+      restored.tags.map((tag) => [
+        tag,
+        previousSelections.get(tag) || catalog.get(tag) || metadata.get(tag),
+      ]),
+    );
+    const selections = state.selections;
     state.picker = restored.picker;
     let active = true;
     globalThis.pauseSearch = () => {
@@ -159,8 +164,6 @@ import { createDirectoryState } from "../directory-state.mjs";
         }
       }
     };
-    for (const tag of selections.keys())
-      if (!restored.tags.includes(tag)) selections.delete(tag);
     if (input.value !== restored.text) input.value = restored.text;
     input.readOnly = false;
     let unknown = [];
@@ -520,9 +523,6 @@ import { createDirectoryState } from "../directory-state.mjs";
       composing = false;
       tokens();
     });
-    for (const tag of restored.tags) {
-      if (!selections.has(tag)) select(tag);
-    }
     picker(restored.picker, false);
     state.error = state.notice = "";
     update(false);

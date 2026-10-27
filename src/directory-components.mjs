@@ -3,7 +3,9 @@ import { downloadName, linkSearch } from "./directory-model.mjs";
 
 // HTML replaces literal NUL. Keep the model lossless and its DOM projection stable.
 const domText = (value) =>
-  typeof value === "string" ? value.replaceAll("\0", "\ufffd") : value;
+  typeof value === "string"
+    ? value.toWellFormed().replaceAll("\0", "\ufffd")
+    : value;
 const h = (type, props, children) =>
   vnode(
     type,
@@ -187,9 +189,11 @@ const DirectoryNode = {
     let details;
     let nativeOpen = false;
     watch(
-      () => props.node.expanded,
-      (expanded) => {
-        if (expanded) nativeOpen = details?.open || false;
+      () => props.node,
+      (node, previous) => {
+        if (node.expanded && !previous.expanded)
+          nativeOpen = details?.open || false;
+        if (details) details.open = node.expanded || nativeOpen;
       },
       { flush: "sync" },
     );
@@ -276,11 +280,7 @@ export const Directory = {
                 "aria-label": "Selected tags",
                 hidden: !selected.length,
               },
-              selected.map((tag) => {
-                const chip = TagChip(tag, true);
-                chip.key = `${s.selectionEpoch || 0}:${tag.identity}`;
-                return chip;
-              }),
+              selected.map((tag) => TagChip(tag, true)),
             ),
             m.total
               ? h("div", { class: "search", hidden: !s.enhanced }, [
