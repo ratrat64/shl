@@ -1,0 +1,5 @@
+[
+  {"claim":"Generic component state/event/rendering responsibility [1]","class":"pattern","pub_date":"2025-04-11"},
+  {"claim":"Svelte compiler versus Kit application framework [2,13]","class":"pattern","pub_date":"2026-04-21"},
+  {"claim":"Framework selection judgment","class":"selection","pub_date":"2026-10-27"}
+]
