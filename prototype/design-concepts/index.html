@@ -1,0 +1,1622 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway. Three structurally different concepts for the shl
+  directory page, built on docs/design-system-requirements.md and switchable
+  with ?variant=A|B|C (or the floating bar, or ← / →). Real data and the real
+  directory model (src/directory-model.mjs). Run: bun run prototype
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Design concepts · shl prototype</title>
+    <style>
+      /* ---------- Primitives (TOK-1): theme-agnostic raw values ---------- */
+      :root {
+        --gray-0: #ffffff;
+        --gray-50: #f6f7f9;
+        --gray-100: #eef0f3;
+        --gray-200: #dfe3e8;
+        --gray-300: #c5cbd3;
+        --gray-400: #9aa2ad;
+        --gray-500: #6c7480;
+        --gray-600: #555c67;
+        --gray-700: #3d434c;
+        --gray-800: #262b32;
+        --gray-850: #1c2026;
+        --gray-900: #14171b;
+        --gray-950: #0d0f12;
+        --teal-200: #9be3d7;
+        --teal-300: #6fd3c3;
+        --teal-600: #00776b;
+        --teal-700: #005f56;
+        --teal-tint-light: #dff3ef;
+        --teal-tint-dark: #10302c;
+        --violet-300: #c0a6f5;
+        --violet-600: #6b3fc4;
+        --vermilion-300: #f3957b;
+        --vermilion-600: #b33a1b;
+        --red-300: #f97066;
+        --red-600: #b42318;
+        --space-1: 0.25rem;
+        --space-2: 0.5rem;
+        --space-3: 0.75rem;
+        --space-4: 1rem;
+        --space-6: 1.5rem;
+        --radius-sm: 4px;
+        --radius-md: 6px;
+        --radius-lg: 8px;
+        --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono",
+          Menlo, Consolas, monospace;
+        --motion-duration: 240ms;
+        --motion-easing: cubic-bezier(0.2, 0, 0, 1);
+      }
+
+      /* ---------- Semantic tokens (TOK-1, TOK-3): themes live here ---------- */
+      :root {
+        color-scheme: light dark;
+        --bg: light-dark(var(--gray-50), var(--gray-950));
+        --surface: light-dark(var(--gray-0), var(--gray-900));
+        --surface-raised: light-dark(var(--gray-0), var(--gray-850));
+        --ink: light-dark(var(--gray-900), var(--gray-100));
+        --ink-muted: light-dark(var(--gray-600), var(--gray-400));
+        --border: light-dark(var(--gray-200), var(--gray-800));
+        --row-hover: light-dark(var(--gray-100), var(--gray-850));
+        --accent: light-dark(var(--teal-600), var(--teal-300));
+        --accent-strong: light-dark(var(--teal-700), var(--teal-200));
+        --accent-tint: light-dark(var(--teal-tint-light), var(--teal-tint-dark));
+        --accent-contrast: light-dark(var(--gray-0), var(--gray-950));
+        --broken: light-dark(var(--vermilion-600), var(--vermilion-300));
+        --script: light-dark(var(--violet-600), var(--violet-300));
+        --disabled: light-dark(var(--gray-500), var(--gray-400));
+        --tag-script: var(--script);
+        --tag-hidden: light-dark(var(--gray-600), var(--gray-300));
+        --error: light-dark(var(--red-600), var(--red-300));
+        --shadow-raised: 0 4px 16px rgb(0 0 0 / 0.14);
+        --row-height: 2.5rem;
+        --target: 2rem;
+      }
+      :root[data-theme="light"] {
+        color-scheme: light;
+      }
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+      }
+      @media (any-pointer: coarse) {
+        :root {
+          --row-height: 2.75rem;
+          --target: 2.75rem;
+        }
+      }
+
+      /* ---------- Base ---------- */
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font: 400 0.9375rem/1.5 var(--font-ui);
+        padding-bottom: 7rem;
+      }
+      ::selection {
+        background: var(--accent-tint);
+        color: var(--accent-strong);
+      }
+      a {
+        color: var(--accent);
+      }
+      :focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+        border-radius: var(--radius-sm);
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+      .wrap {
+        max-width: 74rem;
+        margin: 0 auto;
+        padding: 0 var(--space-4);
+      }
+      .i {
+        width: 16px;
+        height: 16px;
+        flex: none;
+      }
+      kbd {
+        font: 500 0.6875rem var(--font-mono);
+        border: 1px solid var(--border);
+        border-bottom-width: 2px;
+        border-radius: var(--radius-sm);
+        padding: 0 0.3rem;
+        background: var(--surface);
+      }
+
+      /* ---------- Shell ---------- */
+      .head {
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+      }
+      .head-in {
+        display: flex;
+        align-items: center;
+        gap: var(--space-6);
+        min-height: 3.5rem;
+      }
+      .brand {
+        font: 700 1.0625rem var(--font-mono);
+        color: var(--ink);
+        text-decoration: none;
+      }
+      .brand .sl {
+        color: var(--accent);
+      }
+      .nav {
+        display: flex;
+        gap: var(--space-4);
+      }
+      .nav a {
+        color: var(--ink-muted);
+        text-decoration: none;
+        font-weight: 500;
+        padding: 0.25rem 0;
+      }
+      .nav a[aria-current="page"] {
+        color: var(--ink);
+        text-decoration: underline 2px var(--accent);
+        text-underline-offset: 0.55rem;
+      }
+      .head-in .theme {
+        margin-left: auto;
+      }
+      .foot {
+        color: var(--ink-muted);
+        font-size: 0.8125rem;
+        padding-block: var(--space-6);
+      }
+
+      /* ---------- Buttons ---------- */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        min-height: var(--target);
+        padding: 0 0.625rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        background: transparent;
+        color: var(--ink);
+        font: 500 0.8125rem var(--font-ui);
+        text-decoration: none;
+        white-space: nowrap;
+        cursor: pointer;
+        transition:
+          background-color 120ms,
+          border-color 120ms,
+          color 120ms;
+      }
+      .btn:hover {
+        background: var(--row-hover);
+      }
+      .btn.ghost {
+        border-color: transparent;
+      }
+      .btn-open {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .btn-open:hover,
+      .btn-open:focus-visible {
+        background: var(--accent-tint);
+        color: var(--accent-strong);
+      }
+      .btn:disabled {
+        color: var(--disabled);
+        border-color: var(--border);
+        border-style: dashed;
+        background: transparent;
+        cursor: not-allowed;
+      }
+      .btn[aria-busy="true"] {
+        cursor: progress;
+      }
+      .chev {
+        transition: transform 120ms;
+      }
+      [aria-expanded="true"] > .chev {
+        transform: rotate(180deg);
+      }
+
+      /* ---------- Tags (TAG-1..4, COL-4/5) ---------- */
+      .tag {
+        --tone: light-dark(var(--tag-light), var(--tag-dark));
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        height: 1.375rem;
+        padding: 0 0.375rem;
+        border: 1px solid color-mix(in srgb, var(--tone) 32%, transparent);
+        border-radius: var(--radius-sm);
+        background: color-mix(in srgb, var(--tone) 9%, transparent);
+        color: var(--tone);
+        font: 500 0.75rem var(--font-mono);
+        white-space: nowrap;
+        flex: none;
+      }
+      .tag .i {
+        width: 12px;
+        height: 12px;
+      }
+      .tag.more {
+        --tone: var(--ink-muted);
+        cursor: default;
+      }
+      .chip {
+        cursor: pointer;
+        height: 1.75rem;
+      }
+      .chip:hover {
+        background: color-mix(in srgb, var(--tone) 18%, transparent);
+      }
+      .chip[aria-pressed="true"] {
+        border-color: color-mix(in srgb, var(--tone) 60%, transparent);
+      }
+      .tags {
+        display: flex;
+        gap: 0.25rem;
+        min-width: 0;
+        overflow: hidden;
+      }
+
+      /* ---------- Toolbar ---------- */
+      .tools {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: var(--space-3) var(--space-4);
+        align-items: center;
+        margin: var(--space-6) 0 var(--space-2);
+      }
+      .count {
+        margin: 0;
+        font: 650 1.5rem/1.2 var(--font-ui);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      .tool-actions {
+        display: flex;
+        gap: var(--space-2);
+        justify-content: flex-end;
+        align-items: center;
+        min-width: 0;
+      }
+      .track {
+        display: flex;
+        gap: 0.375rem;
+        overflow-x: auto;
+        padding: 4px;
+        margin: -4px;
+        min-width: 0;
+        scrollbar-width: thin;
+      }
+      .track[hidden] {
+        display: none;
+      }
+      .track.available {
+        grid-column: 1 / -1;
+      }
+      .track .note {
+        color: var(--ink-muted);
+        font-size: 0.8125rem;
+        align-self: center;
+      }
+      .search {
+        position: relative;
+        display: block;
+        flex: 0 1 18rem;
+        min-width: 10rem;
+      }
+      .search input {
+        width: 100%;
+        height: var(--target);
+        min-height: 2.25rem;
+        padding: 0 0.625rem 0 2rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        background: var(--surface);
+        color: var(--ink);
+        font: 400 0.875rem var(--font-ui);
+      }
+      .search input:focus {
+        border-color: var(--accent);
+      }
+      .search .si {
+        position: absolute;
+        left: 0.625rem;
+        top: 50%;
+        translate: 0 -50%;
+        color: var(--ink-muted);
+        pointer-events: none;
+      }
+      .crumbs {
+        color: var(--ink-muted);
+        font-size: 0.8125rem;
+        min-height: 1.25rem;
+        margin-bottom: var(--space-2);
+      }
+      .crumbs a {
+        color: var(--ink-muted);
+      }
+      .crumbs a:hover {
+        color: var(--accent);
+      }
+      .empty {
+        color: var(--ink-muted);
+        padding: var(--space-4) var(--space-2);
+      }
+
+      /* ---------- Link row (§4.5, ACT-1..10) ---------- */
+      .list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .row {
+        display: grid;
+        align-items: center;
+        gap: var(--space-4);
+        min-height: var(--row-height);
+        padding: 0 var(--space-2);
+        border-radius: var(--radius-md);
+      }
+      .row:hover,
+      .row:focus-within {
+        background: var(--row-hover);
+      }
+      .c-code,
+      .c-dest,
+      .c-tags {
+        min-width: 0;
+        display: flex;
+      }
+      .c-acts {
+        display: flex;
+        gap: 0.375rem;
+        justify-content: flex-end;
+      }
+      .copy {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        min-width: 0;
+        max-width: calc(100% + 0.5rem); /* the negative margins below */
+        padding: 0.125rem 0.25rem;
+        margin: 0 -0.25rem;
+        border: 0;
+        border-radius: var(--radius-sm);
+        background: none;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        text-decoration: none;
+        cursor: copy;
+      }
+      .code {
+        font: 600 0.875rem/1.25rem var(--font-mono);
+        color: var(--ink);
+      }
+      .code .path {
+        color: var(--ink-muted);
+        font-weight: 400;
+      }
+      .code-text,
+      .path {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .copy:hover .code-text,
+      .copy:hover .d-start,
+      .copy:hover .d-end {
+        text-decoration: underline dotted;
+        text-underline-offset: 3px;
+      }
+      .dest {
+        width: 100%;
+        color: var(--ink-muted);
+        font: 400 0.8125rem/1.25rem var(--font-mono);
+      }
+      .d-text {
+        display: flex;
+        min-width: 0;
+      }
+      .d-start {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .d-end {
+        flex-shrink: 0;
+        max-width: 55%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      /* Copy icons: space always reserved, shown on row hover/focus (ACT-3). */
+      .ci {
+        width: 14px;
+        height: 14px;
+        color: var(--ink-muted);
+        opacity: 0;
+        transition: opacity 120ms;
+      }
+      .row:hover .ci,
+      .row:focus-within .ci {
+        opacity: 1;
+      }
+      @media (any-pointer: coarse) {
+        .ci {
+          opacity: 1;
+        }
+      }
+      html:not(.js) .ci {
+        display: none;
+      }
+      .ci-check,
+      .ci-err {
+        display: none;
+      }
+      .copy[data-state] .ci-copy {
+        display: none;
+      }
+      .copy[data-state="copied"] .ci-check,
+      .copy[data-state="failed"] .ci-err {
+        display: block;
+        opacity: 1;
+      }
+      .copy[data-state="copied"] .ci-check {
+        color: var(--ink);
+      }
+      .copy[data-state="failed"] .ci-err {
+        color: var(--error);
+      }
+
+      /* Row states combine, one channel each (COL-6). */
+      .s-disabled .code,
+      .s-disabled .dest {
+        color: var(--disabled);
+      }
+      .s-hidden .c-code,
+      .s-hidden .c-dest,
+      .s-hidden .tag:not(.state) {
+        opacity: 0.68;
+      }
+      .s-broken:not(.s-disabled) .btn:not(:disabled):hover {
+        border-color: var(--broken);
+        color: var(--broken);
+        background: color-mix(in srgb, var(--broken) 10%, transparent);
+      }
+
+      /* ---------- Folder rows ---------- */
+      .folder > details > summary {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        min-height: var(--row-height);
+        padding: 0 var(--space-2);
+        padding-left: calc(var(--space-2) + var(--depth, 0) * 1.25rem);
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        list-style: none;
+      }
+      .folder > details > summary::-webkit-details-marker {
+        display: none;
+      }
+      .folder > details > summary:hover {
+        background: var(--row-hover);
+      }
+      .folder > details > summary > .chev {
+        transform: rotate(-90deg);
+        color: var(--ink-muted);
+      }
+      .folder > details[open] > summary > .chev {
+        transform: none;
+      }
+      .fi {
+        color: var(--ink-muted);
+      }
+      .fname {
+        font: 600 0.875rem var(--font-ui);
+        color: var(--ink);
+        text-decoration: none;
+      }
+      a.fname:hover {
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+      .fcount {
+        color: var(--ink-muted);
+        font: 400 0.75rem var(--font-mono);
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* ---------- A · Ledger ---------- */
+      .ledger .row {
+        grid-template-columns:
+          minmax(0, 15rem) minmax(0, 13rem) minmax(0, 1fr)
+          11.5rem;
+      }
+      .ledger .c-code {
+        padding-left: calc(var(--depth, 0) * 1.25rem);
+      }
+      .ledger-head {
+        display: grid;
+        grid-template-columns:
+          minmax(0, 15rem) minmax(0, 13rem) minmax(0, 1fr)
+          11.5rem;
+        gap: var(--space-4);
+        padding: 0 var(--space-2) var(--space-1);
+        border-bottom: 1px solid var(--border);
+        margin-bottom: var(--space-1);
+        color: var(--ink-muted);
+        font: 500 0.75rem var(--font-ui);
+      }
+      .ledger-head :last-child {
+        text-align: right;
+      }
+
+      /* ---------- B · Finder ---------- */
+      .finder {
+        display: grid;
+        grid-template-columns: 15rem minmax(0, 1fr);
+        gap: var(--space-6);
+        align-items: start;
+        margin-top: var(--space-6);
+      }
+      .side {
+        position: sticky;
+        top: var(--space-4);
+        max-height: calc(100vh - 2rem);
+        overflow: auto;
+        padding: var(--space-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        background: var(--surface);
+      }
+      .tree,
+      .tree ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .tnode {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        min-height: var(--target);
+        padding: 0 var(--space-2);
+        padding-left: calc(var(--space-2) + var(--depth, 0) * 0.875rem);
+        border-radius: var(--radius-md);
+        color: var(--ink);
+        text-decoration: none;
+        font-size: 0.875rem;
+      }
+      .tnode > span:first-of-type {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .tnode .fcount {
+        margin-left: auto;
+      }
+      .tnode:hover {
+        background: var(--row-hover);
+      }
+      .tnode[aria-current="page"] {
+        background: var(--accent-tint);
+        color: var(--accent-strong);
+        box-shadow: inset 2px 0 var(--accent);
+      }
+      .pane .tools {
+        margin-top: var(--space-2);
+      }
+      .folder-btn {
+        display: none;
+      }
+      .flat .row {
+        grid-template-columns:
+          minmax(0, 12rem) minmax(0, 10rem) minmax(0, 1fr)
+          auto;
+      }
+      .frow-link {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-height: var(--row-height);
+        padding: 0 var(--space-2);
+        border-radius: var(--radius-md);
+        text-decoration: none;
+      }
+      .frow-link:hover {
+        background: var(--row-hover);
+      }
+      .frow-link .chev-r {
+        margin-left: auto;
+        transform: rotate(-90deg);
+        color: var(--ink-muted);
+      }
+      .frow + .row,
+      .frow-end {
+        border-top: 1px solid var(--border);
+        margin-top: var(--space-1);
+        padding-top: var(--space-1);
+      }
+
+      /* ---------- C · Launcher ---------- */
+      .launcher {
+        max-width: 54rem;
+        margin: 0 auto;
+      }
+      .hero {
+        padding: 2.5rem 0 var(--space-2);
+      }
+      .count-line {
+        margin: 0 0 var(--space-2);
+        color: var(--ink-muted);
+        font-size: 0.875rem;
+        font-variant-numeric: tabular-nums;
+      }
+      .count-line .num {
+        color: var(--ink);
+        font-weight: 650;
+      }
+      .search.big {
+        max-width: none;
+      }
+      .search.big input {
+        height: 3.25rem;
+        padding-left: 2.75rem;
+        border-radius: var(--radius-lg);
+        font-size: 1.125rem;
+        box-shadow: var(--shadow-raised);
+      }
+      .search.big .si {
+        left: 1rem;
+        width: 18px;
+        height: 18px;
+      }
+      .hints {
+        margin: var(--space-2) 0 0;
+        color: var(--ink-muted);
+        font-size: 0.75rem;
+      }
+      .facets {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.375rem;
+        margin: var(--space-4) 0 var(--space-2);
+      }
+      .facets.collapsed {
+        max-height: 3.75rem;
+        overflow: hidden;
+      }
+      .facets-more {
+        margin-bottom: var(--space-2);
+      }
+      .facets .sep {
+        width: 1px;
+        background: var(--border);
+        margin: 0 0.25rem;
+      }
+      .group > h2 {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        margin: var(--space-4) 0 0;
+        padding: var(--space-2) var(--space-3);
+        background: var(--bg);
+        color: var(--ink-muted);
+        font: 600 0.75rem var(--font-mono);
+      }
+      .launch .row {
+        grid-template-columns: fit-content(60%) minmax(0, 1fr) auto;
+        grid-template-areas:
+          "code tags acts"
+          "dest dest acts";
+        gap: 0.125rem var(--space-3);
+        padding: var(--space-2) var(--space-3);
+        border-radius: var(--radius-lg);
+      }
+      .launch .c-code {
+        grid-area: code;
+      }
+      .launch .c-tags {
+        grid-area: tags;
+      }
+      .launch .c-dest {
+        grid-area: dest;
+      }
+      .launch .c-acts {
+        grid-area: acts;
+      }
+      .launch .code {
+        font-size: 0.9375rem;
+      }
+      .launch .row.active {
+        background: var(--row-hover);
+        box-shadow: inset 2px 0 var(--accent);
+      }
+      .launch .row.active .ci {
+        opacity: 1;
+      }
+
+      /* ---------- Narrow screens: one breakpoint (LAY-4) ---------- */
+      @media (max-width: 740px) {
+        .head-in {
+          gap: var(--space-4);
+        }
+        .tools {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .tool-actions {
+          flex-wrap: wrap;
+          justify-content: stretch;
+        }
+        .tool-actions .track.selected {
+          flex: 1 0 100%;
+          order: -1;
+        }
+        .search {
+          flex: 1 1 auto;
+        }
+        .ledger-head {
+          display: none;
+        }
+        /* State tags must never clip (TAG-3): let tags wrap instead. */
+        .c-tags .tags {
+          flex-wrap: wrap;
+        }
+        /* Finding: code + state tags don't fit beside the buttons at
+           375px, so tags take their own line instead of the required two. */
+        .ledger .row,
+        .flat .row,
+        .launch .row {
+          grid-template-columns: minmax(0, 1fr) auto;
+          grid-template-areas:
+            "code acts"
+            "tags acts"
+            "dest acts";
+          gap: 0.125rem var(--space-3);
+          padding: var(--space-2);
+        }
+        .c-tags:not(:has(.tag)) {
+          display: none;
+        }
+        .ledger .c-code,
+        .flat .c-code {
+          grid-area: code;
+        }
+        .ledger .c-tags,
+        .flat .c-tags {
+          grid-area: tags;
+        }
+        .ledger .c-dest,
+        .flat .c-dest {
+          grid-area: dest;
+          padding-left: calc(var(--depth, 0) * 1.25rem);
+        }
+        .ledger .c-acts,
+        .flat .c-acts,
+        .launch .c-acts {
+          grid-area: acts;
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .finder {
+          grid-template-columns: minmax(0, 1fr);
+          gap: var(--space-2);
+          margin-top: var(--space-4);
+        }
+        .side {
+          display: none;
+          position: static;
+          max-height: 60vh;
+        }
+        .side.open {
+          display: block;
+        }
+        .folder-btn {
+          display: inline-flex;
+          justify-self: start;
+          border-color: var(--border);
+        }
+        .hero {
+          padding-top: var(--space-6);
+        }
+        .hints {
+          display: none;
+        }
+      }
+
+      /* ---------- Tooltip and "Copied" bubble (§4.9) ---------- */
+      .tip {
+        position: fixed;
+        z-index: 50;
+        max-width: 22rem;
+        padding: 0.3rem 0.5rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        background: var(--surface-raised);
+        box-shadow: var(--shadow-raised);
+        color: var(--ink);
+        font: 500 0.75rem/1.35 var(--font-ui);
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 120ms;
+      }
+      .tip.show {
+        opacity: 1;
+      }
+      .status {
+        position: fixed;
+        left: var(--space-4);
+        bottom: 5rem;
+        z-index: 40;
+        max-width: min(28rem, calc(100vw - 2rem));
+        margin: 0;
+        padding: var(--space-2) var(--space-3);
+        border: 1px solid color-mix(in srgb, var(--error) 40%, var(--border));
+        border-radius: var(--radius-md);
+        background: var(--surface-raised);
+        box-shadow: var(--shadow-raised);
+        font-size: 0.8125rem;
+      }
+      .status:empty {
+        display: none;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        ::before,
+        ::after {
+          transition: none !important;
+          animation: none !important;
+        }
+      }
+
+      /* ---------- Prototype chrome: deliberately NOT part of the design ---------- */
+      .proto-bar {
+        position: fixed;
+        left: 50%;
+        bottom: 1rem;
+        translate: -50% 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        max-width: calc(100vw - 1rem);
+        padding: 0.3rem;
+        border-radius: 999px;
+        background: #111;
+        color: #fff;
+        outline: 2px dashed #f5c400;
+        outline-offset: 2px;
+        box-shadow: 0 8px 28px rgb(0 0 0 / 0.4);
+        font: 500 0.8125rem system-ui, sans-serif;
+        color-scheme: dark;
+      }
+      .proto-bar button {
+        border: 0;
+        border-radius: 999px;
+        background: #2a2a2a;
+        color: #fff;
+        font: inherit;
+        height: 2rem;
+        min-width: 2rem;
+        padding: 0 0.6rem;
+        cursor: pointer;
+      }
+      .proto-bar button:hover {
+        background: #3a3a3a;
+      }
+      .proto-label {
+        padding: 0 0.6rem;
+        white-space: nowrap;
+      }
+      .proto-state {
+        color: #aaa;
+        font: 400 0.6875rem ui-monospace, monospace;
+        max-width: 22rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        padding-right: 0.5rem;
+      }
+      .proto-notes {
+        position: fixed;
+        left: 50%;
+        bottom: 4.25rem;
+        translate: -50% 0;
+        z-index: 100;
+        width: min(38rem, calc(100vw - 1rem));
+        max-height: 60vh;
+        overflow: auto;
+        padding: 1rem 1.25rem;
+        border-radius: 12px;
+        background: #111;
+        color: #eee;
+        outline: 2px dashed #f5c400;
+        outline-offset: 2px;
+        font: 400 0.8125rem/1.55 system-ui, sans-serif;
+        color-scheme: dark;
+      }
+      .proto-notes h2 {
+        margin: 0 0 0.5rem;
+        font-size: 0.9375rem;
+      }
+      .proto-notes h3 {
+        margin: 0.75rem 0 0.25rem;
+        font-size: 0.75rem;
+        color: #f5c400;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .proto-notes ul {
+        margin: 0;
+        padding-left: 1.1rem;
+      }
+      .proto-notes code {
+        color: #9be3d7;
+      }
+      @media (max-width: 740px) {
+        .proto-state {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="head">
+      <div class="wrap head-in">
+        <a class="brand" href="#" data-folder=""
+          ><span class="sl">/</span>shl<span class="sl">/</span></a
+        >
+        <nav class="nav" aria-label="Main navigation">
+          <a href="#" aria-current="page">Links</a><a href="#">Guide</a>
+        </nav>
+        <button type="button" class="btn ghost theme" id="theme"></button>
+      </div>
+    </header>
+    <main class="wrap" id="main"></main>
+    <footer class="wrap foot">shl · Guide · Repository</footer>
+
+    <div class="tip" id="tip" role="tooltip" hidden></div>
+    <div class="tip" id="bubble" aria-hidden="true" hidden></div>
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+    <p class="sr-only" id="announce" role="status" aria-live="polite"></p>
+
+    <div class="proto-notes" id="proto-notes" hidden></div>
+    <div class="proto-bar" role="toolbar" aria-label="Prototype variant switcher">
+      <button type="button" id="proto-prev" aria-label="Previous variant">←</button>
+      <span class="proto-label" id="proto-label"></span>
+      <button type="button" id="proto-next" aria-label="Next variant">→</button>
+      <button type="button" id="proto-notes-toggle" aria-expanded="false">Notes</button>
+      <span class="proto-state" id="proto-state"></span>
+    </div>
+
+    <script type="module">
+      import {
+        entryTree,
+        tagCatalog,
+        filterDirectory,
+        downloadName,
+      } from "/model.mjs";
+
+      document.documentElement.classList.add("js");
+      const raw = await (await fetch("/links.json")).json();
+      const tree = entryTree(raw);
+
+      const $ = (selector) => document.querySelector(selector);
+      const esc = (value) =>
+        String(value).replace(
+          /[&<>"']/g,
+          (c) =>
+            ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
+        );
+
+      // ---------- Icons (ICO-1/2): 16px grid, 1.5 stroke, currentColor ----------
+      const ICONS = {
+        open: '<path d="M6.5 3.5H3.5v9h9V9.5M9 3h4v4M13 3 7.5 8.5"/>',
+        download: '<path d="M8 2.5v8m0 0 3-3m-3 3-3-3M2.5 13.5h11"/>',
+        tag: '<path d="M2.5 2.5H8l5.5 5.5-5.5 5.5-5.5-5.5zM5.5 5.5h.01"/>',
+        chev: '<path d="m4.5 6 3.5 3.5L11.5 6"/>',
+        copy: '<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5v-2a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2"/>',
+        check: '<path d="m3.5 8.5 3 3 6-7"/>',
+        error: '<circle cx="8" cy="8" r="5.5"/><path d="M8 5v3.5M8 11h.01"/>',
+        warning: '<path d="M8 2.5 14 13H2z"/><path d="M8 6.5v3M8 11.2h.01"/>',
+        terminal: '<rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="m4.5 6.5 2 1.5-2 1.5M8 10h3"/>',
+        blocked: '<circle cx="8" cy="8" r="5.5"/><path d="m4.2 11.8 7.6-7.6"/>',
+        eyeoff: '<path d="M2 8s2.2-4 6-4c1 0 1.9.3 2.6.7M14 8s-2.2 4-6 4c-1 0-1.9-.3-2.6-.7M6.6 9.4a2 2 0 0 1 2.8-2.8M2.5 13.5l11-11"/>',
+        close: '<path d="m4.5 4.5 7 7m0-7-7 7"/>',
+        folder: '<path d="M2 4.5a1 1 0 0 1 1-1h3l1.5 1.5H13a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/>',
+        search: '<circle cx="7" cy="7" r="4"/><path d="m10 10 3.5 3.5"/>',
+        system: '<rect x="2.5" y="3" width="11" height="7.5" rx="1"/><path d="M6.5 13.5h3M8 10.5v3"/>',
+        light: '<circle cx="8" cy="8" r="2.8"/><path d="M8 1.8v1.4M8 12.8v1.4M1.8 8h1.4M12.8 8h1.4M3.6 3.6l1 1M11.4 11.4l1 1M12.4 3.6l-1 1M4.6 11.4l-1 1"/>',
+        dark: '<path d="M13.5 8.5A5.5 5.5 0 1 1 7.5 2.5a4.5 4.5 0 0 0 6 6z"/>',
+      };
+      const icon = (name, cls = "") =>
+        `<svg class="i ${cls}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
+
+      // ---------- Shared state: survives variant switches for fair comparison ----------
+      const state = { text: "", tags: [], picker: false, path: [], active: 0 };
+      const openFolders = new Set();
+      const isActive = () => !!state.text.trim() || !!state.tags.length;
+      const pathKey = () => state.path.join("/");
+      const nodesAt = (path) => {
+        let nodes = tree;
+        for (const segment of path) {
+          const next = nodes.find((n) => n.isDirectory && n.code === segment);
+          if (!next) return tree;
+          nodes = next.children;
+        }
+        return nodes;
+      };
+      const filtered = (nodes) =>
+        filterDirectory(
+          nodes,
+          state.text,
+          state.tags,
+          state.path.length ? pathKey() + "/" : "",
+        );
+      const flatten = (items, rel = "") =>
+        items.flatMap((item) =>
+          item.isDirectory
+            ? flatten(item.children, rel + item.code + "/")
+            : item.shown
+              ? [{ node: item, rel }]
+              : [],
+        );
+      const countShown = (item) =>
+        item.isDirectory
+          ? item.children.reduce((n, child) => n + countShown(child), 0)
+          : Number(!!item.shown);
+      const catalogOf = (nodes) =>
+        [...tagCatalog(nodes).values()].sort((a, b) =>
+          a.identity < b.identity ? -1 : 1,
+        );
+      const allTags = new Map(catalogOf(tree).map((t) => [t.identity, t]));
+
+      // ---------- Tags: state tags first with icons, then file order (TAG-1..3) ----------
+      const STATES = ["broken", "disabled", "script", "hidden"];
+      const STATE_ICON = {
+        broken: "warning",
+        disabled: "blocked",
+        script: "terminal",
+        hidden: "eyeoff",
+      };
+      const tagLabel = (t) =>
+        `<span class="tag${STATE_ICON[t.identity] ? " state" : ""}" style="${esc(t.style)}">${STATE_ICON[t.identity] ? icon(STATE_ICON[t.identity]) : ""}#${esc(t.label)}</span>`;
+      const tagsHtml = (node, limit) => {
+        const states = STATES.map((s) =>
+          node.tagMetadata.find((t) => t.identity === s),
+        ).filter(Boolean);
+        const rest = node.tagMetadata.filter((t) => !STATES.includes(t.identity));
+        const extra = rest.slice(limit);
+        return `<span class="tags">${states.map(tagLabel).join("")}${rest
+          .slice(0, limit)
+          .map(tagLabel)
+          .join(
+            "",
+          )}${extra.length ? `<span class="tag more" tabindex="0" data-tip="${esc(extra.map((t) => "#" + t.label).join(" · "))}">+${extra.length}</span>` : ""}</span>`;
+      };
+      const chip = (t, selected = false) =>
+        `<button type="button" class="tag chip${STATE_ICON[t.identity] ? " state" : ""}" style="${esc(t.style)}" data-tag="${esc(t.identity)}" ${
+          selected
+            ? `aria-pressed="true" aria-label="Remove #${esc(t.label)} filter"`
+            : `aria-label="Filter by #${esc(t.label)}"`
+        }>${STATE_ICON[t.identity] ? icon(STATE_ICON[t.identity]) : ""}#${esc(t.label)}${selected ? icon("close") : ""}</button>`;
+
+      // ---------- Link row: three core actions + Download (ACT-1..10) ----------
+      const destParts = (url) => {
+        const originLength = new URL(url).origin.length;
+        const path = url.slice(originLength).split(/[?#]/, 1)[0];
+        const split = path.lastIndexOf("/", path.lastIndexOf("/") - 1);
+        const cut = split > 0 ? originLength + split + 1 : url.length;
+        return [url.slice(0, cut), url.slice(cut)];
+      };
+      const copyIcons = `${icon("copy", "ci ci-copy")}${icon("check", "ci ci-check")}${icon("error", "ci ci-err")}`;
+      const row = (node, { depth = 0, path = "", index, tagLimit = 1 } = {}) => {
+        const short = new URL(`/${node.prefix}${node.code}/`, location.origin).href;
+        const [start, end] = destParts(node.url);
+        const classes = ["row", ...STATES.filter((s) => node[s]).map((s) => "s-" + s)];
+        if (index !== undefined && index === state.active) classes.push("active");
+        const code = `<a class="copy code" href="${esc(short)}" data-copy="${esc(short)}" data-kind="short" aria-label="Copy short link for ${esc(node.code)}"${node.title ? ` data-tip="${esc(node.title)}"` : ""}>${path ? `<span class="path">${esc(path)}</span>` : ""}<span class="code-text">${esc(node.code)}</span>${copyIcons}</a>`;
+        const destInner = `<span class="d-text"><span class="d-start">${esc(start)}</span><span class="d-end">${esc(end)}</span></span>${copyIcons}`;
+        const destAttrs = `class="copy dest" data-copy="${esc(node.url)}" data-kind="dest" aria-label="Copy destination for ${esc(node.code)}"`;
+        const dest = node.disabled
+          ? `<button type="button" ${destAttrs}>${destInner}</button>`
+          : `<a href="${esc(node.url)}" ${destAttrs}>${destInner}</a>`;
+        const download = !node.script
+          ? ""
+          : node.disabled
+            ? `<button type="button" class="btn" disabled>${icon("download")}Download</button>`
+            : `<button type="button" class="btn" data-download="${esc(node.url)}" data-name="${esc(downloadName(node.url, node.code))}" aria-label="Download script for ${esc(node.code)}">${icon("download")}Download</button>`;
+        const open = node.disabled
+          ? `<button type="button" class="btn btn-open" disabled>${icon("open")}Open</button>`
+          : `<a class="btn btn-open" href="${esc(node.url)}" aria-label="Open destination for ${esc(node.code)}">${icon("open")}Open</a>`;
+        return `<li class="${classes.join(" ")}" style="--depth:${depth}"${index !== undefined ? ` id="r${index}"` : ""}><span class="c-code">${code}</span><span class="c-tags">${tagsHtml(node, tagLimit)}</span><span class="c-dest">${dest}</span><span class="c-acts"${node.disabled ? ' data-tip="This link is disabled. shl will not forward it."' : ""}>${download}${open}</span></li>`;
+      };
+
+      // ---------- Shared toolbar pieces (A and B) ----------
+      const toolbar = () => `
+        <div class="tools">
+          <h1 class="count" id="count" aria-live="polite" aria-atomic="true"></h1>
+          <div class="tool-actions">
+            <div class="track selected" id="selected" role="region" aria-label="Selected tags" hidden></div>
+            <label class="search">${icon("search", "si")}<span class="sr-only">Search links</span><input id="q" type="search" placeholder="Search link, title or tag" autocomplete="off" /></label>
+            <button type="button" class="btn ghost" id="picker-toggle" aria-expanded="false" aria-controls="available">${icon("tag")}Tags${icon("chev", "chev")}</button>
+          </div>
+          <div class="track available" id="available" role="region" aria-label="Available tags" hidden></div>
+        </div>`;
+      const renderCount = (count) => {
+        $("#count").innerHTML = `<span class="num">${count}</span> ${count === 1 ? "Link" : "Links"}`;
+      };
+      const renderTracks = (catalog) => {
+        const selected = $("#selected");
+        selected.hidden = !state.tags.length;
+        selected.innerHTML = state.tags.map((id) => chip(allTags.get(id), true)).join("");
+        const available = catalog.filter((t) => !state.tags.includes(t.identity));
+        const track = $("#available");
+        track.hidden = !state.picker;
+        track.innerHTML = available.length
+          ? available.map((t) => chip(t)).join("")
+          : '<span class="note">All tags selected.</span>';
+        const toggle = $("#picker-toggle");
+        toggle.setAttribute("aria-expanded", String(state.picker));
+        toggle.disabled = !catalog.length;
+      };
+      const crumbs = () =>
+        `<nav class="crumbs" aria-label="Breadcrumb">${state.path.length ? '<a href="#" data-folder="">Home</a>' : "Home"}${state.path
+          .map(
+            (segment, i) =>
+              ` / ${i < state.path.length - 1 ? `<a href="#" data-folder="${esc(state.path.slice(0, i + 1).join("/"))}">${esc(segment)}</a>` : esc(segment)}`,
+          )
+          .join("")}</nav>`;
+      const renderEmpty = (count) => {
+        const empty = $("#empty");
+        empty.hidden = !!count;
+        empty.textContent = isActive() ? "No links match your search." : "No links listed here.";
+      };
+
+      // ---------- A · Ledger: aligned columns, folders inline as a tree ----------
+      const folderA = (item, depth, active) => {
+        const key = item.prefix + item.code;
+        const open = active ? item.expanded : openFolders.has(key);
+        return `<li class="folder" style="--depth:${depth}"><details data-key="${esc(key)}"${open ? " open" : ""}><summary>${icon("chev", "chev")}${icon("folder", "fi")}<a href="#" class="fname" data-folder="${esc(key)}">${esc(item.code)}</a><span class="fcount">${countShown(item)}</span></summary><ul class="list">${listA(item.children, depth + 1, active)}</ul></details></li>`;
+      };
+      const listA = (items, depth, active) =>
+        items
+          .filter((item) => item.shown)
+          .map((item) => (item.isDirectory ? folderA(item, depth, active) : row(item, { depth })))
+          .join("");
+      const A = {
+        key: "A",
+        name: "Ledger",
+        mount(main) {
+          main.innerHTML = `${toolbar()}<div id="crumbs"></div><div class="ledger-head" aria-hidden="true"><span>Short link</span><span>Tags</span><span>Destination</span><span>Actions</span></div><p class="empty" id="empty" hidden></p><ul class="list ledger" id="list"></ul>`;
+        },
+        update() {
+          const nodes = nodesAt(state.path);
+          const { items, count, active } = filtered(nodes);
+          renderCount(count);
+          renderTracks(catalogOf(nodes));
+          $("#crumbs").innerHTML = crumbs();
+          $("#list").innerHTML = listA(items, 0, active);
+          renderEmpty(count);
+          return count;
+        },
+        notes: `<h2>A · Ledger</h2>
+          <p>Closest to today's page, tightened into aligned columns: short link, tags, destination, actions. Folders stay inline as an expandable tree; depth indents only the code column, so the other columns line up down the whole page.</p>
+          <h3>What it tests</h3>
+          <ul><li>Whether fixed columns make a long list easier to scan (TYP-4 split truncation in a fixed-width destination column).</li><li>Whether a column header is worth its space.</li><li>Tree indentation that doesn't break column alignment (LAY-2).</li></ul>
+          <h3>Watch for</h3>
+          <ul><li>The tags column shows one descriptive tag plus “+N”: does that hide too much?</li><li>Deep folders squeeze the code column.</li></ul>
+          <h3>Finding for the requirements</h3><ul><li>At 375px, a code plus its state tags doesn’t fit on one line beside Open/Download, so state tags would clip (breaking TAG-3). The prototype gives tags their own line on narrow screens, making tagged rows three lines instead of the two §4.5 asks for.</li></ul>`,
+      };
+
+      // ---------- B · Finder: folder sidebar, flat list per folder ----------
+      const treeB = (nodes, depth) =>
+        nodes
+          .filter((n) => n.isDirectory && n.visible)
+          .map((n) => {
+            const key = n.prefix + n.code;
+            const current = pathKey() === key;
+            const onPath = (pathKey() + "/").startsWith(key + "/");
+            return `<li><a href="#" class="tnode" data-folder="${esc(key)}" style="--depth:${depth}"${current ? ' aria-current="page"' : ""}>${icon("folder", "fi")}<span>${esc(n.code)}</span><span class="fcount">${n.visible}</span></a>${onPath ? `<ul>${treeB(n.children, depth + 1)}</ul>` : ""}</li>`;
+          })
+          .join("");
+      const B = {
+        key: "B",
+        name: "Finder",
+        mount(main) {
+          main.innerHTML = `<div class="finder"><button type="button" class="btn folder-btn" id="folder-btn" aria-expanded="false" aria-controls="side">${icon("folder")}<span id="folder-label"></span>${icon("chev", "chev")}</button><aside class="side" id="side" aria-label="Folders"><ul class="tree" id="tree"></ul></aside><div class="pane"><div id="crumbs"></div>${toolbar()}<p class="empty" id="empty" hidden></p><ul class="list flat" id="list"></ul></div></div>`;
+        },
+        update() {
+          const nodes = nodesAt(state.path);
+          const { items, count, active } = filtered(nodes);
+          renderCount(count);
+          renderTracks(catalogOf(nodes));
+          $("#crumbs").innerHTML = crumbs();
+          const total = tree.reduce((n, node) => n + node.visible, 0);
+          $("#tree").innerHTML = `<li><a href="#" class="tnode" data-folder="" style="--depth:0"${state.path.length ? "" : ' aria-current="page"'}>${icon("folder", "fi")}<span>All links</span><span class="fcount">${total}</span></a></li>${treeB(tree, 1)}`;
+          $("#folder-label").textContent = state.path.length ? `/${pathKey()}/` : "All links";
+          const shown = items.filter((item) => item.shown);
+          $("#list").innerHTML = active
+            ? flatten(items).map(({ node, rel }) => row(node, { path: rel })).join("")
+            : shown
+                .filter((item) => item.isDirectory)
+                .map(
+                  (item) =>
+                    `<li class="frow"><a href="#" class="frow-link" data-folder="${esc(item.prefix + item.code)}">${icon("folder", "fi")}<span class="fname">${esc(item.code)}</span><span class="fcount">${countShown(item)} ${countShown(item) === 1 ? "link" : "links"}</span>${icon("chev", "chev-r")}</a></li>`,
+                )
+                .join("") +
+              shown
+                .filter((item) => !item.isDirectory)
+                .map((item) => row(item))
+                .join("");
+          renderEmpty(count);
+          return count;
+        },
+        notes: `<h2>B · Finder</h2>
+          <p>Folders move into a persistent sidebar; the main pane lists one folder at a time, subfolders first. Searching flattens matches from the whole subtree and prefixes each code with its relative path.</p>
+          <h3>What it tests</h3>
+          <ul><li>Whether folders deserve a permanent place, or are rarely used next to search.</li><li>The accent as “current context” (COL-10) in the sidebar.</li><li>On narrow screens, the sidebar becomes a folder button that opens the tree.</li></ul>
+          <h3>Watch for</h3>
+          <ul><li>Two navigation systems at once (sidebar and breadcrumbs).</li><li>The sidebar costs 15rem of width that destinations could use.</li></ul>
+          <h3>Finding for the requirements</h3><ul><li>At 375px, a code plus its state tags doesn’t fit on one line beside Open/Download, so state tags would clip (breaking TAG-3). The prototype gives tags their own line on narrow screens, making tagged rows three lines instead of the two §4.5 asks for.</li></ul>`,
+      };
+
+      // ---------- C · Launcher: search first, flat results grouped by folder ----------
+      let flatC = [];
+      const C = {
+        key: "C",
+        name: "Launcher",
+        mount(main) {
+          main.innerHTML = `<div class="launcher"><div class="hero"><p class="count-line" id="count" aria-live="polite" aria-atomic="true"></p><label class="search big">${icon("search", "si")}<span class="sr-only">Search links</span><input id="q" type="search" placeholder="Search links, titles or #tags" autocomplete="off" aria-controls="list" /></label><p class="hints"><kbd>↑</kbd> <kbd>↓</kbd> select · <kbd>Enter</kbd> open · <kbd>Shift</kbd>+<kbd>Enter</kbd> copy short link · <kbd>Alt</kbd>+<kbd>Enter</kbd> copy destination</p><div class="facets collapsed" id="facets" role="group" aria-label="Filter by tag"></div><button type="button" class="btn ghost facets-more" id="facets-more" aria-expanded="false" aria-controls="facets">All tags${icon("chev", "chev")}</button></div><p class="empty" id="empty" hidden></p><div class="launch" id="list"></div></div>`;
+          $("#q").addEventListener("keydown", keysC);
+        },
+        update() {
+          const { items, count } = filterDirectory(tree, state.text, state.tags);
+          $("#count").innerHTML = `<span class="num">${count}</span> ${count === 1 ? "link" : "links"}`;
+          const rest = catalogOf(tree).filter((t) => !state.tags.includes(t.identity));
+          $("#facets").innerHTML =
+            state.tags.map((id) => chip(allTags.get(id), true)).join("") +
+            (state.tags.length && rest.length ? '<span class="sep" aria-hidden="true"></span>' : "") +
+            rest.map((t) => chip(t)).join("");
+          flatC = flatten(items);
+          state.active = Math.min(state.active, Math.max(0, flatC.length - 1));
+          let html = "";
+          let group = null;
+          flatC.forEach(({ node }, index) => {
+            if (node.prefix !== group) {
+              if (group !== null) html += "</ul></section>";
+              group = node.prefix;
+              html += `<section class="group"><h2>${group ? esc("/" + group) : "/"}</h2><ul class="list">`;
+            }
+            html += row(node, { index, tagLimit: 3 });
+          });
+          if (group !== null) html += "</ul></section>";
+          $("#list").innerHTML = html;
+          renderEmpty(count);
+          return count;
+        },
+        notes: `<h2>C · Launcher</h2>
+          <p>Search is the page. One big field, every tag visible as a facet, and results grouped under their folder path. Folders aren't browsed; they're headings. The keyboard drives all three actions: <code>Enter</code> opens, <code>Shift+Enter</code> copies the short link, <code>Alt+Enter</code> copies the destination.</p>
+          <h3>What it tests</h3>
+          <ul><li>Whether people come to shl to find one link fast rather than to browse.</li><li>Keyboard-first use of the three core actions.</li></ul>
+          <h3>Deviates from the requirements</h3>
+          <ul><li>Rows are two-line at every width (§4.5 says two-line only at ≤740px).</li><li>Tags are always visible as facets instead of behind the Tags toggle (§4.3).</li><li>No folder pages: breadcrumbs and folder rows are gone (§4.2, §4.6).</li></ul>
+          <h3>Finding for the requirements</h3><ul><li>At 375px, a code plus its state tags doesn’t fit on one line beside Open/Download, so state tags would clip (breaking TAG-3). The prototype gives tags their own line on narrow screens, making tagged rows three lines instead of the two §4.5 asks for.</li></ul>`,
+      };
+      const keysC = (event) => {
+        if (!flatC.length || event.isComposing) return;
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+          event.preventDefault();
+          const step = event.key === "ArrowDown" ? 1 : -1;
+          state.active = (state.active + step + flatC.length) % flatC.length;
+          document.querySelector(".launch .row.active")?.classList.remove("active");
+          const next = document.querySelector(`#r${state.active}`);
+          next?.classList.add("active");
+          next?.scrollIntoView({ block: "nearest" });
+          readout();
+        } else if (event.key === "Enter") {
+          event.preventDefault();
+          const current = document.querySelector(`#r${state.active}`);
+          if (event.shiftKey) copy(current.querySelector(".code"));
+          else if (event.altKey) copy(current.querySelector(".dest"));
+          else {
+            const open = current.querySelector("a.btn-open");
+            if (open) location.href = open.href;
+            else showStatus("This link is disabled. Open is unavailable, but both copies work.");
+          }
+        }
+      };
+
+      // ---------- Variant switching ----------
+      const VARIANTS = [A, B, C];
+      let variant =
+        VARIANTS.find((v) => v.key === new URL(location.href).searchParams.get("variant")) ?? A;
+      let lastCount = 0;
+      const readout = () => {
+        $("#proto-label").textContent = `${variant.key} · ${variant.name}`;
+        $("#proto-state").textContent = `/${state.path.length ? pathKey() + "/" : ""} · "${state.text}" · ${
+          state.tags.map((t) => "#" + t).join(" ") || "no tags"
+        } · ${lastCount} shown${variant.key === "C" ? ` · row ${state.active + 1}` : ""}`;
+        $("#proto-notes").innerHTML = variant.notes;
+      };
+      const update = () => {
+        lastCount = variant.update();
+        readout();
+      };
+      const mount = () => {
+        hideTip();
+        variant.mount($("#main"));
+        const q = $("#q");
+        q.value = state.text;
+        q.addEventListener("input", () => {
+          state.text = q.value;
+          state.active = 0;
+          update();
+        });
+        update();
+      };
+      const setVariant = (step) => {
+        const index = VARIANTS.indexOf(variant);
+        variant = VARIANTS[(index + step + VARIANTS.length) % VARIANTS.length];
+        const url = new URL(location.href);
+        url.searchParams.set("variant", variant.key);
+        history.replaceState(null, "", url);
+        mount();
+      };
+      $("#proto-prev").addEventListener("click", () => setVariant(-1));
+      $("#proto-next").addEventListener("click", () => setVariant(1));
+      $("#proto-notes-toggle").addEventListener("click", (event) => {
+        const notes = $("#proto-notes");
+        notes.hidden = !notes.hidden;
+        event.currentTarget.setAttribute("aria-expanded", String(!notes.hidden));
+      });
+
+      // ---------- Copy (ACT-5/6/9) ----------
+      const copyTimers = new WeakMap();
+      const announce = (message) => {
+        $("#announce").textContent = "";
+        requestAnimationFrame(() => ($("#announce").textContent = message));
+      };
+      let statusTimer;
+      const showStatus = (message) => {
+        clearTimeout(statusTimer);
+        $("#status").textContent = message;
+        statusTimer = setTimeout(() => ($("#status").textContent = ""), 5000);
+      };
+      const copy = async (control) => {
+        clearTimeout(copyTimers.get(control));
+        delete control.dataset.state;
+        const kind = control.dataset.kind;
+        try {
+          await navigator.clipboard.writeText(control.dataset.copy);
+          control.dataset.state = "copied";
+          announce(kind === "short" ? "Short link copied." : "Destination copied.");
+          showBubble(control);
+        } catch {
+          control.dataset.state = "failed";
+          showStatus(
+            kind === "short"
+              ? "Could not copy the link. Try your browser’s copy-link action."
+              : "Could not copy the link. Select and copy the destination text.",
+          );
+        }
+        copyTimers.set(
+          control,
+          setTimeout(() => delete control.dataset.state, 1500),
+        );
+      };
+
+      // ---------- Tooltip and bubble (§4.9) ----------
+      const tip = $("#tip");
+      const bubble = $("#bubble");
+      let tipTimer;
+      let tipFor = null;
+      const place = (element, anchor) => {
+        element.hidden = false;
+        const rect = anchor.getBoundingClientRect();
+        const width = element.offsetWidth;
+        const height = element.offsetHeight;
+        const x = Math.max(8, Math.min(rect.left + rect.width / 2 - width / 2, innerWidth - width - 8));
+        const y = rect.top - height - 6 < 8 ? rect.bottom + 6 : rect.top - height - 6;
+        element.style.left = `${x}px`;
+        element.style.top = `${y}px`;
+        requestAnimationFrame(() => element.classList.add("show"));
+      };
+      const showTip = (anchor, immediate) => {
+        clearTimeout(tipTimer);
+        if (tipFor && tipFor !== anchor) hideTip();
+        tipFor = anchor;
+        tipTimer = setTimeout(
+          () => {
+            tip.textContent = anchor.dataset.tip;
+            anchor.setAttribute("aria-describedby", "tip");
+            place(tip, anchor);
+          },
+          immediate ? 0 : 500,
+        );
+      };
+      function hideTip() {
+        clearTimeout(tipTimer);
+        tip.classList.remove("show");
+        tip.hidden = true;
+        tipFor?.removeAttribute("aria-describedby");
+        tipFor = null;
+      }
+      let bubbleTimer;
+      const showBubble = (anchor) => {
+        hideTip();
+        clearTimeout(bubbleTimer);
+        bubble.classList.remove("show");
+        bubble.textContent = "Copied";
+        place(bubble, anchor.querySelector(".ci-check") ?? anchor);
+        bubbleTimer = setTimeout(() => {
+          bubble.classList.remove("show");
+          bubble.hidden = true;
+        }, 1500);
+      };
+      document.addEventListener("pointerover", (event) => {
+        const anchor = event.target.closest?.("[data-tip]");
+        if (anchor && anchor !== tipFor) showTip(anchor, false);
+      });
+      document.addEventListener("pointerout", (event) => {
+        const anchor = event.target.closest?.("[data-tip]");
+        if (anchor && !anchor.contains(event.relatedTarget)) hideTip();
+      });
+      document.addEventListener("focusin", (event) => {
+        const anchor = event.target.closest?.("[data-tip]");
+        if (anchor && event.target.matches(":focus-visible")) showTip(anchor, true);
+      });
+      document.addEventListener("focusout", (event) => {
+        if (event.target.closest?.("[data-tip]")) hideTip();
+      });
+      addEventListener("scroll", hideTip, { passive: true });
+
+      // ---------- Download (unchanged behavior) ----------
+      const download = async (button) => {
+        button.disabled = true;
+        button.setAttribute("aria-busy", "true");
+        try {
+          const response = await fetch(button.dataset.download);
+          if (!response.ok || response.type === "opaque") throw new Error();
+          const url = URL.createObjectURL(await response.blob());
+          const link = Object.assign(document.createElement("a"), {
+            href: url,
+            download: button.dataset.name,
+          });
+          link.click();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          showStatus("Script download started.");
+        } catch {
+          showStatus("Could not download the script. Check the destination and whether its host allows CORS.");
+        } finally {
+          button.disabled = false;
+          button.removeAttribute("aria-busy");
+        }
+      };
+
+      // ---------- Delegated interactions ----------
+      document.addEventListener("click", (event) => {
+        const plain =
+          event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+        const copyControl = event.target.closest(".copy[data-copy]");
+        if (copyControl && plain) {
+          event.preventDefault();
+          copy(copyControl);
+          return;
+        }
+        const folder = event.target.closest("[data-folder]");
+        if (folder && plain) {
+          event.preventDefault();
+          state.path = folder.dataset.folder ? folder.dataset.folder.split("/") : [];
+          state.active = 0;
+          $("#side")?.classList.remove("open");
+          $("#folder-btn")?.setAttribute("aria-expanded", "false");
+          update();
+          return;
+        }
+        const tagButton = event.target.closest("button[data-tag]");
+        if (tagButton) {
+          const id = tagButton.dataset.tag;
+          const removing = state.tags.includes(id);
+          const neighbor = removing
+            ? (tagButton.nextElementSibling ?? tagButton.previousElementSibling)?.dataset?.tag
+            : null;
+          state.tags = removing ? state.tags.filter((t) => t !== id) : [...state.tags, id];
+          state.active = 0;
+          update();
+          const target = removing
+            ? (neighbor && state.tags.includes(neighbor) && document.querySelector(`[aria-pressed="true"][data-tag="${CSS.escape(neighbor)}"]`)) || $("#q")
+            : document.querySelector(`[aria-pressed="true"][data-tag="${CSS.escape(id)}"]`);
+          target?.focus({ preventScroll: true });
+          return;
+        }
+        if (event.target.closest("#facets-more")) {
+          const facets = $("#facets");
+          facets.classList.toggle("collapsed");
+          $("#facets-more").setAttribute("aria-expanded", String(!facets.classList.contains("collapsed")));
+          return;
+        }
+        if (event.target.closest("#picker-toggle")) {
+          state.picker = !state.picker;
+          update();
+          return;
+        }
+        if (event.target.closest("#folder-btn")) {
+          const side = $("#side");
+          side.classList.toggle("open");
+          $("#folder-btn").setAttribute("aria-expanded", String(side.classList.contains("open")));
+          return;
+        }
+        const downloadButton = event.target.closest("button[data-download]");
+        if (downloadButton && plain) download(downloadButton);
+      });
+      document.addEventListener(
+        "toggle",
+        (event) => {
+          const key = event.target.dataset?.key;
+          if (key === undefined || isActive()) return;
+          if (event.target.open) openFolders.add(key);
+          else openFolders.delete(key);
+        },
+        true,
+      );
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") hideTip();
+        const typing = event.target.closest?.("input, textarea, [contenteditable]");
+        if (typing || event.altKey || event.metaKey || event.ctrlKey) return;
+        if (event.key === "ArrowLeft") setVariant(-1);
+        if (event.key === "ArrowRight") setVariant(1);
+      });
+
+      // ---------- Theme: System → Light → Dark → System (§4.1) ----------
+      const THEMES = ["system", "light", "dark"];
+      const THEME_LABELS = { system: "System", light: "Light", dark: "Dark" };
+      let theme = "system";
+      try {
+        theme = THEMES.includes(localStorage.getItem("shl-prototype-theme"))
+          ? localStorage.getItem("shl-prototype-theme")
+          : "system";
+      } catch {}
+      const applyTheme = () => {
+        if (theme === "system") delete document.documentElement.dataset.theme;
+        else document.documentElement.dataset.theme = theme;
+        const button = $("#theme");
+        button.innerHTML = `${icon(theme)}${THEME_LABELS[theme]}`;
+        button.setAttribute("aria-label", `Theme: ${THEME_LABELS[theme]}`);
+      };
+      $("#theme").addEventListener("click", () => {
+        theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+        try {
+          localStorage.setItem("shl-prototype-theme", theme);
+        } catch {}
+        if (document.startViewTransition && !matchMedia("(prefers-reduced-motion: reduce)").matches)
+          document.startViewTransition(applyTheme);
+        else applyTheme();
+      });
+      applyTheme();
+      mount();
+    </script>
+  </body>
+</html>

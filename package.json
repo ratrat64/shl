@@ -7,7 +7,8 @@
     "format:check": "prettier --check build.mjs src test .github/workflows package.json 'links.{json,yaml,yml}' --no-error-on-unmatched-pattern",
     "build": "bun build.mjs",
     "test": "bun test --timeout 30000 ./test/build.test.mjs",
-    "dev": "bun build.mjs && bunx --bun http-server@14.1.1 dist -c-1"
+    "dev": "bun build.mjs && bunx --bun http-server@14.1.1 dist -c-1",
+    "prototype": "bun prototype/design-concepts/serve.mjs"
   },
   "dependencies": {
     "vue": "3.5.22",
