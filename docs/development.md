@@ -93,10 +93,13 @@ A successful build deletes and recreates `dist/`. Edit sources, not generated fi
 | --- | --- |
 | `build.mjs` | Entry point forwarding to the builder. |
 | `src/build.mjs` | Validate input and generate site output and native assets. |
-| `src/links.mjs` | Input validation, leaf interpretation, directory tree, and counts. |
+| `src/links.mjs` | Build-only filesystem/YAML loading and input validation. |
+| `src/directory-model.mjs` | Browser-safe entry interpretation, tree, filter policy and published tag metadata. |
+| `src/directory-components.mjs` | Shared Vue render functions for SSR/hydrated directories and static Guide rows. |
+| `src/directory-state.mjs` | Reactive directory state and computed filtering. |
 | `src/pages.mjs` | Guide, redirect/disabled pages, legacy forwarding, 404, and Bash launchers. |
 | `src/layout.mjs` | Shared document foundations and shell. |
-| `src/directory.mjs` | Homepage and nested directory components. |
+| `src/directory.mjs` | Vue server rendering and safely serialized directory model publication. |
 | `src/assets/site.css` | Shared styles, controls, and design tokens. |
 | `src/assets/*.js` | Native browser behavior, navigation, and content lifecycle. |
 | `src/styles.mjs`, `src/browser.mjs` | Module-relative loading of styles/theme for embedded documents. |
@@ -107,6 +110,14 @@ Keep shared UI ownership and styling consistent with
 Reuse existing helpers and components; keep unique content inside `<main>`.
 HTML templates remain in `.mjs`; `/* HTML */` comments enable embedded formatting.
 Preserve escaping and whitespace-sensitive code samples.
+
+### Vue directory pilot
+
+`bun ci` installs pinned Vue; Bun 1.4.2 uses `vue/server-renderer` for complete static listings and bundles `src/assets/search.js` with its browser-safe component/model/state imports into one self-contained directory runtime. Module-relative entry resolution supports fixture builds from unrelated directories. The same bundle is emitted externally and embedded in 404; it has no remote imports or chunks. Minimal pages keep only their existing native foundations. No Nuxt, Vue Router, Pinia, backend, renderer mode or competing markup/state owner is introduced.
+
+Hydrate defaults first, then restore the tab session without saving. The uncontrolled input preserves native caret/undo. Navigation extracts inert incoming models before stripping scripts, resolves relative paths against the incoming URL and updates retained Vue instances. It awaits DOM flushes and checks cancellation before mounting services/history/focus; searchless or different-base transitions unmount normally. Vue owns chips/count/filter visibility; editing, synchronous mutation saves and motion remain native policy in search. Existing shell/theme/recovery/copy/download services retain their responsibilities.
+
+Run `bun run format`, `bun run format:check`, `SHL_REQUIRE_BROWSER=1 bun test --timeout 30000 ./test/build.test.mjs`, `bun build.mjs`, and `git diff --check`. Browser assertions await `directoryTick()` after mutations; synchronous-save assertions run before that await. Hydration checks must catch warnings and SSR-node replacement, and hostile model data must remain lossless and script-safe. Compare handwritten additions/removals against the pilot baseline, including adapters/build wiring; moved code is not simplification.
 
 Links, folders, Guide, and 404 use the full shared shell. Destination/legacy
 redirects and disabled explanations use the minimal document without chrome.

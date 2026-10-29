@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { loadLinks } from "./links.mjs";
 import { indexPage, directoryPage } from "./directory.mjs";
 import { GUIDE_NAV } from "./layout.mjs";
-import { recoveryScript } from "./browser.mjs";
+import { recoveryScript, directoryScript } from "./browser.mjs";
 import {
   redirectPage,
   scriptLauncher,
@@ -37,6 +37,7 @@ await cp(new URL("./assets/", import.meta.url), join(OUT, "assets"), {
   recursive: true,
 });
 await writeFile(join(OUT, "assets/recovery.js"), recoveryScript);
+await writeFile(join(OUT, "assets/search.js"), directoryScript);
 
 for (const link of links) {
   await mkdir(join(OUT, link.code), { recursive: true });
@@ -45,12 +46,15 @@ for (const link of links) {
     await writeFile(join(OUT, `${link.code}.sh`), scriptLauncher(link));
 }
 
-await writeFile(join(OUT, "index.html"), indexPage({ raw, links, source }));
+await writeFile(
+  join(OUT, "index.html"),
+  await indexPage({ raw, links, source }),
+);
 for (const directory of directories.slice(1)) {
   await mkdir(join(OUT, ...directory.path), { recursive: true });
   await writeFile(
     join(OUT, ...directory.path, "index.html"),
-    directoryPage({ ...directory, raw }),
+    await directoryPage({ ...directory, raw }),
   );
 }
 for (const [name, page] of [
@@ -59,7 +63,7 @@ for (const [name, page] of [
   ["how-it-works", () => oldInfoPage("how-it-works")],
 ]) {
   await mkdir(join(OUT, name), { recursive: true });
-  await writeFile(join(OUT, name, "index.html"), page());
+  await writeFile(join(OUT, name, "index.html"), await page());
 }
 await writeFile(join(OUT, "404.html"), notFoundPage());
 await writeFile(join(OUT, "links.json"), JSON.stringify(raw, null, 2));

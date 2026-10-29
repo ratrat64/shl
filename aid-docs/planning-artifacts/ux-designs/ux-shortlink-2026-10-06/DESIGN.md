@@ -88,6 +88,8 @@ Link rows and folder summaries are unruled with subtle 4px corners. Inputs and c
 
 ### Ownership and composition
 
+The approved Vue directory pilot (2026-10-27) uses one `.mjs` render-function definition for SSR and browser hydration of directory tools, listings, tags and Guide rows. Browser-safe model metadata and reactive filtering replace string/DOM reconciliation; the existing shell/navigation/theme/recovery/copy/download owners remain authoritative. This changes implementation, not appearance or interaction contracts. Hydrate defaults before restoring filters, retain uncontrolled input/caret and connected keyed controls on eligible navigation, and await Vue DOM flushes in rendered checks without deferring mutation saves. No renderer modes or duplicate owners. Use Bun 1.4.2 with `bun ci`, formatting/check, the required-browser suite and `bun build.mjs` as documented in `docs/development.md`.
+
 Follow AD-7–AD-9 in the [architecture spine](../../architecture/architecture-shortlink-2026-10-04/ARCHITECTURE-SPINE.md). Every HTML page reuses the document, theme, and style foundations. Browsable pages compose the same header/navigation/theme-control/footer shell; destination and legacy redirects select the minimal document without chrome. Shared components keep the same geometry, typography, color, spacing, and responsive behavior at equal viewport/theme, except active navigation state. Page-specific content stays inside main; it cannot restyle chrome. Variants identify component purpose or state, never page identity. Shared markup alone does not establish visual consistency: verify computed appearance and page/navigation states.
 
 ### Navigation

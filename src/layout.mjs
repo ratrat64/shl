@@ -20,7 +20,6 @@ export const NAV_ITEMS = [
 ];
 export const GUIDE_NAV = NAV_ITEMS.find(({ key }) => key === "guide");
 
-const countLabels = { singular: "Link", plural: "Links" };
 const themeLabels = {
   system: "system",
   light: "light",
@@ -34,10 +33,10 @@ const themeIcons = {
   dark: `<svg ${iconSvgAttrs}><path d="M13.5 8.5A5.5 5.5 0 1 1 7.5 2.5a4.5 4.5 0 0 0 6 6z"/></svg>`,
 };
 
-export const pageTitle = (title, count) => /* HTML */ `
-  <h1${count === undefined ? "" : ' id="link-count"'} class="page-title"${count === undefined ? "" : ` aria-live="polite" aria-atomic="true" data-label-singular="${esc(countLabels.singular)}" data-label-plural="${esc(countLabels.plural)}"`}>
-    <span class="count-number"${count === undefined ? ' aria-hidden="true"' : ""}>${count === undefined ? "" : esc(count)}</span
-    ><span class="count-label">${count === undefined ? esc(title) : " " + esc(count === 1 ? countLabels.singular : countLabels.plural)}</span>
+export const pageTitle = (title) =>
+  /* HTML */ ` <h1 class="page-title">
+    <span class="count-number" aria-hidden="true"></span
+    ><span class="count-label">${esc(title)}</span>
   </h1>`;
 
 const header = (active, depth) =>
